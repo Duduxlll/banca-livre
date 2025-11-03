@@ -1,4 +1,4 @@
- /* =========================================
+/* =========================================
    area.js — Bancas & Pagamentos (via API) c/ transições suaves
    - Bancas: Nome | Depósito | Banca(editável) | Ações
    - Pagamentos: Nome | Pagamento | Ações (Fazer PIX, Pago/Não pago, Excluir)
@@ -158,6 +158,7 @@ function renderPagamentos(){
 }
 
 /* ========== AÇÕES PRINCIPAIS (API) ========== */
+
 async function setTab(tab){
   if (TAB === tab) return;
   TAB = tab;
@@ -172,22 +173,21 @@ async function setTab(tab){
   const toShow = (tab === 'bancas') ? vB : vP;
   const toHide = (tab === 'bancas') ? vP : vB;
 
-  // põe skeleton na próxima aba enquanto carrega
+  // skeleton da próxima aba
   if (tab === 'bancas') showSkeleton(tbodyBancas);
   else                  showSkeleton(tbodyPags);
 
-  // inicia transição: esconde atual e prepara próxima
+  // prepara transição
   toHide?.classList.remove('show');
   toHide?.classList.add('transitioning');
   toShow?.classList.add('transitioning');
 
-  // aguarda 1 frame para o CSS aplicar
+  // aguarda 1 frame p/ CSS aplicar
   await new Promise(r => requestAnimationFrame(()=>r()));
 
-  // mostra próxima (fade/slide controlado pelo CSS)
+  // mostra próxima (fade/slide pelo CSS)
   toShow?.classList.add('show');
 
-  // busca em background sem travar a animação
   try {
     if (tab === 'bancas') {
       await loadBancas();
@@ -203,7 +203,6 @@ async function setTab(tab){
     hideSkeleton(tab === 'bancas' ? tbodyBancas : tbodyPags);
   }
 
-  // encerra transição
   toHide?.classList.remove('transitioning');
   toShow?.classList.remove('transitioning');
 }
@@ -409,7 +408,6 @@ function showStatusMenu(anchorBtn, id, current){
 function hideStatusMenu(){
   if(statusMenuEl){
     statusMenuEl.classList.remove('show');
-    m = statusMenuEl;
     statusMenuEl.style.display = 'none';
   }
   statusMenuId = null;
@@ -480,7 +478,7 @@ document.addEventListener('blur', async (e)=>{
   }
 }, true);
 
-// busca
+// busca (com filtro simples)
 function filtrarTabela(tbody, q){
   if(!tbody) return;
   const query = (q||'').trim().toLowerCase();

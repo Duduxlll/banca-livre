@@ -362,3 +362,9 @@ body{
 
 /* mantém a hierarquia de camadas ok (já tinha no seu CSS) */
 .status-float{ z-index: 99999; }
+/* MOSTRAR mesmo sem a classe .transitioning (fallback) */
+.tab-view.show{
+  display:block;
+  opacity:1;           /* <- garante visível */
+  transform:none;      /* <- sem deslize se não tiver transitioning */
+}

@@ -9,11 +9,6 @@
   <link rel="stylesheet" href="assets/css/area.css">
 </head>
 <body>
-
-
-
-
-
   <!-- Banner grande com logo -->
   <header class="hero">
     <div class="hero-overlay"></div>
@@ -37,17 +32,13 @@
         <button class="nav-btn active" data-tab="bancas">Bancas</button>
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">Sair</button>
-
-
-
-
       </nav>
     </aside>
 
     <!-- Conteúdo -->
     <section class="content">
       <!-- TAB: BANCAS -->
-      <div class="tab show" id="tab-bancas">
+      <div class="tab tab-view show" id="tab-bancas">
         <div class="bar">
           <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
         </div>
@@ -69,8 +60,8 @@
         </div>
       </div>
 
-      <!-- TAB: PAGAMENTOS (apenas Nome e Pagamento) -->
-      <div class="tab" id="tab-pagamentos">
+      <!-- TAB: PAGAMENTOS -->
+      <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
             <table class="table" id="tblPagamentos" aria-label="Tabela de Pagamentos">
@@ -90,19 +81,9 @@
   </main>
 
   <div class="toast" id="toast"></div>
-  <script src="assets/js/area.js"></script>
-  <!-- NÃO deixe nenhum <script> inline -->
-<script src="assets/js/session.js" defer></script>
-<script src="assets/js/area.js" defer></script>
 
-
-
-
-
-
-
-
-
+  <!-- Ordem correta: primeiro sessão, depois área -->
+  <script src="assets/js/session.js" defer></script>
+  <script src="assets/js/area.js" defer></script>
 </body>
 </html>
-
