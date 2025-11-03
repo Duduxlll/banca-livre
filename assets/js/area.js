@@ -52,15 +52,16 @@ const STATE = {
 
 /* ========== Carregamento (preenche STATE) ========== */
 async function loadBancas() {
-  const list = await apiFetch('/api/bancas');
+  const list = await apiFetch(`/api/bancas`);
   STATE.bancas = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
   return STATE.bancas;
 }
 async function loadPagamentos() {
-  const list = await apiFetch('/api/pagamentos');
+  const list = await apiFetch(`/api/pagamentos`);
   STATE.pagamentos = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
   return STATE.pagamentos;
 }
+
 
 /* ========== Render ========== */
 async function render(){
@@ -150,14 +151,32 @@ async function refresh(){
   render();
 }
 
+function getBancaInputById(id){
+  return document.querySelector(`input[data-role="banca"][data-id="${CSS.escape(id)}"]`);
+}
+
 async function toPagamento(id){
+  // 1) Se houver edição no input, salva via PATCH antes de mover
+  const inp = getBancaInputById(id);
+  if (inp) {
+    const cents = toCents(inp.value);
+    await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, {
+      method:'PATCH',
+      body: JSON.stringify({ bancaCents: cents })
+    });
+  }
+
+  // 2) Agora move para pagamentos
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}/to-pagamento`, { method:'POST' });
+
+  // 3) Recarrega as listas e re-renderiza
   TAB = 'pagamentos';
   localStorage.setItem('area_tab', TAB);
   await Promise.all([loadBancas(), loadPagamentos()]);
   render();
-  setupAutoDeleteTimers(); // reprograma timers para pagos existentes
+  setupAutoDeleteTimers();
 }
+
 
 async function deleteBanca(id){
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, { method:'DELETE' });

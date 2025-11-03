@@ -326,38 +326,38 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
 });
 
 app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
-  const client = await pool.connect();
-  try{
-    await client.query('BEGIN');
-    const bRes = await client.query(
-      `SELECT id, nome, deposito_cents, COALESCE(banca_cents, deposito_cents) AS valor,
-              pix_type, pix_key, created_at
-       FROM bancas WHERE id = $1 FOR UPDATE`, [req.params.id]
-    );
-    if (!bRes.rows.length) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'not_found' });
-    }
-    const b = bRes.rows[0];
+  const { bancaCents } = req.body || {};
+  const db = await readDB();
+  const ix = db.bancas.findIndex(x => x.id === req.params.id);
+  if (ix < 0) return res.status(404).json({ error: 'not_found' });
 
-    await client.query(`DELETE FROM bancas WHERE id = $1`, [req.params.id]);
+  const b = db.bancas[ix];
 
-    await client.query(
-      `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, status, paid_at, created_at)
-       VALUES ($1,$2,$3,$4,$5,'nao_pago',NULL,$6)`,
-      [b.id, b.nome, b.valor, b.pix_type, b.pix_key, b.created_at]
-    );
-
-    await client.query('COMMIT');
-    res.json({ ok:true });
-  }catch(e){
-    await client.query('ROLLBACK');
-    console.error(e);
-    res.status(500).json({ error: 'fail' });
-  }finally{
-    client.release();
+  // Se o cliente mandou um override válido, aplica antes de mover
+  if (typeof bancaCents === 'number' && bancaCents >= 0) {
+    b.bancaCents = bancaCents;
   }
+
+  db.bancas.splice(ix,1);
+
+  const valor = (typeof b.bancaCents === 'number' && b.bancaCents>0)
+    ? b.bancaCents
+    : b.depositoCents;
+
+  db.pagamentos.push({
+    id: b.id,
+    nome: b.nome,
+    pagamentoCents: valor,
+    pixType: b.pixType || null,
+    pixKey:  b.pixKey  || null,
+    status: 'nao_pago',
+    createdAt: b.createdAt
+  });
+
+  await writeDB(db);
+  res.json({ ok:true });
 });
+
 
 app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
   const r = await pool.query(`DELETE FROM bancas WHERE id = $1`, [req.params.id]);
