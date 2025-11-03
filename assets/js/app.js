@@ -1,0 +1,296 @@
+/* =========================================
+   Depósito PIX – front (HTML/CSS intactos)
+   - Cria modal de QR por JS
+   - Chama backend Efi (cob/status)
+   - Ao confirmar: salva em localStorage (bancas) e NÃO redireciona
+   ========================================= */
+
+const API = ''; // troque para seu domínio em produção
+
+// ===== Seletores do seu HTML =====
+const cpfInput    = document.querySelector('#cpf');
+const nomeInput   = document.querySelector('#nome');
+const tipoSelect  = document.querySelector('#tipoChave');
+const chaveWrap   = document.querySelector('#chaveWrapper');
+const chaveInput  = document.querySelector('#chavePix');
+const valorInput  = document.querySelector('#valor');
+const form        = document.querySelector('#depositoForm');
+const toast       = document.querySelector('#toast');
+
+// Resumo
+const rCpf     = document.querySelector('#r-cpf');
+const rNome    = document.querySelector('#r-nome');
+const rTipo    = document.querySelector('#r-tipo');
+const rChaveLi = document.querySelector('#r-chave-li');
+const rChave   = document.querySelector('#r-chave');
+const rValor   = document.querySelector('#r-valor');
+
+// ===== Utils =====
+document.querySelector('#ano') && (document.querySelector('#ano').textContent = new Date().getFullYear());
+function notify(msg, isError=false, time=3200){
+  if(!toast) return alert(msg);
+  toast.textContent = msg;
+  toast.style.borderColor = isError ? 'rgba(255,92,122,.45)' : 'rgba(0,209,143,.45)';
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'), time);
+}
+function centsToBRL(c){ return (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+
+// salva no formato que a área lê: [{id,nome,depositoCents,pixType,pixKey,createdAt}]
+function addToBancas({ nome, valorCentavos, tipo, chave }){
+  const registro = {
+    id: Date.now().toString(),
+    nome,
+    depositoCents: valorCentavos,
+    pixType: tipo,
+    pixKey:  chave,
+    createdAt: new Date().toISOString()
+  };
+  const lista = JSON.parse(localStorage.getItem('bancas') || '[]');
+  lista.push(registro);
+  localStorage.setItem('bancas', JSON.stringify(lista));
+}
+
+// ===== Máscaras & Resumo =====
+cpfInput.addEventListener('input', () => {
+  let v = cpfInput.value.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2')
+       .replace(/(\d{3})(\d)/,'$1.$2')
+       .replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  cpfInput.value = v;
+  rCpf.textContent = v || '—';
+});
+nomeInput.addEventListener('input', () => rNome.textContent = nomeInput.value.trim() || '—');
+
+tipoSelect.addEventListener('change', () => {
+  const t = tipoSelect.value;
+  rTipo.textContent = t === 'aleatoria' ? 'Chave aleatória' : (t.charAt(0).toUpperCase()+t.slice(1));
+  if (t === 'cpf'){
+    chaveWrap.style.display = 'none';
+    rChaveLi.style.display = 'none';
+    chaveInput.value = '';
+  }else{
+    chaveWrap.style.display = '';
+    rChaveLi.style.display = '';
+    chaveInput.placeholder = t === 'telefone' ? '(00) 90000-0000' : (t === 'email' ? 'seu@email.com' : 'Ex.: 2e1a-…)');
+  }
+});
+
+chaveInput.addEventListener('input', () => {
+  if (tipoSelect.value === 'telefone'){
+    let v = chaveInput.value.replace(/\D/g,'').slice(0,11);
+    if(v.length > 2) v = `(${v.slice(0,2)}) ${v.slice(2)}`;
+    if(v.length > 10) v = `${v.slice(0,10)}-${v.slice(10)}`;
+    chaveInput.value = v;
+    rChave.textContent = v || '—';
+  } else {
+    rChave.textContent = chaveInput.value.trim() || '—';
+  }
+});
+
+valorInput.addEventListener('input', () => {
+  let v = valorInput.value.replace(/\D/g,'');
+  if(!v){ rValor.textContent='—'; valorInput.value=''; return; }
+  v = v.replace(/^0+/, '');
+  if(v.length < 3) v = v.padStart(3,'0');
+  const money = centsToBRL(parseInt(v,10));
+  valorInput.value = money;
+  rValor.textContent = money;
+});
+
+// ===== Validações =====
+function isCPFValid(cpf){
+  cpf = (cpf||'').replace(/\D/g,'');
+  if(cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
+  let s=0,r;
+  for (let i=1;i<=9;i++) s += parseInt(cpf.substring(i-1,i))*(11-i);
+  r = (s*10)%11; if(r===10||r===11) r=0; if(r!==parseInt(cpf.substring(9,10))) return false;
+  s=0; for (let i=1;i<=10;i++) s += parseInt(cpf.substring(i-1,i))*(12-i);
+  r = (s*10)%11; if(r===10||r===11) r=0; return r===parseInt(cpf.substring(10,11));
+}
+function isEmail(v){ return /.+@.+\..+/.test(v); }
+function showError(sel, ok){ const el = document.querySelector(sel); ok ? el.classList.remove('show') : el.classList.add('show'); }
+
+// ===== Submit =====
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+
+  const cpfOk   = isCPFValid(cpfInput.value);
+  const nomeOk  = nomeInput.value.trim().length > 2;
+  const tipo    = tipoSelect.value;
+  let chaveOk   = true;
+  if (tipo !== 'cpf'){
+    const v = chaveInput.value.trim();
+    if (tipo === 'email')        chaveOk = isEmail(v);
+    else if (tipo === 'telefone')chaveOk = v.replace(/\D/g,'').length === 11;
+    else                         chaveOk = v.length >= 10; // aleatória
+  }
+  const valorCents = Number((valorInput.value.replace(/\D/g,'')) || 0);
+  const valorOk    = valorCents >= 1000; // R$10,00
+
+  showError('#cpfError',  cpfOk);
+  showError('#nomeError', nomeOk);
+  showError('#chaveError',chaveOk);
+  showError('#valorError',valorOk);
+
+  if (cpfOk && nomeOk && chaveOk && valorOk){
+    criarCobrancaPIX({
+      nome: nomeInput.value.trim(),
+      cpf: cpfInput.value,
+      valorCentavos: valorCents,
+      tipo: tipoSelect.value,
+      chave: tipoSelect.value === 'cpf' ? cpfInput.value : chaveInput.value.trim()
+    });
+  } else {
+    notify('Por favor, corrija os campos destacados.', true);
+  }
+});
+
+// ===== Modal de QR (criado por JS) =====
+function ensurePixStyles(){
+  if (!document.getElementById('pixCss')) {
+    const link = document.createElement('link');
+    link.id = 'pixCss';
+    link.rel = 'stylesheet';
+    link.href = 'assets/css/pix.css'; // deixe o pix.css na pasta
+    document.head.appendChild(link);
+  }
+}
+function ensurePixModal(){
+  ensurePixStyles();
+
+  let dlg = document.querySelector('#pixModal');
+  if (dlg) return dlg;
+
+  dlg = document.createElement('dialog');
+  dlg.id = 'pixModal';
+  dlg.className = 'pix-modal';
+
+  const card = document.createElement('div');
+  card.className = 'pix-card';
+
+  const title = document.createElement('h3');
+  title.className = 'pix-title';
+  title.textContent = 'Escaneie para pagar';
+
+  const qrWrap = document.createElement('div');
+  qrWrap.className = 'pix-qr-wrap';
+
+  const img = document.createElement('img');
+  img.id = 'pixQr';
+  img.className = 'pix-qr';
+  img.alt = 'QR Code do PIX';
+
+  const code = document.createElement('div');
+  code.className = 'pix-code';
+
+  const emv = document.createElement('input');
+  emv.id = 'pixEmv';
+  emv.className = 'pix-emv';
+  emv.readOnly = true;
+
+  const copy = document.createElement('button');
+  copy.id = 'btnCopy';
+  copy.className = 'pix-copy btn cta cta--small';
+  copy.textContent = 'Copiar';
+
+  const status = document.createElement('p');
+  status.id = 'pixStatus';
+  status.className = 'pix-status';
+  status.textContent = 'Aguardando pagamento…';
+
+  const actions = document.createElement('div');
+  actions.className = 'pix-actions';
+
+  const close = document.createElement('button');
+  close.id = 'btnFechar';
+  close.className = 'pix-close btn-outline';
+  close.textContent = 'Fechar';
+
+  // montar
+  qrWrap.appendChild(img);
+  code.appendChild(emv);
+  code.appendChild(copy);
+  actions.appendChild(close);
+  [title, qrWrap, code, status, actions].forEach(n => card.appendChild(n));
+  dlg.appendChild(card);
+  document.body.appendChild(dlg);
+
+  // comportamento
+  dlg.addEventListener('cancel', (e)=>{ e.preventDefault(); dlg.close(); });
+  dlg.addEventListener('click', (e)=>{ if(e.target === dlg) dlg.close(); });
+  copy.onclick = async ()=> {
+    const emvEl = dlg.querySelector('#pixEmv');
+    if (!emvEl.value) return;
+    await navigator.clipboard.writeText(emvEl.value);
+    if (typeof notify === 'function') notify('Código copia e cola copiado!');
+  };
+  close.onclick = ()=> dlg.close();
+
+  return dlg;
+}
+
+// ===== Backend Efi =====
+async function criarCobrancaPIX({ nome, cpf, valorCentavos, tipo, chave }){
+  try{
+    // 1) criar cobrança
+    const resp = await fetch(`${API}/api/pix/cob`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ nome, cpf, valorCentavos })
+    });
+    if(!resp.ok){
+      let err = 'Falha ao criar PIX';
+      try{ const j = await resp.json(); if(j.error) err = j.error; }catch{}
+      throw new Error(err);
+    }
+    const { txid, emv, qrPng } = await resp.json();
+
+    // 2) abrir modal QR
+    const dlg = ensurePixModal();
+    const img = dlg.querySelector('#pixQr');
+    const emvEl = dlg.querySelector('#pixEmv');
+    const st = dlg.querySelector('#pixStatus');
+
+    img.src = qrPng;
+    emvEl.value = emv;
+    st.textContent = 'Aguardando pagamento…';
+    if(typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open','');
+
+    // 3) polling até CONCLUIDA
+    const check = async () => {
+      const s = await fetch(`${API}/api/pix/status/${encodeURIComponent(txid)}`).then(r=>r.json());
+      if (s.status === 'CONCLUIDA') {
+        st.textContent = 'Pagamento confirmado! ✅';
+
+        // >>> SALVA NA ÁREA (bancas) — sem redirecionar
+        addToBancas({ nome, valorCentavos, tipo, chave });
+
+        // fecha modal e avisa
+        setTimeout(()=>{
+          dlg.close();
+          if (typeof notify === 'function') {
+            notify('Pagamento confirmado! Seus dados já estão na Área.', false, 4500);
+          }
+        }, 900);
+
+        return true;
+      }
+      return false;
+    };
+
+    let tries = 36; // 3 minutos (5s cada)
+    const timer = setInterval(async ()=>{
+      tries--;
+      const done = await check();
+      if(done || tries<=0){
+        clearInterval(timer);
+        if(tries<=0) st.textContent = 'Tempo esgotado. Se já pagou, a confirmação aparecerá ao abrir a área.';
+      }
+    }, 5000);
+
+  }catch(e){
+    console.error(e);
+    notify('Não foi possível iniciar o PIX. Tente novamente.', true);
+  }
+}
