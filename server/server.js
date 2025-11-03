@@ -128,15 +128,16 @@ function verifySession(token) {
 function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
 
 function setAuthCookies(res, token) {
+  const isProd = process.env.NODE_ENV === 'production';
   const common = {
-    sameSite: PROD ? 'lax' : 'strict', // em produção, navegação normal entre páginas
-    secure: PROD,                      // no Render (https) fica true
-    maxAge: 2 * 60 * 60 * 1000,        // 2h
-    path: '/'
+    sameSite: 'strict',
+    secure: isProd,            // 🔒 em prod: true
+    maxAge: 2 * 60 * 60 * 1000 // 2h
   };
   res.cookie('session', token, { ...common, httpOnly: true });
   res.cookie('csrf',    randomHex(16), { ...common, httpOnly: false });
 }
+
 
 function clearAuthCookies(res){
   const common = {

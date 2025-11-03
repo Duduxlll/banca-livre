@@ -5,7 +5,9 @@
    - Ao confirmar: salva em localStorage (bancas) e NÃO redireciona
    ========================================= */
 
-const API = ''; // troque para seu domínio em produção
+// Em vez de http://localhost:3000
+const API = window.location.origin;
+ // troque para seu domínio em produção
 
 // ===== Seletores do seu HTML =====
 const cpfInput    = document.querySelector('#cpf');
@@ -39,16 +41,17 @@ function centsToBRL(c){ return (c/100).toLocaleString('pt-BR',{style:'currency',
 // salva no formato que a área lê: [{id,nome,depositoCents,pixType,pixKey,createdAt}]
 function addToBancas({ nome, valorCentavos, tipo, chave }){
   const registro = {
-    id: Date.now().toString(),
-    nome,
-    depositoCents: valorCentavos,
-    pixType: tipo,
-    pixKey:  chave,
-    createdAt: new Date().toISOString()
-  };
-  const lista = JSON.parse(localStorage.getItem('bancas') || '[]');
-  lista.push(registro);
-  localStorage.setItem('bancas', JSON.stringify(lista));
+  id: Date.now().toString(),
+  nome: dados.nome,
+  depositoCents: valorCentavos,
+  pixType: dados.tipo,
+  pixKey:  dados.chave,
+  createdAt: new Date().toISOString()
+};
+const bancas = JSON.parse(localStorage.getItem('bancas') || '[]');
+bancas.push(registro);
+localStorage.setItem('bancas', JSON.stringify(bancas));
+
 }
 
 // ===== Máscaras & Resumo =====
