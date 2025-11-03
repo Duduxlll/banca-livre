@@ -1,10 +1,7 @@
 /* =========================================
-   area.js — Bancas & Pagamentos (via API) c/ transições suaves
-   - Bancas: Nome | Depósito | Banca(editável) | Ações
-   - Pagamentos: Nome | Pagamento | Ações (Fazer PIX, Pago/Não pago, Excluir)
-   - Menu de status flutuante (fora do scroll)
-   - Auto-exclusão de "pago" após 3 minutos (robusto a reload)
-   - Troca de abas com fade + slide + skeleton
+   area.js — Bancas & Pagamentos (via API) sem skeleton
+   - Transição suave entre abas (fade + leve slide)
+   - Mantém timers de auto-delete para "pago"
    ========================================= */
 
 /* ========== Utils base ========== */
@@ -51,29 +48,6 @@ const STATE = {
   timers: new Map(), // id => timeoutId (auto-delete pagos)
 };
 
-/* ========== Skeleton helpers (visuais no CSS) ========== */
-function showSkeleton(tbody, rows = 6) {
-  if (!tbody) return;
-  const wrap = tbody.closest('.table-wrap');
-  if (!wrap || wrap._skel) return;
-  const box = document.createElement('div');
-  box.className = 'skel-box';
-  for (let i = 0; i < rows; i++) {
-    const r = document.createElement('div');
-    r.className = 'skel-row';
-    box.appendChild(r);
-  }
-  wrap._skel = box;
-  wrap.appendChild(box);
-}
-function hideSkeleton(tbody) {
-  const wrap = tbody?.closest?.('.table-wrap');
-  if (wrap && wrap._skel) {
-    wrap._skel.remove();
-    wrap._skel = null;
-  }
-}
-
 /* ========== Carregamento (preenche STATE) ========== */
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
@@ -88,16 +62,13 @@ async function loadPagamentos() {
 
 /* ========== Render ========== */
 function render(){
-  const vB = tabBancasEl;
-  const vP = tabPagamentosEl;
-
   if (TAB==='bancas'){
-    vB.classList.add('show');
-    vP.classList.remove('show');
+    tabBancasEl.classList.add('show');
+    tabPagamentosEl.classList.remove('show');
     renderBancas();
   } else {
-    vP.classList.add('show');
-    vB.classList.remove('show');
+    tabPagamentosEl.classList.add('show');
+    tabBancasEl.classList.remove('show');
     renderPagamentos();
   }
 }
@@ -127,7 +98,6 @@ function renderBancas(){
 
 function renderPagamentos(){
   const lista = STATE.pagamentos;
-
   tbodyPags.innerHTML = lista.length ? lista.map(p => {
     const isPago = p.status === 'pago';
     const statusTxt = isPago ? 'Pago' : 'Não pago';
@@ -157,54 +127,38 @@ function renderPagamentos(){
   filtrarTabela(tbodyPags, buscaInput?.value || '');
 }
 
-/* ========== AÇÕES PRINCIPAIS (API) ========== */
-
+/* ========== Transição suave entre abas (sem overlay/skeleton) ========== */
 async function setTab(tab){
   if (TAB === tab) return;
-  TAB = tab;
-  localStorage.setItem('area_tab', tab);
+
+  // ativa botão
   qsa('.nav-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
-  // views
-  const vB = tabBancasEl;
-  const vP = tabPagamentosEl;
-  const toShow = (tab === 'bancas') ? vB : vP;
-  const toHide = (tab === 'bancas') ? vP : vB;
+  const leaving = (TAB === 'bancas') ? tabBancasEl : tabPagamentosEl;
+  const entering = (tab === 'bancas') ? tabBancasEl : tabPagamentosEl;
 
-  // skeleton da próxima aba
-  if (tab === 'bancas') showSkeleton(tbodyBancas);
-  else                  showSkeleton(tbodyPags);
+  // inicia fade-out da aba atual
+  leaving?.classList.add('hiding');
+  leaving?.classList.remove('show');
 
-  // prepara transição
-  toHide?.classList.remove('show');
-  toHide?.classList.add('transitioning');
-  toShow?.classList.add('transitioning');
-
-  // aguarda 1 frame p/ CSS aplicar
+  // aguarda um frame p/ aplicar CSS
   await new Promise(r => requestAnimationFrame(()=>r()));
 
-  // mostra próxima (fade/slide pelo CSS)
-  toShow?.classList.add('show');
+  // mostra a próxima com fade-in (conteúdo já renderizado do último load)
+  entering?.classList.add('show');
+  entering?.classList.remove('hiding');
 
+  // atualiza a aba ativa
+  TAB = tab;
+  localStorage.setItem('area_tab', TAB);
+
+  // re-carrega em background (sem skeleton)
   try {
-    if (tab === 'bancas') {
-      await loadBancas();
-      render();
-      hideSkeleton(tbodyBancas);
-    } else {
-      await loadPagamentos();
-      render();
-      hideSkeleton(tbodyPags);
-    }
-  } catch (e) {
-    console.error(e);
-    hideSkeleton(tab === 'bancas' ? tbodyBancas : tbodyPags);
-  }
-
-  toHide?.classList.remove('transitioning');
-  toShow?.classList.remove('transitioning');
+    if (TAB==='bancas') await loadBancas(); else await loadPagamentos();
+    render(); // atualiza conteúdo suavemente (sem piscar)
+  } catch(e){ console.error(e); }
 }
 
 async function refresh(){
@@ -221,7 +175,7 @@ function getBancaInputById(id){
 }
 
 async function toPagamento(id){
-  // 1) Se houver edição no input, salva via PATCH antes de mover
+  // salva edição do input (se houver) antes de mover
   const inp = getBancaInputById(id);
   if (inp) {
     const cents = toCents(inp.value);
@@ -231,10 +185,8 @@ async function toPagamento(id){
     });
   }
 
-  // 2) Move para pagamentos
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}/to-pagamento`, { method:'POST' });
 
-  // 3) Recarrega as listas e re-renderiza
   TAB = 'pagamentos';
   localStorage.setItem('area_tab', TAB);
   await Promise.all([loadBancas(), loadPagamentos()]);
@@ -252,7 +204,6 @@ async function deletePagamento(id){
   await apiFetch(`/api/pagamentos/${encodeURIComponent(id)}`, { method:'DELETE' });
   await loadPagamentos();
   render();
-  // cancela timer, se existir
   const t = STATE.timers.get(id);
   if (t){ clearTimeout(t); STATE.timers.delete(id); }
 }
@@ -267,10 +218,8 @@ async function setStatus(id, value){
   if (!item) return;
 
   if (value === 'pago') {
-    // agenda auto delete em 3 minutos (considerando paidAt do servidor)
     scheduleAutoDelete(item);
   } else {
-    // cancelar timer se tinha
     const t = STATE.timers.get(id);
     if (t){ clearTimeout(t); STATE.timers.delete(id); }
   }
@@ -281,11 +230,9 @@ function scheduleAutoDelete(item){
   const { id, paidAt } = item;
   if (!paidAt) return;
   const left = (new Date(paidAt).getTime() + 3*60*1000) - Date.now();
-  // cancela anterior, se houver
   const prev = STATE.timers.get(id);
   if (prev) clearTimeout(prev);
   if (left <= 0) {
-    // já passou: deleta agora
     deletePagamento(id).catch(()=>{});
     return;
   }
@@ -294,10 +241,8 @@ function scheduleAutoDelete(item){
 }
 
 function setupAutoDeleteTimers(){
-  // limpa timers antigos
   STATE.timers.forEach(t=> clearTimeout(t));
   STATE.timers.clear();
-
   STATE.pagamentos.forEach(p=>{
     if (p.status === 'pago' && p.paidAt) scheduleAutoDelete(p);
   });
@@ -349,7 +294,7 @@ function abrirPixModal(id){
   dlg.showModal();
 }
 
-/* ========== MENU FLUTUANTE (PORTAL) — Pago / Não pago ========== */
+/* ========== MENU FLUTUANTE — Pago / Não pago ========== */
 let statusMenuEl = null;
 let statusMenuId = null;
 
@@ -380,12 +325,10 @@ function showStatusMenu(anchorBtn, id, current){
   const m = ensureStatusMenu();
   statusMenuId = id;
 
-  // marca a atual
   qsa('.status-item', m).forEach(b=>{
     b.classList.toggle('active', b.dataset.value === current);
   });
 
-  // posiciona (abre pra cima se faltar espaço)
   const r = anchorBtn.getBoundingClientRect();
   m.style.display = 'block';
   m.style.visibility = 'hidden';
@@ -413,7 +356,6 @@ function hideStatusMenu(){
   statusMenuId = null;
 }
 
-// abre/fecha via clique
 document.addEventListener('click', (e)=>{
   const openBtn = e.target.closest('button[data-action="status-open"]');
   if(openBtn){
@@ -426,8 +368,6 @@ document.addEventListener('click', (e)=>{
   }
   if(!e.target.closest('.status-float')) hideStatusMenu();
 });
-
-// rolar/resize fecha menu
 ['scroll','resize'].forEach(ev=>{
   window.addEventListener(ev, hideStatusMenu, {passive:true});
 });
@@ -478,7 +418,7 @@ document.addEventListener('blur', async (e)=>{
   }
 }, true);
 
-// busca (com filtro simples)
+// busca
 function filtrarTabela(tbody, q){
   if(!tbody) return;
   const query = (q||'').trim().toLowerCase();
@@ -494,7 +434,7 @@ buscaInput?.addEventListener('input', ()=>{
 
 /* ========== start ========== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // garante classes de transição (CSS fará o fade/slide)
+  // classes para transição (veja CSS abaixo)
   tabBancasEl?.classList.add('tab-view');
   tabPagamentosEl?.classList.add('tab-view');
 
@@ -502,17 +442,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     btn.classList.toggle('active', btn.dataset.tab === TAB);
   });
 
-  // skeleton inicial na aba atual
-  if (TAB==='bancas') showSkeleton(tbodyBancas);
-  else                showSkeleton(tbodyPags);
-
-  // pré-carrega as duas listas (aquecimento) sem travar a UI
+  // pré-carrega as duas listas (sem overlay)
   await Promise.allSettled([loadBancas(), loadPagamentos()]);
   render();
-
-  // remove skeleton da aba visível
-  hideSkeleton(TAB==='bancas' ? tbodyBancas : tbodyPags);
-
-  // agenda timers para pagos existentes
   setupAutoDeleteTimers();
 });

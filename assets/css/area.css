@@ -75,22 +75,34 @@ body{
   border:1px solid var(--line);
   border-radius:16px;
   box-shadow:var(--shadow);
+  overflow:hidden; /* garante cantos do header colados ao card */
 }
-.table-wrap{overflow:auto}
+.table-wrap{
+  overflow:auto;
+  max-height:460px;
+  overscroll-behavior: contain;
+  contain: paint;            /* melhora scroll/anim */
+  will-change: transform;
+}
+
+/* ---------- TABELA ---------- */
 .table{width:100%; border-collapse:separate; border-spacing:0}
 .table thead th{
-  text-align:left; padding:14px; color:#cbd3ff; font-weight:700; background: rgba(255,255,255,.02);
+  text-align:left; padding:14px; color:#cbd3ff; font-weight:700;
+  position: sticky; top: 0; z-index: 5;
+  background: #0d1330;        /* sólido: elimina “fantasma” no topo */
   border-bottom:1px solid var(--line);
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
 }
-.table tbody td{
-  padding:14px; border-bottom:1px solid rgba(255,255,255,.06);
-}
-.col-acoes{width:1%; white-space:nowrap}
+.table thead th:first-child{ border-top-left-radius: 12px; }
+.table thead th:last-child{  border-top-right-radius: 12px; text-align:left; }
+
+.table tbody td{ padding:14px; border-bottom:1px solid rgba(255,255,255,.06); }
+.table tbody tr{ position: relative; }
+.col-acoes{ width:1%; white-space:nowrap }
 
 /* Banca input (inline) */
-.table input.input-money{
-  min-width:140px;
-}
+.table input.input-money{ min-width:140px; }
 
 /* ---------- BOTÕES ---------- */
 .btn{
@@ -100,7 +112,6 @@ body{
   cursor:pointer; transition:transform .06s ease, filter .2s ease;
 }
 .btn:active{transform:translateY(1px)}
-
 .btn--primary{
   background:linear-gradient(90deg, var(--brand), var(--brand-2));
   color:#061024; border:none;
@@ -110,24 +121,6 @@ body{
   background:rgba(255,255,255,.02);
   border-color:rgba(255,255,255,.18);
 }
-
-/* Status cores */
-.ok{ color: var(--ok); font-weight:700 }
-.warn{ color: var(--warn); font-weight:700 }
-
-/* ---------- ABAS ---------- */
-.tab{display:none}
-.tab.show{display:block}
-
-/* TOAST */
-.toast{
-  position:fixed; right:16px; bottom:16px; background:#0e1327; border:1px solid var(--line);
-  padding:14px 16px; border-radius:12px; display:none
-}
-.toast.show{display:block}
-
-
-/* === NOVO: botões danger (vermelho) === */
 .btn--danger{
   background: rgba(255,92,122,.08);
   border-color: rgba(255,92,122,.35);
@@ -135,12 +128,16 @@ body{
 }
 .btn--danger:hover{ filter: brightness(1.05); }
 
-/* === NOVO: dropdown de status (Pago/Não pago) === */
+/* ---------- STATUS ---------- */
+.ok{ color: var(--ok); font-weight:700 }
+.warn{ color: var(--warn); font-weight:700 }
+
 .status{ position: relative; display: inline-block; }
 .status-btn{
   display:inline-flex; align-items:center; gap:8px;
   padding:10px 12px; border-radius:10px; font-weight:700;
   cursor:pointer; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.02); color:var(--text);
+  position: relative; z-index: 1;
 }
 .status-btn .caret{
   width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:6px solid currentColor;
@@ -148,223 +145,73 @@ body{
 .status--pago{ color: var(--ok); border-color: rgba(0,209,143,.45) !important; }
 .status--nao{ color: #ff9aa6; border-color: rgba(255,92,122,.45) !important; }
 
-.status-menu{
-  position:absolute; top:100%; left:0; margin-top:6px;
-  background:#0e1327; border:1px solid rgba(255,255,255,.12); border-radius:10px;
-  box-shadow: var(--shadow); display:none; overflow:hidden; z-index:20;
-}
-.status-menu.show{ display:block; }
-.status-opt{
-  display:flex; align-items:center; gap:8px;
-  padding:10px 12px; width:180px; background:transparent; border:0; color:var(--text);
-  cursor:pointer; text-align:left;
-}
-.status-opt:hover{ background: rgba(255,255,255,.06); }
-.status-opt.status--pago{ color: var(--ok); }
-.status-opt.status--nao{ color: #ff9aa6; }
-
-/* opcional: deixa a coluna “Ações” sem quebrar layout */
-.col-acoes{ width:1%; white-space:nowrap; }
-
-/* ===== TABELA COM CABEÇALHO FIXO ===== */
-.table-wrap{
-  /* define uma altura e torna a área rolável APENAS nas linhas */
-  max-height: 460px;          /* ajuste se quiser mais/menos altura */
-  overflow: auto;
-  overscroll-behavior: contain;
-  position: relative;
-}
-
-/* cabeçalho gruda no topo do container rolável */
-.table thead th{
-  position: sticky;
-  top: 0;
-  z-index: 5;                 /* fica acima das linhas */
-  background: rgba(11, 16, 39, 0.82); /* fundo sólido/translúcido para não “vazar” */
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid var(--line);
-}
-
-/* linhas/células com contexto próprio (evita recorte visual) */
-.table tbody tr{ position: relative; }
-.table tbody td{ position: relative; }
-
-/* ===== DROPDOWN (select) SEM FICAR ESCONDIDO ===== */
-/* dá prioridade de camada ao select e evita que seja recortado por sombras/stacking */
-.status-select{
-  position: relative;
-  z-index: 10;        /* sobe o select acima da tabela */
-  transform: translateZ(0); /* cria contexto de composição (ajuda no Chrome) */
-}
-
-/* opcional: se quiser o menu de opções ainda “acima de tudo” em alguns navegadores */
-.table-wrap, .card, .content, .layout { z-index: 0; position: relative; }
-
-
-/* Dropdown abre pra cima quando faltar espaço */
-.status-menu.dropup{
-  top: auto;
-  bottom: 100%;
-  margin-top: 0;
-  margin-bottom: 6px;
-}
-
-/* mantém o menu sempre acima de outros elementos */
-.status-menu{ z-index: 9999; }
-
-/* melhora clique/stacking do botão */
-.status-btn{ position: relative; z-index: 10; }
-
-/* evita que o menu seja “cortado” visualmente por sombras internas */
-.table tbody tr, .table tbody td { overflow: visible; }
-
-/* ===== Menu flutuante (fora da tabela) ===== */
 .status-float{
-  position: fixed;
-  top: 0; left: 0;
-  display: none;
-  background:#0e1327;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:10px;
-  box-shadow: var(--shadow);
-  z-index: 99999;             /* acima de tudo */
-  overflow: hidden;
-  min-width: 160px;
+  position: fixed; top: 0; left: 0; display: none;
+  background:#0e1327; border:1px solid rgba(255,255,255,.12); border-radius:10px;
+  box-shadow: var(--shadow); z-index: 99999; overflow: hidden; min-width: 160px;
 }
 .status-float.show{ display:block; }
-
 .status-item{
-  display:block;
-  width:100%;
-  text-align:left;
-  padding:10px 12px;
-  background:transparent;
-  border:0;
-  color:var(--text);
-  cursor:pointer;
+  display:block; width:100%; text-align:left; padding:10px 12px;
+  background:transparent; border:0; color:var(--text); cursor:pointer;
 }
 .status-item:hover{ background: rgba(255,255,255,.06); }
 .status-item.active{ background: rgba(255,255,255,.08); }
-
 .status-item.pago{ color: var(--ok); }
 .status-item.nao { color: var(--danger); }
 
-/* melhora o botão que abre o menu */
-.status-btn{ position: relative; z-index: 1; }
+/* ---------- ABAS (sem skeleton) ---------- */
+.tab{ display:none; }
+.tab.show{ display:block; }
 
-
-/* ===== Modal: fundo escuro e blur (mais visível) ===== */
-#payModal::backdrop{
-  background: rgba(8, 12, 26, .65);        /* escurece a página atrás */
-  backdrop-filter: blur(6px) saturate(.9);  /* leve blur no fundo */
+/* transição suave entre abas */
+.tab.tab-view{
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .22s cubic-bezier(.22,.61,.36,1), transform .22s cubic-bezier(.22,.61,.36,1);
+  will-change: opacity, transform;
+}
+.tab.tab-view.show{
+  opacity: 1;
+  transform: translateY(0);
+}
+.tab.tab-view.hiding{
+  opacity: 0;
+  transform: translateY(6px);
 }
 
-/* pequena animação de entrada */
+/* animação leve nas linhas quando a aba aparece */
+@keyframes rowIn{
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab.tab-view.show .table tbody tr{
+  animation: rowIn .18s ease both;
+}
+.tab.tab-view.show .table tbody tr:nth-child(2){ animation-delay:.015s }
+.tab.tab-view.show .table tbody tr:nth-child(3){ animation-delay:.03s }
+.tab.tab-view.show .table tbody tr:nth-child(4){ animation-delay:.045s }
+.tab.tab-view.show .table tbody tr:nth-child(5){ animation-delay:.06s }
+
+/* ---------- TOAST ---------- */
+.toast{
+  position:fixed; right:16px; bottom:16px; background:#0e1327; border:1px solid var(--line);
+  padding:14px 16px; border-radius:12px; display:none
+}
+.toast.show{display:block}
+
+/* ---------- MODAL PIX ---------- */
+#payModal::backdrop{
+  background: rgba(8, 12, 26, .65);
+  backdrop-filter: blur(6px) saturate(.9);
+}
 @keyframes payModalIn {
   from { transform: translateY(6px); opacity: 0; }
   to   { transform: translateY(0);  opacity: 1; }
 }
 #payModal[open]{ animation: payModalIn .16s ease-out; }
-
-/* reforça o cartão do modal (sobrepõe os estilos inline) */
 #payModal > div{
   background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05)) !important;
   border: 1px solid rgba(255,255,255,.22) !important;
   box-shadow: 0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04) !important;
-}
-/* ================================
-   TRANSIÇÕES DE ABAS (combina com area.js)
-   - .tab-view é aplicado no DOMContentLoaded
-   - .show controla visibilidade
-   - .transitioning habilita o fade/slide
-   ================================ */
-.tab-view{
-  display:none;              /* padrão: escondido */
-  opacity:0;                 /* prepara o fade */
-  transform: translateY(8px);/* leve deslize para baixo */
-  transition: opacity .22s ease, transform .22s ease;
-  will-change: opacity, transform;
-}
-.tab-view.show{ display:block; }
-/* quando o JS liga a transição, animamos a ENTRADA */
-.tab-view.transitioning.show{
-  opacity:1;
-  transform: translateY(0);
-}
-/* acessibilidade: desativa animações se o usuário preferir */
-@media (prefers-reduced-motion: reduce){
-  .tab-view{ transition: none !important; transform:none !important; }
-}
-
-/* ================================
-   SKELETON LOADER (lista/tabela)
-   - criado pelo area.js com .skel-box dentro de .table-wrap
-   ================================ */
-.skel-box{
-  position:absolute; inset:0;
-  padding:12px; display:grid; gap:10px;
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
-  pointer-events:none;       /* não intercepta cliques */
-  z-index: 4;                /* abaixo do thead sticky (z=5) */
-}
-.skel-row{
-  height:42px; border-radius:12px;
-  position:relative; overflow:hidden;
-  background: rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.06);
-}
-.skel-row::after{
-  content:"";
-  position:absolute; inset:0;
-  background: linear-gradient(90deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255,255,255,.08) 45%,
-    rgba(255,255,255,0) 90%);
-  animation: skelShimmer 1.2s infinite;
-  transform: translateX(-60%);
-}
-@keyframes skelShimmer{
-  from { transform: translateX(-60%); }
-  to   { transform: translateX(120%); }
-}
-@media (prefers-reduced-motion: reduce){
-  .skel-row::after{ animation:none; }
-}
-
-/* ================================
-   MICRO-ANIMAÇÃO NAS LINHAS AO ENTRAR
-   (só quando a aba fica visível)
-   ================================ */
-@keyframes rowIn{
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.tab-view.show .table tbody tr{
-  animation: rowIn .18s ease both;
-}
-/* leve escalonamento para dar “fluidez” */
-.tab-view.show .table tbody tr:nth-child(1){ animation-delay:.00s }
-.tab-view.show .table tbody tr:nth-child(2){ animation-delay:.015s }
-.tab-view.show .table tbody tr:nth-child(3){ animation-delay:.03s }
-.tab-view.show .table tbody tr:nth-child(4){ animation-delay:.045s }
-.tab-view.show .table tbody tr:nth-child(5){ animation-delay:.06s }
-
-/* ================================
-   SUAVIDADE/RENDERIZAÇÃO
-   ================================ */
-.table-wrap{
-  contain: paint;            /* isola pintura (melhora scroll/anim) */
-  will-change: transform;    /* dá pista ao compositor do browser */
-}
-
-/* garante que skeleton e dropdown não sejam cortados */
-.table tbody tr, .table tbody td { overflow: visible; }
-
-/* mantém a hierarquia de camadas ok (já tinha no seu CSS) */
-.status-float{ z-index: 99999; }
-/* MOSTRAR mesmo sem a classe .transitioning (fallback) */
-.tab-view.show{
-  display:block;
-  opacity:1;           /* <- garante visível */
-  transform:none;      /* <- sem deslize se não tiver transitioning */
 }
