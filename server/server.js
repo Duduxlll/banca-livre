@@ -14,61 +14,82 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import axios from 'axios';
 import QRCode from 'qrcode';
-import { Pool } from 'pg';
+import pkg from 'pg';
+const { Pool } = pkg;
 
-/* ================= .env (produção) =================
-NODE_ENV=production
-ORIGIN=https://seu-app.onrender.com
-STATIC_ROOT=..                  # raiz do site (pai de /server)
-ADMIN_USER=admin
-ADMIN_PASSWORD_HASH=<hash_bcrypt>
-JWT_SECRET=<64+ chars aleatórios>
+/* =========================================================
+   .env esperados (Render/produção)
+   ---------------------------------------------------------
+   NODE_ENV=production
+   PORT=10000                       # Render injeta, pode omitir
+   ORIGIN=https://seu-app.onrender.com
+   STATIC_ROOT=..                   # (padrão) raiz do projeto (pai de /server)
 
-# Postgres (Render)
-DATABASE_URL=postgres://user:pass@host:5432/dbname
+   ADMIN_USER=admin
+   ADMIN_PASSWORD_HASH=<hash_bcrypt>
+   JWT_SECRET=<64+ chars aleatórios>
 
-# Efi (PIX)
-EFI_CLIENT_ID=...
-EFI_CLIENT_SECRET=...
-EFI_PIX_KEY=...
-EFI_BASE_URL=https://pix-h.api.efipay.com.br
-EFI_OAUTH_URL=https://pix-h.api.efipay.com.br/oauth/token
-EFI_CERT_PATH=/etc/secrets/client-cert.pem
-EFI_KEY_PATH=/etc/secrets/client-key.pem
-==================================================== */
+   # Chave pública opcional p/ salvar bancas sem login (app.js)
+   APP_PUBLIC_KEY=<uma-chave-só-sua>
+
+   # Efi (PIX)
+   EFI_CLIENT_ID=...
+   EFI_CLIENT_SECRET=...
+   EFI_PIX_KEY=...
+   EFI_BASE_URL=https://pix-h.api.efipay.com.br
+   EFI_OAUTH_URL=https://pix-h.api.efipay.com.br/oauth/token
+   EFI_CERT_PATH=/etc/secrets/client-cert.pem
+   EFI_KEY_PATH=/etc/secrets/client-key.pem
+
+   # Postgres (Render)
+   DATABASE_URL=postgres://usuario:senha@host:5432/db
+   ========================================================= */
 
 const {
   PORT = 3000,
   ORIGIN = `http://localhost:3000`,
-  STATIC_ROOT,
+  STATIC_ROOT, // opcional; default = pai de /server
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
-  DATABASE_URL,
+  APP_PUBLIC_KEY,
   EFI_CLIENT_ID,
   EFI_CLIENT_SECRET,
   EFI_CERT_PATH,
   EFI_KEY_PATH,
   EFI_BASE_URL,
   EFI_OAUTH_URL,
-  EFI_PIX_KEY
+  EFI_PIX_KEY,
+  DATABASE_URL
 } = process.env;
 
 const PROD = process.env.NODE_ENV === 'production';
 
-/* ===== valida env ===== */
-['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET','DATABASE_URL'].forEach(k=>{
-  if(!process.env[k]) { console.error(`❌ Falta ${k} no .env`); process.exit(1); }
+// ===== valida env do login =====
+['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
+  if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (login)`); process.exit(1); }
 });
+// ===== valida env do Efi =====
 ['EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_CERT_PATH','EFI_KEY_PATH','EFI_PIX_KEY','EFI_BASE_URL','EFI_OAUTH_URL']
   .forEach(k => { if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (Efi)`); process.exit(1); } });
+// ===== valida PG =====
+if (!DATABASE_URL) { console.error('❌ Falta DATABASE_URL no .env'); process.exit(1); }
 
-/* ===== paths ===== */
+// ===== paths =====
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..');
+const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..'); // raiz do site
 
-/* ===== HTTPS agent Efi ===== */
+// ===== PG pool =====
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // Render PG usa SSL
+});
+
+// Funções utilitárias de DB
+const q = (text, params) => pool.query(text, params);
+
+// ===== HTTPS agent APENAS para chamadas ao Efi =====
 const httpsAgent = new https.Agent({
   cert: fs.readFileSync(EFI_CERT_PATH),
   key:  fs.readFileSync(EFI_KEY_PATH),
@@ -88,55 +109,28 @@ async function getAccessToken() {
   return resp.data.access_token;
 }
 
-/* ===== Postgres ===== */
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Render PG
-});
-
-async function initDB(){
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS bancas (
-      id TEXT PRIMARY KEY,
-      nome TEXT NOT NULL,
-      deposito_cents INT NOT NULL,
-      banca_cents INT,
-      pix_type TEXT,
-      pix_key  TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS pagamentos (
-      id TEXT PRIMARY KEY,
-      nome TEXT NOT NULL,
-      pagamento_cents INT NOT NULL,
-      pix_type TEXT,
-      pix_key  TEXT,
-      status TEXT NOT NULL DEFAULT 'nao_pago' CHECK (status IN ('pago','nao_pago')),
-      paid_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-  `);
-}
-function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-
-/* ===== app base ===== */
+// ===== app base =====
 const app = express();
+
+// Proxies (Render) — cookies secure/samesite corretos
 app.set('trust proxy', 1);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: ORIGIN, credentials: true }));
-app.options('*', cors({ origin: ORIGIN, credentials: true }));
 
-// estáticos do site
+// CORS (se front e back no mesmo domínio, OK; se outro domínio, ajuste ORIGIN)
+app.use(cors({
+  origin: ORIGIN,
+  credentials: true
+}));
+
+// Servir estáticos (site completo)
 app.use(express.static(ROOT, { extensions: ['html'] }));
 
-/* ===== auth helpers ===== */
+// ===== helpers de auth =====
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 20,
@@ -155,8 +149,8 @@ function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
 function setAuthCookies(res, token) {
   const common = {
     sameSite: 'strict',
-    secure: PROD,
-    maxAge: 2 * 60 * 60 * 1000,
+    secure: PROD,               // 🔒 em produção: true
+    maxAge: 2 * 60 * 60 * 1000, // 2h
     path: '/'
   };
   res.cookie('session', token, { ...common, httpOnly: true });
@@ -167,11 +161,13 @@ function clearAuthCookies(res){
   res.clearCookie('session', { ...common, httpOnly:true });
   res.clearCookie('csrf',    { ...common });
 }
+
 function requireAuth(req, res, next){
   const token = req.cookies?.session;
   const data = token && verifySession(token);
   if (!data) return res.status(401).json({ error: 'unauthorized' });
 
+  // CSRF para métodos que alteram estado
   if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
     const csrfHeader = req.get('X-CSRF-Token');
     const csrfCookie = req.cookies?.csrf;
@@ -183,13 +179,14 @@ function requireAuth(req, res, next){
   next();
 }
 
-/* ===== rotas de auth ===== */
+// ===== rotas de auth =====
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'missing_fields' });
 
   const userOk = username === ADMIN_USER;
   const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+
   if (!userOk || !passOk) return res.status(401).json({ error: 'invalid_credentials' });
 
   const token = signSession({ sub: ADMIN_USER, role: 'admin' });
@@ -197,7 +194,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
   return res.json({ ok: true });
 });
 
-app.post('/api/auth/logout', requireAuth, (req, res) => {
+app.post('/api/auth/logout', (req, res) => {
   clearAuthCookies(res);
   return res.json({ ok:true });
 });
@@ -209,26 +206,35 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
-// protege a área
+// Protege a área
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
-/* ===== verificação ===== */
+// ===== endpoints de verificação geral =====
 app.get('/health', async (req, res) => {
   try {
-    // confere certificados e conexão ao PG
+    // testa certs
     fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH);
-    await pool.query('SELECT 1;');
+    // testa PG
+    await q('select 1');
     return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
   } catch (e) {
-    return res.status(500).json({ ok:false, msg:String(e?.message||e) });
+    return res.status(500).json({ ok:false, error: e.message });
+  }
+});
+app.get('/api/pix/ping', async (req, res) => {
+  try {
+    const token = await getAccessToken();
+    return res.json({ ok:true, token:true });
+  } catch (e) {
+    return res.status(500).json({ ok:false, error: e.response?.data || e.message });
   }
 });
 
-/* ===== PIX (Efi) ===== */
+// ===== API PIX (Efi) =====
 app.post('/api/pix/cob', async (req, res) => {
   try {
     const { nome, cpf, valorCentavos } = req.body || {};
@@ -247,7 +253,8 @@ app.post('/api/pix/cob', async (req, res) => {
     };
 
     const { data: cob } = await axios.post(
-      `${EFI_BASE_URL}/v2/cob`, payload,
+      `${EFI_BASE_URL}/v2/cob`,
+      payload,
       { httpsAgent, headers: { Authorization: `Bearer ${token}` } }
     );
     const { txid, loc } = cob;
@@ -280,16 +287,62 @@ app.get('/api/pix/status/:txid', async (req, res) => {
   }
 });
 
-/* ===== Área (precisa login) — Postgres ===== */
+/* =========================================================
+   PUBLIC: salvar bancas sem estar logado (para o app.js)
+   Protegido por APP_PUBLIC_KEY em header: X-APP-KEY
+   ========================================================= */
+app.post('/api/public/bancas', async (req, res) => {
+  try{
+    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
+    const key = req.get('X-APP-KEY');
+    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
+
+    const { nome, depositoCents, pixType=null, pixKey=null } = req.body || {};
+    if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
+      return res.status(400).json({ error: 'dados_invalidos' });
+    }
+
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+    const { rows } = await q(
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
+       values ($1,$2,$3,$4,$5,$6, now())
+       returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
+                 pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
+      [id, nome, depositoCents, null, pixType, pixKey]
+    );
+    return res.json(rows[0]);
+  }catch(e){
+    console.error('public/bancas:', e.message);
+    return res.status(500).json({ error:'falha_public' });
+  }
+});
+
+// ====== MIDDLEWARE: todas as rotas da Área exigem login ======
 const areaAuth = [requireAuth];
 
-/* Bancas */
+/* =========================================================
+   BANCAS (Postgres)
+   Tabela esperada:
+   create table if not exists bancas(
+     id text primary key,
+     nome text not null,
+     deposito_cents integer not null,
+     banca_cents integer,
+     pix_type text,
+     pix_key text,
+     created_at timestamptz default now()
+   );
+   ========================================================= */
 app.get('/api/bancas', areaAuth, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT id, nome, deposito_cents AS "depositoCents", banca_cents AS "bancaCents",
-            pix_type AS "pixType", pix_key AS "pixKey", created_at AS "createdAt"
-     FROM bancas
-     ORDER BY created_at DESC`
+  const { rows } = await q(
+    `select id, nome,
+            deposito_cents as "depositoCents",
+            banca_cents    as "bancaCents",
+            pix_type       as "pixType",
+            pix_key        as "pixKey",
+            created_at     as "createdAt"
+     from bancas
+     order by created_at desc`
   );
   res.json(rows);
 });
@@ -299,13 +352,13 @@ app.post('/api/bancas', areaAuth, async (req, res) => {
   if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
     return res.status(400).json({ error: 'dados_invalidos' });
   }
-  const id = uid();
-  const { rows } = await pool.query(
-    `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key)
-     VALUES ($1,$2,$3,NULL,$4,$5)
-     RETURNING id, nome, deposito_cents AS "depositoCents", banca_cents AS "bancaCents",
-               pix_type AS "pixType", pix_key AS "pixKey", created_at AS "createdAt"`,
-    [id, nome, depositoCents, pixType, pixKey]
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const { rows } = await q(
+    `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
+     values ($1,$2,$3,$4,$5,$6, now())
+     returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
+               pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
+    [id, nome, depositoCents, null, pixType, pixKey]
   );
   res.json(rows[0]);
 });
@@ -315,141 +368,131 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
   if (typeof bancaCents !== 'number' || bancaCents < 0) {
     return res.status(400).json({ error: 'dados_invalidos' });
   }
-  const { rows } = await pool.query(
-    `UPDATE bancas SET banca_cents = $2 WHERE id = $1
-     RETURNING id, nome, deposito_cents AS "depositoCents", banca_cents AS "bancaCents",
-               pix_type AS "pixType", pix_key AS "pixKey", created_at AS "createdAt"`,
+  const { rows } = await q(
+    `update bancas set banca_cents = $2
+     where id = $1
+     returning id, nome,
+               deposito_cents as "depositoCents",
+               banca_cents    as "bancaCents",
+               pix_type       as "pixType",
+               pix_key        as "pixKey",
+               created_at     as "createdAt"`,
     [req.params.id, bancaCents]
   );
-  if (!rows.length) return res.status(404).json({ error: 'not_found' });
+  if (!rows.length) return res.status(404).json({ error:'not_found' });
   res.json(rows[0]);
 });
 
 app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
+  // aceita override opcional vindo do front
   const { bancaCents } = req.body || {};
-  const db = await readDB();
-  const ix = db.bancas.findIndex(x => x.id === req.params.id);
-  if (ix < 0) return res.status(404).json({ error: 'not_found' });
+  const client = await pool.connect();
+  try{
+    await client.query('begin');
 
-  const b = db.bancas[ix];
+    const sel = await client.query(
+      `select id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at
+       from bancas where id = $1 for update`,
+      [req.params.id]
+    );
+    if (!sel.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error:'not_found' });
+    }
+    const b = sel.rows[0];
 
-  // Se o cliente mandou um override válido, aplica antes de mover
-  if (typeof bancaCents === 'number' && bancaCents >= 0) {
-    b.bancaCents = bancaCents;
+    const bancaFinal = (typeof bancaCents === 'number' && bancaCents >= 0)
+      ? bancaCents
+      : (typeof b.banca_cents === 'number' && b.banca_cents > 0 ? b.banca_cents : b.deposito_cents);
+
+    await client.query(
+      `insert into pagamentos (id, nome, pagamento_cents, pix_type, pix_key, status, created_at, paid_at)
+       values ($1,$2,$3,$4,$5,'nao_pago',$6,null)`,
+      [b.id, b.nome, bancaFinal, b.pix_type, b.pix_key, b.created_at]
+    );
+    await client.query(`delete from bancas where id = $1`, [b.id]);
+
+    await client.query('commit');
+    res.json({ ok:true });
+  }catch(e){
+    await client.query('rollback');
+    console.error('to-pagamento:', e.message);
+    res.status(500).json({ error:'falha_mover' });
+  }finally{
+    client.release();
   }
-
-  db.bancas.splice(ix,1);
-
-  const valor = (typeof b.bancaCents === 'number' && b.bancaCents>0)
-    ? b.bancaCents
-    : b.depositoCents;
-
-  db.pagamentos.push({
-    id: b.id,
-    nome: b.nome,
-    pagamentoCents: valor,
-    pixType: b.pixType || null,
-    pixKey:  b.pixKey  || null,
-    status: 'nao_pago',
-    createdAt: b.createdAt
-  });
-
-  await writeDB(db);
-  res.json({ ok:true });
 });
-
 
 app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
-  const r = await pool.query(`DELETE FROM bancas WHERE id = $1`, [req.params.id]);
-  if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+  const r = await q(`delete from bancas where id = $1`, [req.params.id]);
+  if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
   res.json({ ok:true });
 });
 
-/* Pagamentos */
+/* =========================================================
+   PAGAMENTOS (Postgres)
+   Tabela esperada:
+   create table if not exists pagamentos(
+     id text primary key,
+     nome text not null,
+     pagamento_cents integer not null,
+     pix_type text,
+     pix_key text,
+     status text not null check (status in ('pago','nao_pago')),
+     created_at timestamptz default now(),
+     paid_at timestamptz
+   );
+   ========================================================= */
 app.get('/api/pagamentos', areaAuth, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT id, nome, pagamento_cents AS "pagamentoCents", pix_type AS "pixType",
-            pix_key AS "pixKey", status, paid_at AS "paidAt", created_at AS "createdAt"
-     FROM pagamentos
-     ORDER BY created_at DESC`
+  const { rows } = await q(
+    `select id, nome,
+            pagamento_cents as "pagamentoCents",
+            pix_type        as "pixType",
+            pix_key         as "pixKey",
+            status,
+            created_at      as "createdAt",
+            paid_at         as "paidAt"
+     from pagamentos
+     order by created_at desc`
   );
   res.json(rows);
 });
-
-
-// >>> PUBLIC: confirmar pagamento PIX e registrar na tabela "bancas"
-// Recebe { txid, nome, valorCentavos, tipo, chave }
-// 1) confere no Efi se o txid está CONCLUIDA
-// 2) se estiver, insere em "bancas"
-app.post('/api/pix/confirmar', async (req, res) => {
-  try {
-    const { txid, nome, valorCentavos, tipo=null, chave=null } = req.body || {};
-    if (!txid || !nome || !valorCentavos || valorCentavos < 1) {
-      return res.status(400).json({ error: 'dados_invalidos' });
-    }
-
-    // valida no Efi
-    const token = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (data.status !== 'CONCLUIDA') {
-      return res.status(409).json({ error: 'pix_nao_concluido', status: data.status });
-    }
-
-    // grava em "bancas" (Postgres)
-    const id = txid; // pode usar o próprio txid como id
-    await pool.query(
-      `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       VALUES ($1,$2,$3,NULL,$4,$5, now())
-       ON CONFLICT (id) DO NOTHING`,
-      [id, nome, valorCentavos, tipo, chave]
-    );
-
-    return res.json({ ok:true });
-  } catch (err) {
-    console.error('Erro /api/pix/confirmar:', err.response?.data || err.message);
-    return res.status(500).json({ error: 'falha_confirmar' });
-  }
-});
-
-
 
 app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
   const { status } = req.body || {};
   if (!['pago','nao_pago'].includes(status)) return res.status(400).json({ error: 'status_invalido' });
 
-  const paidAt = (status === 'pago') ? new Date() : null;
-
-  const { rows } = await pool.query(
-    `UPDATE pagamentos
-       SET status = $2, paid_at = $3
-     WHERE id = $1
-     RETURNING id, nome, pagamento_cents AS "pagamentoCents", pix_type AS "pixType",
-               pix_key AS "pixKey", status, paid_at AS "paidAt", created_at AS "createdAt"`,
-    [req.params.id, status, paidAt]
+  const { rows } = await q(
+    `update pagamentos
+       set status = $2,
+           paid_at = case when $2 = 'pago' then now() else null end
+     where id = $1
+     returning id, nome,
+               pagamento_cents as "pagamentoCents",
+               pix_type as "pixType",
+               pix_key  as "pixKey",
+               status, created_at as "createdAt", paid_at as "paidAt"`,
+    [req.params.id, status]
   );
-  if (!rows.length) return res.status(404).json({ error: 'not_found' });
+  if (!rows.length) return res.status(404).json({ error:'not_found' });
   res.json(rows[0]);
 });
 
 app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
-  const r = await pool.query(`DELETE FROM pagamentos WHERE id = $1`, [req.params.id]);
-  if (r.rowCount === 0) return res.status(404).json({ error: 'not_found' });
+  const r = await q(`delete from pagamentos where id = $1`, [req.params.id]);
+  if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
   res.json({ ok:true });
 });
 
-/* start */
-initDB().then(()=>{
-  app.listen(PORT, () => {
-    console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
-    console.log(`🗂  Servindo estáticos de: ${ROOT}`);
-    console.log(`🗄️  Postgres conectado`);
-    console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
-  });
-}).catch((e)=>{
-  console.error('❌ Falha ao iniciar DB:', e);
-  process.exit(1);
+// ===== start =====
+app.listen(PORT, async () => {
+  try{
+    await q('select 1');
+    console.log('🗄️  Postgres conectado');
+  }catch(e){
+    console.error('❌ Postgres falhou:', e.message);
+  }
+  console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
+  console.log(`🗂  Servindo estáticos de: ${ROOT}`);
+  console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
 });
