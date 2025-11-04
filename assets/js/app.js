@@ -2,7 +2,7 @@
    Depósito PIX – front (produção)
    - Cria modal do QR por JS
    - Chama backend Efi (/api/pix/cob e /api/pix/status/:txid)
-   - Ao confirmar: registra no servidor (/api/pix/confirmar)
+   - Ao confirmar: registra no servidor (/api/public/bancas)
      e cai para localStorage se o servidor rejeitar
    ========================================= */
 
@@ -39,15 +39,27 @@ function notify(msg, isError=false, time=3200){
 }
 function centsToBRL(c){ return (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function toCentsMasked(str){ return Number((str||'').replace(/\D/g,'')||0); }
+function getMeta(name){
+  const el = document.querySelector(`meta[name="${name}"]`);
+  return el ? el.content : '';
+}
 
 /* ===== Persistência ===== */
-
-// 1) Salva UNIVERSAL no servidor (rota pública que valida o TXID e grava)
-async function saveOnServer({ txid, nome, valorCentavos, tipo, chave }){
-  const res = await fetch(`${API}/api/pix/confirmar`, {
+// Salva no servidor (rota pública) se houver APP_PUBLIC_KEY
+async function saveOnServer({ nome, valorCentavos, tipo, chave }){
+  const APP_KEY = window.APP_PUBLIC_KEY || getMeta('app-key') || '';
+  const res = await fetch(`${API}/api/public/bancas`, {
     method: 'POST',
-    headers: { 'Content-Type':'application/json' },
-    body: JSON.stringify({ txid, nome, valorCentavos, tipo, chave })
+    headers: {
+      'Content-Type': 'application/json',
+      ...(APP_KEY ? { 'X-APP-KEY': APP_KEY } : {})
+    },
+    body: JSON.stringify({
+      nome,
+      depositoCents: valorCentavos,
+      pixType:  tipo,
+      pixKey:   chave
+    })
   });
   if(!res.ok){
     let msg = '';
@@ -57,7 +69,7 @@ async function saveOnServer({ txid, nome, valorCentavos, tipo, chave }){
   return res.json();
 }
 
-// 2) Fallback local (visível só neste navegador)
+// Fallback local (visível só neste navegador)
 function saveLocal({ nome, valorCentavos, tipo, chave }){
   const registro = {
     id: Date.now().toString(),
@@ -259,7 +271,7 @@ form.addEventListener('submit', async (e) => {
     nome:  nomeInput.value.trim(),
     cpf:   cpfInput.value,
     tipo:  tipoSelect.value,
-    chave: (tipoSelect.value === 'cpf' ? cpfInput.value : (chaveInput.value || '').trim()),
+    chave: (tipoSelect.value === 'cpf' ? cpfInput.value : (chaveInput.value || '').trim() ),
     valorCentavos
   };
 
@@ -294,17 +306,15 @@ form.addEventListener('submit', async (e) => {
           clearInterval(timer);
           st.textContent = 'Pagamento confirmado! ✅';
 
-          // 4) registra de forma universal
+          // 4) registra no servidor (público) e, se falhar, salva local
           try{
             await saveOnServer({
-              txid,
               nome: dados.nome,
               valorCentavos: dados.valorCentavos,
               tipo: dados.tipo,
               chave: dados.chave
             });
           }catch(_err){
-            // fallback local se o servidor não aceitar
             saveLocal({
               nome: dados.nome,
               valorCentavos: dados.valorCentavos,

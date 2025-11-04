@@ -85,9 +85,30 @@ const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: { rejectUnauthorized: false } // Render PG usa SSL
 });
-
-// Funções utilitárias de DB
 const q = (text, params) => pool.query(text, params);
+
+// ===== cria tabelas se não existirem =====
+async function ensureSchema() {
+  await q(`create table if not exists bancas(
+    id text primary key,
+    nome text not null,
+    deposito_cents integer not null,
+    banca_cents integer,
+    pix_type text,
+    pix_key text,
+    created_at timestamptz default now()
+  );`);
+  await q(`create table if not exists pagamentos(
+    id text primary key,
+    nome text not null,
+    pagamento_cents integer not null,
+    pix_type text,
+    pix_key text,
+    status text not null check (status in ('pago','nao_pago')),
+    created_at timestamptz default now(),
+    paid_at timestamptz
+  );`);
+}
 
 // ===== HTTPS agent APENAS para chamadas ao Efi =====
 const httpsAgent = new https.Agent({
@@ -112,13 +133,12 @@ async function getAccessToken() {
 // ===== app base =====
 const app = express();
 
-// Proxies (Render) — cookies secure/samesite corretos
 app.set('trust proxy', 1);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 // CORS (se front e back no mesmo domínio, OK; se outro domínio, ajuste ORIGIN)
@@ -149,7 +169,7 @@ function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
 function setAuthCookies(res, token) {
   const common = {
     sameSite: 'strict',
-    secure: PROD,               // 🔒 em produção: true
+    secure: PROD,
     maxAge: 2 * 60 * 60 * 1000, // 2h
     path: '/'
   };
@@ -167,7 +187,6 @@ function requireAuth(req, res, next){
   const data = token && verifySession(token);
   if (!data) return res.status(401).json({ error: 'unauthorized' });
 
-  // CSRF para métodos que alteram estado
   if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
     const csrfHeader = req.get('X-CSRF-Token');
     const csrfCookie = req.cookies?.csrf;
@@ -213,12 +232,10 @@ app.get('/area.html', (req, res) => {
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
-// ===== endpoints de verificação geral =====
+// ===== endpoints de verificação =====
 app.get('/health', async (req, res) => {
   try {
-    // testa certs
     fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH);
-    // testa PG
     await q('select 1');
     return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
   } catch (e) {
@@ -291,7 +308,13 @@ app.get('/api/pix/status/:txid', async (req, res) => {
    PUBLIC: salvar bancas sem estar logado (para o app.js)
    Protegido por APP_PUBLIC_KEY em header: X-APP-KEY
    ========================================================= */
-app.post('/api/public/bancas', async (req, res) => {
+const publicLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.post('/api/public/bancas', publicLimiter, async (req, res) => {
   try{
     if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
     const key = req.get('X-APP-KEY');
@@ -322,16 +345,6 @@ const areaAuth = [requireAuth];
 
 /* =========================================================
    BANCAS (Postgres)
-   Tabela esperada:
-   create table if not exists bancas(
-     id text primary key,
-     nome text not null,
-     deposito_cents integer not null,
-     banca_cents integer,
-     pix_type text,
-     pix_key text,
-     created_at timestamptz default now()
-   );
    ========================================================= */
 app.get('/api/bancas', areaAuth, async (req, res) => {
   const { rows } = await q(
@@ -431,17 +444,6 @@ app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
 
 /* =========================================================
    PAGAMENTOS (Postgres)
-   Tabela esperada:
-   create table if not exists pagamentos(
-     id text primary key,
-     nome text not null,
-     pagamento_cents integer not null,
-     pix_type text,
-     pix_key text,
-     status text not null check (status in ('pago','nao_pago')),
-     created_at timestamptz default now(),
-     paid_at timestamptz
-   );
    ========================================================= */
 app.get('/api/pagamentos', areaAuth, async (req, res) => {
   const { rows } = await q(
@@ -488,6 +490,7 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
 app.listen(PORT, async () => {
   try{
     await q('select 1');
+    await ensureSchema();
     console.log('🗄️  Postgres conectado');
   }catch(e){
     console.error('❌ Postgres falhou:', e.message);
