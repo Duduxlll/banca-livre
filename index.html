@@ -4,18 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bancas • Depósito PIX</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <link rel="stylesheet" href="assets/css/pix.css">
+
+  <!-- 1) Chave pública: deve ser IGUAL à APP_PUBLIC_KEY do servidor -->
   <meta name="app-key" content="b01c7cd2e87519f8d0e62fafc69c80f8babb54d0a9799fefdad28d4520e7d25bd39f140cb948041e5c5caa43e7d7f905">
+
+  <!-- Estilo: você pode manter inline ou separar em assets/css/style.css -->
+ 
+<link rel="stylesheet" href="assets/css/style.css">
+  <!-- 2) (Opcional) já deixar o CSS do modal QR carregado -->
+  <link rel="stylesheet" href="assets/css/pix.css">
 </head>
 <body>
   <header>
     <div class="wrap">
       <div class="topbar">
-        <!-- Logo do topo: troque assets/img/logo.png pelo seu arquivo -->
-        <img src="assets/img/banner.jpg" alt="Bancas" class="brand-img" />
+        <div class="logo" aria-hidden="true"></div>
         <div>
           <div class="brand">Bancas</div>
           <div class="subtitle">Depósito via PIX simples, bonito e seguro ✨</div>
@@ -26,18 +29,16 @@
 
   <main class="wrap">
     <div class="grid">
+      <!-- FORMULÁRIO PRINCIPAL -->
       <section class="card" aria-labelledby="form-title">
-        <!-- Banner com imagem via CSS (assets/css/style.css → --banner-img) -->
         <div class="banner">
           <div class="hero-shape" aria-hidden="true"></div>
         </div>
-
         <div class="card-header">
           <span class="pill">1ª etapa</span>
           <h2 id="form-title" style="margin:12px 0 0">Identificação & Chave PIX</h2>
           <p class="subtitle" style="margin:6px 0 0">Preencha seus dados e escolha a chave PIX para receber o depósito.</p>
         </div>
-
         <div class="card-body">
           <form id="depositoForm" novalidate>
             <div class="row">
@@ -86,6 +87,7 @@
         </div>
       </section>
 
+      <!-- RESUMO AO LADO -->
       <aside class="aside">
         <section class="card">
           <div class="card-body">
@@ -107,7 +109,7 @@
               <li>Você informa seu CPF e seu nome.</li>
               <li>Escolhe o tipo de chave PIX (CPF, aleatória, telefone ou e-mail).</li>
               <li>Define o valor (mínimo R$ 10,00) e clica em <strong>Fazer depósito</strong>.</li>
-              <li>Nesta versão, mostramos uma confirmação. A geração do QR-Code/PIX vem na próxima etapa.</li>
+              <li>O QR-Code do PIX abre e, após o pagamento <em>CONCLUÍDO</em>, o registro vai para a Área.</li>
             </ol>
           </div>
         </section>
@@ -119,10 +121,10 @@
     </footer>
   </main>
 
+  <!-- TOAST -->
   <div class="toast" id="toast"></div>
-  
-  
-<script src="assets/js/app.js"></script>
 
+  <!-- 3) Usa o app.js que faz TODO o fluxo do PIX -->
+  <script src="assets/js/app.js"></script>
 </body>
 </html>

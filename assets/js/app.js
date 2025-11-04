@@ -2,7 +2,7 @@
    Depósito PIX – front (produção)
    - Cria modal do QR por JS
    - Chama backend Efi (/api/pix/cob e /api/pix/status/:txid)
-   - Ao confirmar: registra no servidor (/api/public/bancas)
+   - Ao confirmar: registra no servidor (/api/pix/confirmar)
      e cai para localStorage se o servidor rejeitar
    ========================================= */
 
@@ -45,25 +45,22 @@ function getMeta(name){
 }
 
 /* ===== Persistência ===== */
-
-// Salva universalmente no servidor (rota pública com app-key)
-async function saveOnServer({ txid, nome, valorCentavos, tipo, chave }){
+// Salva UNIVERSAL no servidor validando o TXID (rota pública segura)
+async function saveOnServerConfirmado({ txid, nome, valorCentavos, tipo, chave }){
   const APP_KEY = window.APP_PUBLIC_KEY || getMeta('app-key') || '';
-  const res = await fetch(`${API}/api/public/bancas`, {
+  const res = await fetch(`${API}/api/pix/confirmar`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(APP_KEY ? { 'X-APP-KEY': APP_KEY } : {})
     },
-    body: JSON.stringify({
-      txid: txid || null,           // opcional; o servidor pode ignorar
-      nome,
-      depositoCents: valorCentavos,
-      pixType:  tipo,
-      pixKey:   chave
-    })
+    body: JSON.stringify({ txid, nome, valorCentavos, tipo, chave })
   });
-  if (!res.ok) throw new Error(`Falha ao salvar no servidor (${res.status})`);
+  if (!res.ok) {
+    let msg = `Falha ao confirmar (${res.status})`;
+    try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
@@ -108,7 +105,7 @@ tipoSelect.addEventListener('change', () => {
     chaveInput.placeholder = t === 'telefone' ? '(00) 90000-0000' : (t === 'email' ? 'seu@email.com' : 'Ex.: 2e1a-…)');
   }
 });
-// aplica estado inicial
+// estado inicial do wrapper
 tipoSelect.dispatchEvent(new Event('change'));
 
 chaveInput.addEventListener('input', () => {
@@ -310,9 +307,9 @@ form.addEventListener('submit', async (e) => {
           clearInterval(timer);
           st.textContent = 'Pagamento confirmado! ✅';
 
-          // 4) registra de forma universal
+          // 4) registra no servidor com validação de TXID (universal)
           try{
-            await saveOnServer({
+            await saveOnServerConfirmado({
               txid,
               nome: dados.nome,
               valorCentavos: dados.valorCentavos,
@@ -320,13 +317,14 @@ form.addEventListener('submit', async (e) => {
               chave: dados.chave
             });
           }catch(_err){
+            // fallback local se o servidor recusar (não recomendado para produção)
             saveLocal({
               nome: dados.nome,
               valorCentavos: dados.valorCentavos,
               tipo: dados.tipo,
               chave: dados.chave
             });
-            notify('Servidor não aceitou o registro — salvo localmente.', true, 4200);
+            notify('Servidor não confirmou o registro — salvo localmente.', true, 4200);
           }
 
           setTimeout(()=>{

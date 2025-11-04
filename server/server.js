@@ -29,7 +29,7 @@ const { Pool } = pkg;
    ADMIN_PASSWORD_HASH=<hash_bcrypt>
    JWT_SECRET=<64+ chars aleatórios>
 
-   # Chave pública opcional p/ salvar bancas sem login (app.js)
+   # Chave pública p/ endpoints sem sessão (front depositante):
    APP_PUBLIC_KEY=<uma-chave-só-sua>
 
    # Efi (PIX)
@@ -48,7 +48,7 @@ const { Pool } = pkg;
 const {
   PORT = 3000,
   ORIGIN = `http://localhost:3000`,
-  STATIC_ROOT, // opcional; default = pai de /server
+  STATIC_ROOT,
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
@@ -85,8 +85,6 @@ const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: { rejectUnauthorized: false } // Render PG usa SSL
 });
-
-// Funções utilitárias de DB
 const q = (text, params) => pool.query(text, params);
 
 // ===== HTTPS agent APENAS para chamadas ao Efi =====
@@ -109,10 +107,17 @@ async function getAccessToken() {
   return resp.data.access_token;
 }
 
+function brlStrToCents(strOriginal) {
+  // Efi manda "10.00" como string; convertemos para cents com arredondamento
+  const n = Number.parseFloat(String(strOriginal).replace(',', '.'));
+  if (Number.isNaN(n)) return null;
+  return Math.round(n * 100);
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
 // ===== app base =====
 const app = express();
-
-// Proxies (Render) — cookies secure/samesite corretos
 app.set('trust proxy', 1);
 
 app.use(helmet({
@@ -121,11 +126,7 @@ app.use(helmet({
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS (se front e back no mesmo domínio, OK; se outro domínio, ajuste ORIGIN)
-app.use(cors({
-  origin: ORIGIN,
-  credentials: true
-}));
+app.use(cors({ origin: ORIGIN, credentials: true }));
 
 // Servir estáticos (site completo)
 app.use(express.static(ROOT, { extensions: ['html'] }));
@@ -149,8 +150,8 @@ function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
 function setAuthCookies(res, token) {
   const common = {
     sameSite: 'strict',
-    secure: PROD,               // 🔒 em produção: true
-    maxAge: 2 * 60 * 60 * 1000, // 2h
+    secure: PROD,
+    maxAge: 2 * 60 * 60 * 1000,
     path: '/'
   };
   res.cookie('session', token, { ...common, httpOnly: true });
@@ -167,7 +168,6 @@ function requireAuth(req, res, next){
   const data = token && verifySession(token);
   if (!data) return res.status(401).json({ error: 'unauthorized' });
 
-  // CSRF para métodos que alteram estado
   if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
     const csrfHeader = req.get('X-CSRF-Token');
     const csrfCookie = req.cookies?.csrf;
@@ -216,9 +216,7 @@ app.get('/area.html', (req, res) => {
 // ===== endpoints de verificação geral =====
 app.get('/health', async (req, res) => {
   try {
-    // testa certs
     fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH);
-    // testa PG
     await q('select 1');
     return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
   } catch (e) {
@@ -288,8 +286,65 @@ app.get('/api/pix/status/:txid', async (req, res) => {
 });
 
 /* =========================================================
-   PUBLIC: salvar bancas sem estar logado (para o app.js)
-   Protegido por APP_PUBLIC_KEY em header: X-APP-KEY
+   NOVO: PUBLIC/SEGURO — confirmar pagamento por TXID
+   - Requer header X-APP-KEY igual a APP_PUBLIC_KEY
+   - Valida na Efi: status = "CONCLUIDA" e valor bate
+   - Grava em "bancas"
+   ========================================================= */
+app.post('/api/pix/confirmar', async (req, res) => {
+  try{
+    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
+    const key = req.get('X-APP-KEY');
+    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
+
+    const { txid, nome, valorCentavos, tipo=null, chave=null } = req.body || {};
+    if (!txid || !nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
+      return res.status(400).json({ error:'dados_invalidos' });
+    }
+
+    // 1) consulta na Efi
+    const token = await getAccessToken();
+    const { data } = await axios.get(
+      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(txid)}`,
+      { httpsAgent, headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    // 2) valida status + valor
+    if (data.status !== 'CONCLUIDA') {
+      return res.status(409).json({ error:'pix_nao_concluido' });
+    }
+    const valorEfiCents = brlStrToCents(data?.valor?.original);
+    if (valorEfiCents == null) {
+      return res.status(500).json({ error:'valor_invalido_efi' });
+    }
+    if (valorEfiCents !== valorCentavos) {
+      return res.status(409).json({ error:'valor_divergente' });
+    }
+
+    // 3) insere/atualiza em bancas
+    const id = uid(); // podemos usar o próprio txid como id se preferir
+    const { rows } = await q(
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
+       values ($1,$2,$3,$4,$5,$6, now())
+       returning id, nome,
+                 deposito_cents as "depositoCents",
+                 banca_cents    as "bancaCents",
+                 pix_type       as "pixType",
+                 pix_key        as "pixKey",
+                 created_at     as "createdAt"`,
+      [id, nome, valorCentavos, null, tipo, chave]
+    );
+
+    return res.json({ ok:true, ...rows[0] });
+  }catch(e){
+    console.error('pix/confirmar:', e.response?.data || e.message);
+    return res.status(500).json({ error:'falha_confirmar' });
+  }
+});
+
+/* =========================================================
+   (Opcional) PUBLIC: salvar sem validar TXID (legado)
+   Mantido para testes. Em produção, prefira /api/pix/confirmar.
    ========================================================= */
 app.post('/api/public/bancas', async (req, res) => {
   try{
@@ -302,7 +357,7 @@ app.post('/api/public/bancas', async (req, res) => {
       return res.status(400).json({ error: 'dados_invalidos' });
     }
 
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+    const id = uid();
     const { rows } = await q(
       `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
        values ($1,$2,$3,$4,$5,$6, now())
@@ -352,7 +407,7 @@ app.post('/api/bancas', areaAuth, async (req, res) => {
   if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
     return res.status(400).json({ error: 'dados_invalidos' });
   }
-  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  const id = uid();
   const { rows } = await q(
     `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
      values ($1,$2,$3,$4,$5,$6, now())
@@ -384,7 +439,6 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
 });
 
 app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
-  // aceita override opcional vindo do front
   const { bancaCents } = req.body || {};
   const client = await pool.connect();
   try{
@@ -471,7 +525,7 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
                pagamento_cents as "pagamentoCents",
                pix_type as "pixType",
                pix_key  as "pixKey",
-               status, created_at as "createdAt", paid_at as "paidAt"`,
+               status, created_at as "createdAt", paid_at as "PaidAt"`,
     [req.params.id, status]
   );
   if (!rows.length) return res.status(404).json({ error:'not_found' });
