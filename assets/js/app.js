@@ -1,19 +1,13 @@
+
 /* ========================================= 
-   Depósito PIX – front (produção, privacidade)
-   - Cria modal do QR por JS
-   - Chama backend Efi (/api/pix/cob) sem CPF
-   - Faz polling de status (/api/pix/status/:txid)
-   - Ao concluir: confirma e registra (/api/pix/confirmar)
-   - Minimiza dados expostos nas requests/respostas
-   - Inclui a lógica UI: alternar CPF/Chave conforme tipo,
-     máscaras e espelhamento no Resumo.
+   Depósito PIX – front (privacidade, UI/validação)
    ========================================= */
 
 const API = window.location.origin;
 
 /* ===== Seletores ===== */
-const cpfInput    = document.querySelector('#cpf');              // pode não existir na primeira linha
-const cpfWrapper  = document.querySelector('#cpfWrapper');       // existe quando CPF aparece só ao escolher "CPF"
+const cpfInput    = document.querySelector('#cpf');              // pode estar oculto e só aparecer no tipo CPF
+const cpfWrapper  = document.querySelector('#cpfWrapper');       // se existir, será mostrado só no tipo CPF
 const nomeInput   = document.querySelector('#nome');
 const tipoSelect  = document.querySelector('#tipoChave');
 const chaveWrap   = document.querySelector('#chaveWrapper');
@@ -23,11 +17,11 @@ const form        = document.querySelector('#depositoForm');
 const toast       = document.querySelector('#toast');
 const btnSubmit   = document.querySelector('#btnDepositar');
 
-// Resumo (alguns podem não existir dependendo do seu HTML)
-const rCpf     = document.querySelector('#r-cpf');       // opcional (resumo sem CPF é o recomendado)
+// Resumo (alguns podem não existir no seu HTML)
+const rCpf     = document.querySelector('#r-cpf');
 const rNome    = document.querySelector('#r-nome');
 const rTipo    = document.querySelector('#r-tipo');
-const rChaveLi = document.querySelector('#r-chave-li');  // pode existir/ser ocultado
+const rChaveLi = document.querySelector('#r-chave-li');
 const rChave   = document.querySelector('#r-chave');
 const rValor   = document.querySelector('#r-valor');
 
@@ -35,7 +29,7 @@ const rValor   = document.querySelector('#r-valor');
 const anoEl = document.querySelector('#ano');
 if (anoEl) anoEl.textContent = new Date().getFullYear();
 
-function notify(msg, isError=false, time=3200){
+function notify(msg, isError=false, time=3600){
   if(!toast){ alert(msg); return; }
   toast.textContent = msg;
   toast.style.borderColor = isError ? 'rgba(255,92,122,.45)' : 'rgba(0,209,143,.45)';
@@ -44,12 +38,9 @@ function notify(msg, isError=false, time=3200){
 }
 function centsToBRL(c){ return (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function toCentsMasked(str){ return Number((str||'').replace(/\D/g,'')||0); }
-function getMeta(name){
-  const el = document.querySelector(`meta[name="${name}"]`);
-  return el ? el.content : '';
-}
+function getMeta(name){ const el = document.querySelector(`meta[name="${name}"]`); return el ? el.content : ''; }
 
-/* ===== Máscaras helpers ===== */
+/* ===== Máscaras ===== */
 function maskCPF(value){
   let v = String(value||'').replace(/\D/g,'').slice(0,11);
   v = v.replace(/(\d{3})(\d)/,'$1.$2')
@@ -64,8 +55,7 @@ function maskPhone(value){
   return v;
 }
 
-/* ===== Persistência ===== */
-// Salva no servidor validando o TXID (rota pública segura, sem vazar dados)
+/* ===== Persistência (confirmação segura no servidor) ===== */
 async function saveOnServerConfirmado({ txid, nome, valorCentavos, tipo, chave }){
   const APP_KEY = getMeta('app-key') || '';
   const res = await fetch(`${API}/api/pix/confirmar`, {
@@ -78,7 +68,6 @@ async function saveOnServerConfirmado({ txid, nome, valorCentavos, tipo, chave }
       txid,
       nome: (nome||'').toString().slice(0,120),
       valorCentavos,
-      // tipo/chave são opcionais; só enviamos se existirem:
       ...(tipo ? { tipo } : {}),
       ...(chave ? { chave } : {})
     })
@@ -88,10 +77,10 @@ async function saveOnServerConfirmado({ txid, nome, valorCentavos, tipo, chave }
     try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
     throw new Error(msg);
   }
-  return res.json(); // { ok:true, id, ... }
+  return res.json();
 }
 
-// Fallback local (visível só neste navegador)
+// Fallback local (apenas para contingência)
 function saveLocal({ nome, valorCentavos, tipo, chave }){
   const registro = {
     id: Date.now().toString(),
@@ -110,58 +99,17 @@ function saveLocal({ nome, valorCentavos, tipo, chave }){
 if (nomeInput && rNome) {
   nomeInput.addEventListener('input', () => rNome.textContent = nomeInput.value.trim() || '—');
 }
-if (cpfInput && rCpf) {
-  // Se existir um rCpf (caso você não tenha removido do resumo)
+if (cpfInput) {
   cpfInput.addEventListener('input', () => {
     cpfInput.value = maskCPF(cpfInput.value);
-    rCpf.textContent = cpfInput.value || '—';
+    // Quando tipo=CPF, o CPF deve aparecer na linha "Chave" do resumo
+    if (rChave && tipoSelect && tipoSelect.value === 'cpf') {
+      rChave.textContent = cpfInput.value || '—';
+    }
+    // Se você mantiver a linha "CPF" no resumo, também atualiza
+    if (rCpf) rCpf.textContent = cpfInput.value || '—';
   });
 }
-
-/* ===== Alternância CPF/Chave conforme tipo ===== */
-function updateTipoUI(){
-  if (!tipoSelect) return;
-  const t = tipoSelect.value;
-
-  // Texto do resumo (se existir)
-  if (rTipo) {
-    rTipo.textContent = (t === 'aleatoria') ? 'Chave aleatória' : (t.charAt(0).toUpperCase()+t.slice(1));
-  }
-
-  // Quando CPF é escolhido:
-  if (t === 'cpf') {
-    // Se seu HTML usa wrappers dedicados:
-    if (cpfWrapper) cpfWrapper.style.display = '';
-    if (chaveWrap)  { chaveWrap.style.display  = 'none'; }
-    if (rChaveLi)   rChaveLi.style.display = ''; // mantemos a mesma linha "Chave" no resumo
-    if (cpfInput) {
-      cpfInput.value = maskCPF(cpfInput.value);
-      if (rChave) rChave.textContent = cpfInput.value || '—';
-    }
-  } else {
-    // Outros tipos (aleatória, telefone, email):
-    if (cpfWrapper) cpfWrapper.style.display = 'none';
-    if (chaveWrap)  {
-      chaveWrap.style.display  = '';
-      if (chaveInput) {
-        // Placeholder conforme tipo
-        chaveInput.placeholder = t === 'telefone'
-          ? '(00) 90000-0000'
-          : (t === 'email' ? 'seu@email.com' : 'Ex.: 2e1a-…)');
-      }
-    }
-    if (rChaveLi) rChaveLi.style.display = ''; // mostra a linha "Chave" no resumo
-    if (rChave && chaveInput) rChave.textContent = (chaveInput.value || '').trim() || '—';
-  }
-}
-
-if (tipoSelect) {
-  tipoSelect.addEventListener('change', updateTipoUI);
-  // Estado inicial:
-  updateTipoUI();
-}
-
-/* ===== Chave (telefone/email/aleatória) => Resumo ===== */
 if (chaveInput) {
   chaveInput.addEventListener('input', () => {
     if (!tipoSelect) return;
@@ -172,8 +120,6 @@ if (chaveInput) {
     if (rChave) rChave.textContent = (chaveInput.value || '').trim() || '—';
   });
 }
-
-/* ===== Valor (máscara e resumo) ===== */
 if (valorInput && rValor) {
   valorInput.addEventListener('input', () => {
     let v = valorInput.value.replace(/\D/g,'');
@@ -184,6 +130,42 @@ if (valorInput && rValor) {
     valorInput.value = money;
     rValor.textContent = money;
   });
+}
+
+/* ===== Alternância de UI conforme tipo ===== */
+function updateTipoUI(){
+  if (!tipoSelect) return;
+  const t = tipoSelect.value;
+
+  if (rTipo) {
+    rTipo.textContent = (t === 'aleatoria') ? 'Chave aleatória' : (t.charAt(0).toUpperCase()+t.slice(1));
+  }
+
+  if (t === 'cpf') {
+    // Mostrar campo CPF; esconder campo "chave pix"
+    if (cpfWrapper) cpfWrapper.style.display = '';
+    if (cpfInput)  { cpfInput.value = maskCPF(cpfInput.value); }
+    if (chaveWrap) chaveWrap.style.display = 'none';
+    if (rChaveLi)  rChaveLi.style.display = ''; // mantém a linha "Chave" visível
+    if (rChave && cpfInput) rChave.textContent = cpfInput.value || '—';
+  } else {
+    // Outros tipos => esconder CPF; mostrar "chave pix"
+    if (cpfWrapper) cpfWrapper.style.display = 'none';
+    if (chaveWrap)  {
+      chaveWrap.style.display = '';
+      if (chaveInput) {
+        chaveInput.placeholder = t === 'telefone'
+          ? '(00) 90000-0000'
+          : (t === 'email' ? 'seu@email.com' : 'Ex.: 2e1a-…)');
+      }
+    }
+    if (rChaveLi) rChaveLi.style.display = '';
+    if (rChave && chaveInput) rChave.textContent = (chaveInput.value || '').trim() || '—';
+  }
+}
+if (tipoSelect) {
+  tipoSelect.addEventListener('change', updateTipoUI);
+  updateTipoUI();
 }
 
 /* ===== Validações ===== */
@@ -199,7 +181,7 @@ function isCPFValid(cpf){
 function isEmail(v){ return /.+@.+\..+/.test(v); }
 function showError(sel, ok){ const el = document.querySelector(sel); if(!el) return; ok ? el.classList.remove('show') : el.classList.add('show'); }
 
-/* ===== Modal de QR (dinâmico) ===== */
+/* ===== Modal de QR ===== */
 function ensurePixStyles(){
   if (!document.getElementById('pixCss')) {
     const link = document.createElement('link');
@@ -280,26 +262,24 @@ function ensurePixModal(){
   return dlg;
 }
 
-/* ===== Backend Efi ===== */
-// ⚠️ PRIVACIDADE: não enviamos CPF para o backend.
-// Somente nome (opcional) e valor.
+/* ===== Backend Efi (sem enviar CPF) ===== */
 async function criarCobrancaPIX({ nome, valorCentavos }){
   const resp = await fetch(`${API}/api/pix/cob`, {
     method:'POST',
     headers:{ 'Content-Type':'application/json' },
     body: JSON.stringify({
-      // nome é opcional no servidor, mas enviamos se o usuário preencheu
       ...(nome ? { nome } : {}),
       valorCentavos
     })
   });
   if(!resp.ok){
-    let err = 'Falha ao criar PIX';
-    try{ const j = await resp.json(); if(j.error) err = j.error; }catch{}
-    throw new Error(err);
+    // Mensagem mais clara pra 500 (problema do servidor/Efi)
+    const msg = resp.status === 500
+      ? 'Erro 500 ao criar PIX. Verifique as credenciais/certificado da Efi no servidor.'
+      : 'Falha ao criar PIX.';
+    throw new Error(msg);
   }
-  // resposta já é minimalista: { txid, emv, qrPng }
-  return resp.json();
+  return resp.json(); // { txid, emv, qrPng }
 }
 
 /* ===== Submit ===== */
@@ -307,7 +287,7 @@ if (form) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const tipo    = tipoSelect ? tipoSelect.value : 'cpf';
+    const tipo = tipoSelect ? tipoSelect.value : 'cpf';
     const cpfObrigatorio = (tipo === 'cpf');
 
     const cpfOk   = cpfObrigatorio ? (cpfInput ? isCPFValid(cpfInput.value) : false) : true;
@@ -319,6 +299,9 @@ if (form) {
       if (tipo === 'email')         chaveOk = isEmail(v);
       else if (tipo === 'telefone') chaveOk = v.replace(/\D/g,'').length === 11;
       else                          chaveOk = v.length >= 10; // aleatória
+    } else {
+      // sincroniza resumo "Chave" com CPF
+      if (rChave && cpfInput) rChave.textContent = maskCPF(cpfInput.value) || '—';
     }
 
     const valorCentavos = toCentsMasked(valorInput?.value);
@@ -374,33 +357,27 @@ if (form) {
                 txid,
                 nome,
                 valorCentavos,
-                // tipo/chave apenas se existirem:
                 ...(tipo ? { tipo } : {}),
                 ...(chave ? { chave } : {})
               });
             }catch(_err){
-              // Fallback local (não recomendado p/ produção)
               saveLocal({ nome, valorCentavos, tipo, chave });
               notify('Servidor não confirmou o registro — salvo localmente.', true, 4200);
             }
 
-            setTimeout(()=>{
-              dlg.close();
-              notify('Pagamento confirmado! Registro salvo.', false, 4500);
-            }, 900);
+            setTimeout(()=>{ dlg.close(); notify('Pagamento confirmado! Registro salvo.', false, 4500); }, 900);
           } else if (tries <= 0) {
             clearInterval(timer);
             st.textContent = 'Tempo esgotado. Se já pagou, a confirmação aparecerá na Área.';
           }
-        }catch(_loopErr){
-          // silencioso (evita vazar dados em console)
-        }
+        }catch(_loopErr){ /* silencioso */ }
       }, 5000);
 
     }catch(e){
-      notify('Não foi possível iniciar o PIX. Tente novamente.', true);
+      notify(e.message || 'Não foi possível iniciar o PIX. Tente novamente.', true);
     } finally {
       if (btnSubmit) btnSubmit.disabled = false;
     }
   });
 }
+
