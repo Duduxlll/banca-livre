@@ -3,7 +3,6 @@ import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,7 +12,6 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import axios from 'axios';
-import QRCode from 'qrcode';
 import pkg from 'pg';
 const { Pool } = pkg;
 
@@ -23,23 +21,22 @@ const { Pool } = pkg;
    NODE_ENV=production
    PORT=10000
    ORIGIN=https://seu-app.onrender.com
-   STATIC_ROOT=..             # raiz do site (pai de /server)
+   STATIC_ROOT=..                 # raiz do site (pai de /server)
 
    ADMIN_USER=admin
    ADMIN_PASSWORD_HASH=<hash_bcrypt>
    JWT_SECRET=<64+ chars aleatórios>
 
-   # Chave pública p/ endpoints sem sessão (front depositante):
-   APP_PUBLIC_KEY=<uma-chave-só-sua>
+   APP_PUBLIC_KEY=<chave-publica-pro-front>
 
-   # Efi (PIX)
-   EFI_CLIENT_ID=...
-   EFI_CLIENT_SECRET=...
-   EFI_PIX_KEY=...
-   EFI_BASE_URL=https://pix-h.api.efipay.com.br
-   EFI_OAUTH_URL=https://pix-h.api.efipay.com.br/oauth/token
-   EFI_CERT_PATH=/etc/secrets/client-cert.pem
-   EFI_KEY_PATH=/etc/secrets/client-key.pem
+   # >>> Se for usar LivePix <<<
+   PIX_PROVIDER=livepix
+   LIVEPIX_CLIENT_ID=...
+   LIVEPIX_CLIENT_SECRET=...
+   LIVEPIX_API_BASE=https://api.livepix.gg        # confirme no painel/doc
+   LIVEPIX_REDIRECT_URL=https://seu-app.onrender.com/obrigado   # opcional (UX)
+   LIVEPIX_WEBHOOK_SECRET=<segredo-usado-para-assinar-webhooks> # se houver
+   LIVEPIX_WEBHOOK_ALLOWLIST=                          # opcional: IPs separados por vírgula (se o serviço publicar)
 
    # Postgres (Render)
    DATABASE_URL=postgres://usuario:senha@host:5432/db
@@ -49,294 +46,268 @@ const {
   PORT = 3000,
   ORIGIN = `http://localhost:3000`,
   STATIC_ROOT,
+
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
+
   APP_PUBLIC_KEY,
-  EFI_CLIENT_ID,
-  EFI_CLIENT_SECRET,
-  EFI_CERT_PATH,
-  EFI_KEY_PATH,
-  EFI_BASE_URL,
-  EFI_OAUTH_URL,
-  EFI_PIX_KEY,
+
+  // Provedor
+  PIX_PROVIDER = 'livepix',
+
+  // LivePix
+  LIVEPIX_CLIENT_ID,
+  LIVEPIX_CLIENT_SECRET,
+  LIVEPIX_API_BASE,
+  LIVEPIX_REDIRECT_URL,
+  LIVEPIX_WEBHOOK_SECRET,
+  LIVEPIX_WEBHOOK_ALLOWLIST,
+
+  // Postgres
   DATABASE_URL
 } = process.env;
 
 const PROD = process.env.NODE_ENV === 'production';
 
-// ===== valida env do login =====
+// ===== valida env base =====
 ['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
   if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (login)`); process.exit(1); }
 });
-// ===== valida env do Efi =====
-['EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_CERT_PATH','EFI_KEY_PATH','EFI_PIX_KEY','EFI_BASE_URL','EFI_OAUTH_URL']
-  .forEach(k => { if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (Efi)`); process.exit(1); } });
-// ===== valida PG =====
 if (!DATABASE_URL) { console.error('❌ Falta DATABASE_URL no .env'); process.exit(1); }
 
-// ===== paths =====
+// ===== valida LivePix quando ativo =====
+if ((PIX_PROVIDER||'').toLowerCase() === 'livepix') {
+  [
+    'LIVEPIX_CLIENT_ID',
+    'LIVEPIX_CLIENT_SECRET',
+    'LIVEPIX_API_BASE'
+  ].forEach(k=>{
+    if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (LivePix)`); process.exit(1); }
+  });
+}
+
+// ===== infra =====
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..'); // raiz do site
+const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..');
 
-// ===== PG pool =====
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // Render PG usa SSL
+  ssl: { rejectUnauthorized: false }
 });
 const q = (text, params) => pool.query(text, params);
 
-// ===== HTTPS agent APENAS para chamadas ao Efi =====
-const httpsAgent = new https.Agent({
-  cert: fs.readFileSync(EFI_CERT_PATH),
-  key:  fs.readFileSync(EFI_KEY_PATH),
-  rejectUnauthorized: true
-});
-
-async function getAccessToken() {
-  const resp = await axios.post(
-    EFI_OAUTH_URL,
-    'grant_type=client_credentials',
-    {
-      httpsAgent,
-      auth: { username: EFI_CLIENT_ID, password: EFI_CLIENT_SECRET },
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    }
-  );
-  return resp.data.access_token;
-}
-
-function brlStrToCents(strOriginal) {
-  // Efi manda "10.00" como string; convertemos para cents com arredondamento
-  const n = Number.parseFloat(String(strOriginal).replace(',', '.'));
-  if (Number.isNaN(n)) return null;
-  return Math.round(n * 100);
-}
-
+// ===== utils =====
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function tok(){ return 'tok_' + crypto.randomBytes(18).toString('hex'); }
 
-// ===== store em memória p/ token -> txid (TTL 15 min) =====
-/** tokenStore: token -> { txid, createdAt: ms } */
+// token -> providerPaymentId (TTL 30 min)
 const tokenStore = new Map();
-const TOKEN_TTL_MS = 15 * 60 * 1000;
-setInterval(() => {
+const TOKEN_TTL_MS = 30 * 60 * 1000;
+setInterval(()=> {
   const now = Date.now();
-  for (const [k, v] of tokenStore) {
-    if (now - v.createdAt > TOKEN_TTL_MS) tokenStore.delete(k);
-  }
+  for (const [k,v] of tokenStore) if (now - v.createdAt > TOKEN_TTL_MS) tokenStore.delete(k);
 }, 60_000);
 
-// ===== app base =====
+// ===== app =====
 const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(express.json());
+app.use(express.json({ type: ['application/json','application/*+json'] }));
 app.use(cookieParser());
-
 app.use(cors({ origin: ORIGIN, credentials: true }));
-
-// Servir estáticos (site completo)
 app.use(express.static(ROOT, { extensions: ['html'] }));
 
-// ===== helpers de auth =====
-const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-function signSession(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' });
-}
-function verifySession(token) {
-  try { return jwt.verify(token, JWT_SECRET); } catch { return null; }
-}
-function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
+// ===== auth helpers =====
+const loginLimiter = rateLimit({ windowMs: 10*60*1000, max: 20, standardHeaders: true, legacyHeaders: false });
+function signSession(payload) { return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' }); }
+function verifySession(token)  { try { return jwt.verify(token, JWT_SECRET); } catch { return null; } }
+function randomHex(n=32)       { return crypto.randomBytes(n).toString('hex'); }
 
 function setAuthCookies(res, token) {
-  const common = {
-    sameSite: 'strict',
-    secure: PROD,
-    maxAge: 2 * 60 * 60 * 1000,
-    path: '/'
-  };
-  res.cookie('session', token, { ...common, httpOnly: true });
-  res.cookie('csrf',    randomHex(16), { ...common, httpOnly: false });
+  const common = { sameSite:'strict', secure:PROD, maxAge: 2*60*60*1000, path:'/' };
+  res.cookie('session', token, { ...common, httpOnly:true });
+  res.cookie('csrf',    randomHex(16), { ...common, httpOnly:false });
 }
 function clearAuthCookies(res){
-  const common = { sameSite: 'strict', secure: PROD, path: '/' };
+  const common = { sameSite:'strict', secure:PROD, path:'/' };
   res.clearCookie('session', { ...common, httpOnly:true });
   res.clearCookie('csrf',    { ...common });
 }
-
 function requireAuth(req, res, next){
   const token = req.cookies?.session;
-  const data = token && verifySession(token);
-  if (!data) return res.status(401).json({ error: 'unauthorized' });
-
+  const data  = token && verifySession(token);
+  if (!data) return res.status(401).json({ error:'unauthorized' });
   if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
-    const csrfHeader = req.get('X-CSRF-Token');
-    const csrfCookie = req.cookies?.csrf;
-    if (!csrfHeader || csrfHeader !== csrfCookie) {
-      return res.status(403).json({ error: 'invalid_csrf' });
-    }
+    const csrfH = req.get('X-CSRF-Token'); const csrfC = req.cookies?.csrf;
+    if (!csrfH || csrfH !== csrfC) return res.status(403).json({ error:'invalid_csrf' });
   }
-  req.user = data;
-  next();
+  req.user = data; next();
 }
 
-// =========================================================
-// SSE (Server-Sent Events) — stream de eventos da Área
-// =========================================================
+// ===== SSE =====
 const sseClients = new Set();
-
 function sseSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const msg = `event: ${event}\ndata: ${data}\n\n`;
-  for (const res of sseClients) {
-    try { res.write(msg); } catch {}
-  }
+  const msg  = `event: ${event}\ndata: ${data}\n\n`;
+  for (const res of sseClients) { try { res.write(msg); } catch {} }
 }
-
-// Stream protegido por sessão (mesmo cookie)
-app.get('/api/stream', requireAuth, (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  // CORS c/ credenciais (se front/back em domínios diferentes)
+app.get('/api/stream', requireAuth, (req,res)=>{
+  res.setHeader('Content-Type','text/event-stream');
+  res.setHeader('Cache-Control','no-cache, no-transform');
+  res.setHeader('Connection','keep-alive');
   res.setHeader('Access-Control-Allow-Origin', ORIGIN);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
+  res.setHeader('Access-Control-Allow-Credentials','true');
   res.flushHeaders?.();
   sseClients.add(res);
-
-  // keepalive
-  const ping = setInterval(() => {
-    try { res.write(`event: ping\ndata: {}\n\n`); } catch {}
-  }, 25000);
-
-  req.on('close', () => {
-    clearInterval(ping);
-    sseClients.delete(res);
-    try { res.end(); } catch {}
-  });
+  const ping = setInterval(()=>{ try { res.write(`event: ping\ndata: {}\n\n`);} catch {} }, 25000);
+  req.on('close', ()=>{ clearInterval(ping); sseClients.delete(res); try{res.end();}catch{} });
 });
 
-// ===== rotas de auth =====
-app.post('/api/auth/login', loginLimiter, async (req, res) => {
+// ===== auth routes =====
+app.post('/api/auth/login', loginLimiter, async (req,res)=>{
   const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'missing_fields' });
-
+  if (!username || !password) return res.status(400).json({ error:'missing_fields' });
   const userOk = username === ADMIN_USER;
   const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-
-  if (!userOk || !passOk) return res.status(401).json({ error: 'invalid_credentials' });
-
-  const token = signSession({ sub: ADMIN_USER, role: 'admin' });
-  setAuthCookies(res, token);
-  return res.json({ ok: true });
+  if (!userOk || !passOk) return res.status(401).json({ error:'invalid_credentials' });
+  const token = signSession({ sub: ADMIN_USER, role:'admin' }); setAuthCookies(res, token);
+  res.json({ ok:true });
 });
-
-app.post('/api/auth/logout', (req, res) => {
-  clearAuthCookies(res);
-  return res.json({ ok:true });
+app.post('/api/auth/logout', (req,res)=>{ clearAuthCookies(res); res.json({ ok:true }); });
+app.get('/api/auth/me', (req,res)=>{
+  const token = req.cookies?.session; const data = token && verifySession(token);
+  if (!data) return res.status(401).json({ error:'unauthorized' });
+  res.json({ user:{ username: data.sub } });
 });
-
-app.get('/api/auth/me', (req, res) => {
-  const token = req.cookies?.session;
-  const data  = token && verifySession(token);
-  if (!data) return res.status(401).json({ error: 'unauthorized' });
-  return res.json({ user: { username: data.sub } });
-});
-
-// Protege a área
-app.get('/area.html', (req, res) => {
+app.get('/area.html', (req,res)=>{
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
-  return res.sendFile(path.join(ROOT, 'area.html'));
+  return res.sendFile(path.join(ROOT,'area.html'));
 });
 
-// ===== endpoints de verificação geral =====
-app.get('/health', async (req, res) => {
+// ===== health =====
+app.get('/health', async (req,res)=>{
   try {
-    fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH);
     await q('select 1');
-    return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
+    return res.json({ ok:true, provider: (PIX_PROVIDER||'').toLowerCase() });
   } catch (e) {
-    return res.status(500).json({ ok:false, error: e.message });
-  }
-});
-app.get('/api/pix/ping', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    return res.json({ ok:true, token:true });
-  } catch (e) {
-    return res.status(500).json({ ok:false, error: e.response?.data || e.message });
+    return res.status(500).json({ ok:false, error:e.message });
   }
 });
 
-// ===== API PIX (Efi) — NUNCA devolver txid para o front =====
+/* =========================================================
+   ADAPTER DO PROVEDOR PIX — LivePix
+   ---------------------------------------------------------
+   Atenção: os endpoints exatos podem ter nomes diferentes.
+   Preencha conforme a documentação do LivePix.
+   ========================================================= */
+const isLivePix = (PIX_PROVIDER||'').toLowerCase() === 'livepix';
+
+// 1) obter access token (se a API do LivePix usar OAuth2 client_credentials)
+async function livepixGetAccessToken(){
+  // CONFIRA a rota de OAuth do LivePix. Exemplo comum:
+  // POST {LIVEPIX_API_BASE}/oauth/token
+  // body: grant_type=client_credentials
+  // auth basic: client_id / client_secret
+  const url = `${LIVEPIX_API_BASE.replace(/\/+$/,'')}/oauth/token`;
+  const resp = await axios.post(
+    url,
+    new URLSearchParams({ grant_type:'client_credentials' }).toString(),
+    {
+      headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+      auth: { username: LIVEPIX_CLIENT_ID, password: LIVEPIX_CLIENT_SECRET }
+    }
+  );
+  return resp.data.access_token; // confirme o campo na doc
+}
+
+// 2) criar pagamento/checkout no LivePix
+async function livepixCreatePayment({ nome, valorCentavos, tipo, chave }){
+  const access = await livepixGetAccessToken();
+
+  // Monte o corpo conforme a doc do LivePix.
+  // A ideia: enviar valor, payer name e METADATA com (tipo,chave)
+  const body = {
+    amount: (valorCentavos/100).toFixed(2), // "10.00"
+    currency: 'BRL',
+    payer_name: nome,
+    // Se o LivePix permitir descrição/mensagem padrão, você pode compor aqui.
+    description: 'Depósito via site',
+    metadata: { tipo, chave },                 // <- volta no webhook
+    // Se a API aceitar URLs de retorno/cancelamento:
+    success_url: LIVEPIX_REDIRECT_URL || undefined,
+    cancel_url: LIVEPIX_REDIRECT_URL || undefined
+  };
+
+  const url = `${LIVEPIX_API_BASE.replace(/\/+$/,'')}/v1/payments`; // CONFIRMAR rota
+  const { data } = await axios.post(url, body, {
+    headers:{ Authorization:`Bearer ${access}`, 'Content-Type':'application/json' }
+  });
+
+  // Ajuste os campos conforme a resposta real do LivePix:
+  return {
+    providerPaymentId: data.id,             // id do pagamento/checkout
+    redirectUrl: data.checkout_url || data.url // URL para onde vamos redirecionar o usuário
+  };
+}
+
+// 3) consultar status (opcional — geralmente webhook resolve)
+async function livepixGetPaymentStatus(providerPaymentId){
+  const access = await livepixGetAccessToken();
+  const url = `${LIVEPIX_API_BASE.replace(/\/+$/,'')}/v1/payments/${encodeURIComponent(providerPaymentId)}`; // CONFIRMAR rota
+  const { data } = await axios.get(url, { headers:{ Authorization:`Bearer ${access}` } });
+  // Normalize para 'CONCLUIDA' / 'pendente'
+  const paid = (data.status === 'paid' || data.status === 'succeeded' || data.paid === true);
+  return paid ? 'CONCLUIDA' : 'PENDENTE';
+}
+
+/* =========================================================
+   PIX — criar "cobrança"
+   Com LivePix, devolvemos URL de checkout para redirecionar.
+   Não mandamos txid para o navegador; usamos token opaco.
+   ========================================================= */
 app.post('/api/pix/cob', async (req, res) => {
   try {
-    const { nome, cpf, valorCentavos } = req.body || {};
+    const { nome, valorCentavos, tipo=null, chave=null } = req.body || {};
     if (!nome || !valorCentavos || valorCentavos < 1000) {
       return res.status(400).json({ error: 'Dados inválidos (mínimo R$ 10,00)' });
     }
-    const access = await getAccessToken();
-    const valor = (valorCentavos / 100).toFixed(2);
+    if (!isLivePix) {
+      return res.status(400).json({ error: 'Provedor PIX configurado é LivePix. Ajuste o front para redirecionar.' });
+    }
 
-    const payload = {
-      calendario: { expiracao: 3600 },
-      devedor: cpf ? { cpf: (cpf||'').replace(/\D/g,''), nome } : { nome },
-      valor: { original: valor },
-      chave: EFI_PIX_KEY,
-      infoAdicionais: [{ nome: 'Nome', valor: nome }]
-    };
+    // Cria o pagamento/checkout no LivePix (com metadata tipo/chave)
+    const { providerPaymentId, redirectUrl } = await livepixCreatePayment({ nome, valorCentavos, tipo, chave });
 
-    const { data: cob } = await axios.post(
-      `${EFI_BASE_URL}/v2/cob`,
-      payload,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-    const { txid, loc } = cob;
-
-    const { data: qr } = await axios.get(
-      `${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-
-    // Gera token opaco e associa ao txid no servidor
+    // Gera token opaco (front nunca sabe o id real do provedor)
     const tokenOpaque = tok();
-    tokenStore.set(tokenOpaque, { txid, createdAt: Date.now() });
+    tokenStore.set(tokenOpaque, { providerPaymentId, createdAt: Date.now() });
 
-    const emv = qr.qrcode;
-    const qrPng = qr.imagemQrcode || (await QRCode.toDataURL(emv));
-    // Devolve só token + QR (sem txid)
-    res.json({ token: tokenOpaque, emv, qrPng });
+    // Com LivePix o usuário deve ser levado ao redirectUrl
+    // (lá ele poderá escrever a mensagem e finalizar)
+    return res.json({ token: tokenOpaque, redirectUrl });
   } catch (err) {
     console.error('Erro /api/pix/cob:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Falha ao criar cobrança PIX' });
+    res.status(500).json({ error: 'Falha ao iniciar pagamento' });
   }
 });
 
-// Status consultado por token opaco (mapeado para txid no back)
+/* =========================================================
+   PIX — status por token (opcional, se quiser manter polling)
+   Com LivePix, o certo é confiar no webhook. Mantive para testes.
+   ========================================================= */
 app.get('/api/pix/status/:token', async (req, res) => {
   try {
+    if (!isLivePix) return res.status(400).json({ error:'apenas_livepix' });
     const rec = tokenStore.get(req.params.token);
     if (!rec) return res.status(404).json({ error: 'token_not_found' });
-
-    const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-    res.json({ status: data.status });
+    const status = await livepixGetPaymentStatus(rec.providerPaymentId);
+    res.json({ status });
   } catch (err) {
     console.error('Erro status:', err.response?.data || err.message);
     res.status(500).json({ error: 'Falha ao consultar status' });
@@ -344,46 +315,57 @@ app.get('/api/pix/status/:token', async (req, res) => {
 });
 
 /* =========================================================
-   PUBLIC/SEGURO — confirmar pagamento por TOKEN (não txid)
-   - Requer header X-APP-KEY igual a APP_PUBLIC_KEY
-   - Body: { token, nome, valorCentavos, tipo, chave }
-   - Valida na Efi: status = "CONCLUIDA" e valor bate
-   - Grava em "bancas"
+   WEBHOOK LivePix — verdade do pagamento
+   - Configure esta URL no painel do LivePix como "URL de notificações"
+   - Valide a assinatura, se o serviço enviar (ex.: HMAC em header)
+   - Quando status pago: insere em "bancas" usando METADATA (tipo/chave)
    ========================================================= */
-app.post('/api/pix/confirmar', async (req, res) => {
-  try{
-    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
-    const key = req.get('X-APP-KEY');
-    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
+function timingSafeEq(a,b){
+  const ba = Buffer.from(String(a)||''); const bb = Buffer.from(String(b)||'');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 
-    const { token, nome, valorCentavos, tipo=null, chave=null } = req.body || {};
-    if (!token || !nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
-      return res.status(400).json({ error:'dados_invalidos' });
+app.post('/api/livepix/webhook', async (req, res) => {
+  try {
+    // (Opcional) restrição por IP
+    if (LIVEPIX_WEBHOOK_ALLOWLIST) {
+      const allow = LIVEPIX_WEBHOOK_ALLOWLIST.split(',').map(s=>s.trim()).filter(Boolean);
+      const ip = (req.headers['x-forwarded-for']||'').split(',')[0].trim() || req.socket.remoteAddress || '';
+      if (allow.length && !allow.includes(ip)) {
+        return res.status(403).json({ error:'ip_not_allowed' });
+      }
     }
 
-    const rec = tokenStore.get(token);
-    if (!rec) return res.status(404).json({ error:'token_not_found' });
-
-    // 1) consulta na Efi usando o txid associado ao token
-    const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-
-    // 2) valida status + valor
-    if (data.status !== 'CONCLUIDA') {
-      return res.status(409).json({ error:'pix_nao_concluido' });
-    }
-    const valorEfiCents = brlStrToCents(data?.valor?.original);
-    if (valorEfiCents == null) {
-      return res.status(500).json({ error:'valor_invalido_efi' });
-    }
-    if (valorEfiCents !== valorCentavos) {
-      return res.status(409).json({ error:'valor_divergente' });
+    // (Opcional) verificação de assinatura (confirme header na doc)
+    if (LIVEPIX_WEBHOOK_SECRET) {
+      const raw = JSON.stringify(req.body);
+      // Exemplo genérico de HMAC-SHA256; ajuste o header/nome conforme a doc:
+      const signature = req.get('X-LivePix-Signature') || req.get('X-Signature');
+      const check = crypto.createHmac('sha256', LIVEPIX_WEBHOOK_SECRET).update(raw).digest('hex');
+      if (!signature || !timingSafeEq(signature, check)) {
+        return res.status(401).json({ error:'invalid_signature' });
+      }
     }
 
-    // 3) insere em bancas
+    // Normalizar payload (ajuste conforme o formato real do LivePix)
+    const ev = req.body?.event || req.body?.type || '';
+    const data = req.body?.data || req.body?.object || req.body || {};
+
+    // Campos esperados (confirme nomes na doc do LivePix):
+    const paid = (data.status === 'paid' || data.status === 'succeeded' || data.paid === true);
+    const valorCentavos = Math.round(Number(String(data.amount || data.value || 0)) * 100) || data.amount_cents || 0;
+    const nome = data.payer_name || data.customer_name || data.name || 'Contribuinte';
+    const meta = data.metadata || {};
+
+    // Só registra quando pago
+    if (!paid) {
+      return res.json({ ok:true, ignored:true });
+    }
+    if (!valorCentavos || valorCentavos < 1) {
+      return res.status(400).json({ error:'valor_invalido' });
+    }
+
     const id = uid();
     const { rows } = await q(
       `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
@@ -394,60 +376,35 @@ app.post('/api/pix/confirmar', async (req, res) => {
                  pix_type       as "pixType",
                  pix_key        as "pixKey",
                  created_at     as "createdAt"`,
-      [id, nome, valorCentavos, null, tipo, chave]
+      [id, nome, valorCentavos, null, meta.tipo || null, meta.chave || null]
     );
 
-    // 4) limpa token e notifica SSE
-    tokenStore.delete(token);
-    sseSendAll('bancas-changed', { reason: 'insert-confirmed' });
+    sseSendAll('bancas-changed', { reason: 'webhook-paid' });
 
     return res.json({ ok:true, ...rows[0] });
-  }catch(e){
-    console.error('pix/confirmar:', e.response?.data || e.message);
-    return res.status(500).json({ error:'falha_confirmar' });
+  } catch (e) {
+    console.error('livepix webhook:', e.response?.data || e.message);
+    return res.status(500).json({ error:'webhook_fail' });
   }
 });
 
 /* =========================================================
-   (Opcional) PUBLIC: salvar sem validar TXID (legado)
-   Mantido para testes. Em produção, prefira /api/pix/confirmar.
+   OBS: /api/pix/confirmar (via front) não é necessária no LivePix,
+   pois quem confirma é o WEBHOOK. Mantemos apenas por compatibilidade.
    ========================================================= */
-app.post('/api/public/bancas', async (req, res) => {
-  try{
-    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
-    const key = req.get('X-APP-KEY');
-    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
-
-    const { nome, depositoCents, pixType=null, pixKey=null } = req.body || {};
-    if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
-      return res.status(400).json({ error: 'dados_invalidos' });
-    }
-
-    const id = uid();
-    const { rows } = await q(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       values ($1,$2,$3,$4,$5,$6, now())
-       returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-                 pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
-      [id, nome, depositoCents, null, pixType, pixKey]
-    );
-
-    sseSendAll('bancas-changed', { reason: 'insert-public' });
-
-    return res.json(rows[0]);
-  }catch(e){
-    console.error('public/bancas:', e.message);
-    return res.status(500).json({ error:'falha_public' });
+app.post('/api/pix/confirmar', (req,res)=>{
+  if (isLivePix) {
+    return res.status(400).json({ error:'use_webhook_livepix' });
   }
+  return res.status(400).json({ error:'no_provider' });
 });
-
-// ====== MIDDLEWARE: todas as rotas da Área exigem login ======
-const areaAuth = [requireAuth];
 
 /* =========================================================
    BANCAS (Postgres)
    ========================================================= */
-app.get('/api/bancas', areaAuth, async (req, res) => {
+const areaAuth = [requireAuth];
+
+app.get('/api/bancas', areaAuth, async (req,res)=>{
   const { rows } = await q(
     `select id, nome,
             deposito_cents as "depositoCents",
@@ -461,29 +418,27 @@ app.get('/api/bancas', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
-app.post('/api/bancas', areaAuth, async (req, res) => {
+app.post('/api/bancas', areaAuth, async (req,res)=>{
   const { nome, depositoCents, pixType=null, pixKey=null } = req.body || {};
   if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
-    return res.status(400).json({ error: 'dados_invalidos' });
+    return res.status(400).json({ error:'dados_invalidos' });
   }
   const id = uid();
   const { rows } = await q(
     `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
      values ($1,$2,$3,$4,$5,$6, now())
      returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-               pix_type as "PixType", pix_key as "pixKey", created_at as "createdAt"`,
+               pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
     [id, nome, depositoCents, null, pixType, pixKey]
   );
-
   sseSendAll('bancas-changed', { reason: 'insert' });
-
   res.json(rows[0]);
 });
 
-app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
+app.patch('/api/bancas/:id', areaAuth, async (req,res)=>{
   const { bancaCents } = req.body || {};
   if (typeof bancaCents !== 'number' || bancaCents < 0) {
-    return res.status(400).json({ error: 'dados_invalidos' });
+    return res.status(400).json({ error:'dados_invalidos' });
   }
   const { rows } = await q(
     `update bancas set banca_cents = $2
@@ -497,13 +452,11 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
     [req.params.id, bancaCents]
   );
   if (!rows.length) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('bancas-changed', { reason: 'update' });
-
   res.json(rows[0]);
 });
 
-app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
+app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req,res)=>{
   const { bancaCents } = req.body || {};
   const client = await pool.connect();
   try{
@@ -514,10 +467,7 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
        from bancas where id = $1 for update`,
       [req.params.id]
     );
-    if (!sel.rows.length) {
-      await client.query('rollback');
-      return res.status(404).json({ error:'not_found' });
-    }
+    if (!sel.rows.length) { await client.query('rollback'); return res.status(404).json({ error:'not_found' }); }
     const b = sel.rows[0];
 
     const bancaFinal = (typeof bancaCents === 'number' && bancaCents >= 0)
@@ -532,10 +482,8 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
     await client.query(`delete from bancas where id = $1`, [b.id]);
 
     await client.query('commit');
-
     sseSendAll('bancas-changed', { reason: 'moved' });
     sseSendAll('pagamentos-changed', { reason: 'moved' });
-
     res.json({ ok:true });
   }catch(e){
     await client.query('rollback');
@@ -546,19 +494,17 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
+app.delete('/api/bancas/:id', areaAuth, async (req,res)=>{
   const r = await q(`delete from bancas where id = $1`, [req.params.id]);
   if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('bancas-changed', { reason: 'delete' });
-
   res.json({ ok:true });
 });
 
 /* =========================================================
    PAGAMENTOS (Postgres)
    ========================================================= */
-app.get('/api/pagamentos', areaAuth, async (req, res) => {
+app.get('/api/pagamentos', areaAuth, async (req,res)=>{
   const { rows } = await q(
     `select id, nome,
             pagamento_cents as "pagamentoCents",
@@ -573,10 +519,9 @@ app.get('/api/pagamentos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
-app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
+app.patch('/api/pagamentos/:id', areaAuth, async (req,res)=>{
   const { status } = req.body || {};
-  if (!['pago','nao_pago'].includes(status)) return res.status(400).json({ error: 'status_invalido' });
-
+  if (!['pago','nao_pago'].includes(status)) return res.status(400).json({ error:'status_invalido' });
   const { rows } = await q(
     `update pagamentos
        set status = $2,
@@ -590,30 +535,23 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
     [req.params.id, status]
   );
   if (!rows.length) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('pagamentos-changed', { reason: 'update-status' });
-
   res.json(rows[0]);
 });
 
-app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
+app.delete('/api/pagamentos/:id', areaAuth, async (req,res)=>{
   const r = await q(`delete from pagamentos where id = $1`, [req.params.id]);
   if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('pagamentos-changed', { reason: 'delete' });
-
   res.json({ ok:true });
 });
 
 // ===== start =====
 app.listen(PORT, async () => {
-  try{
-    await q('select 1');
-    console.log('🗄️  Postgres conectado');
-  }catch(e){
-    console.error('❌ Postgres falhou:', e.message);
-  }
+  try { await q('select 1'); console.log('🗄️  Postgres conectado'); }
+  catch(e){ console.error('❌ Postgres falhou:', e.message); }
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
+  console.log(`🔁 Provedor PIX: ${(PIX_PROVIDER||'').toLowerCase()}`);
 });
