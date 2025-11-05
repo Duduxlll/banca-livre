@@ -8,7 +8,7 @@
   <!-- Igual à APP_PUBLIC_KEY do servidor -->
   <meta name="app-key" content="b01c7cd2e87519f8d0e62fafc69c80f8babb54d0a9799fefdad28d4520e7d25bd39f140cb948041e5c5caa43e7d7f905">
 
-  <!-- Seus estilos -->
+  <!-- Estilos -->
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/pix.css">
 </head>
@@ -41,7 +41,7 @@
 
         <div class="card-body">
           <form id="depositoForm" novalidate>
-            <!-- Linha: Tipo de chave + Campo da chave (um único campo) -->
+            <!-- Linha: Tipo de chave + Campo único da chave -->
             <div class="row">
               <div>
                 <label for="tipoChave">Tipo de chave PIX</label>
@@ -52,19 +52,19 @@
                   <option value="email">E-mail</option>
                 </select>
                 <p class="help">
-                  Ao selecionar <strong>CPF</strong>, use o campo ao lado para digitar o seu CPF (11 dígitos).
+                  Se escolher <strong>CPF</strong>, use o campo ao lado para digitar o seu CPF (11 dígitos).
                 </p>
               </div>
 
               <div id="chaveWrapper">
                 <label for="chavePix">Informe sua chave PIX</label>
-                <!-- Quando o tipo for CPF, este mesmo campo recebe o CPF (o app.js aplica a máscara/validação) -->
+                <!-- Para CPF, este mesmo campo recebe o CPF (o app.js mascara/valida) -->
                 <input class="input" type="text" id="chavePix" name="chavePix" placeholder="Cole aqui sua chave" autocomplete="off" required>
                 <div class="error" id="chaveError">Informe uma chave PIX válida.</div>
               </div>
             </div>
 
-            <!-- Nome completo abaixo do tipo de chave -->
+            <!-- Nome completo -->
             <div style="margin-top:16px">
               <label for="nome">Nome completo</label>
               <input class="input" type="text" id="nome" name="nome" placeholder="Seu nome" required>
@@ -92,7 +92,7 @@
           <div class="card-body">
             <h3 style="margin-top:0">Resumo</h3>
             <ul class="summary-list" id="resumo">
-              <!-- Sem CPF separado -->
+              <!-- Sem CPF separado; a “Chave” cobre o caso CPF -->
               <li><span class="k">Nome</span> <span id="r-nome">—</span></li>
               <li><span class="k">Tipo de chave</span> <span id="r-tipo">CPF</span></li>
               <li><span class="k">Chave</span> <span id="r-chave">—</span></li>
@@ -106,8 +106,8 @@
             <h3 style="margin-top:0">Como funciona</h3>
             <ol style="margin:0 0 0 18px; color:var(--muted); line-height:1.6">
               <li>Escolha o <strong>tipo de chave PIX</strong> (CPF, aleatória, telefone ou e-mail).</li>
-              <li>Preencha a <strong>chave</strong> (se escolher <strong>CPF</strong>, digite o seu CPF neste campo).</li>
-              <li>Preencha o <strong>nome completo</strong> e o <strong>valor</strong> (mínimo R$ 10,00).</li>
+              <li>Preencha a <strong>chave</strong> (se escolher <strong>CPF</strong>, digite o CPF neste campo único).</li>
+              <li>Informe o <strong>nome completo</strong> e o <strong>valor</strong> (mínimo R$ 10,00).</li>
               <li>Clique em <strong>Fazer depósito</strong> para prosseguir.</li>
             </ol>
           </div>
