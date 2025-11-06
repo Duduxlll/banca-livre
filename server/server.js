@@ -285,7 +285,8 @@ app.get('/api/pix/ping', async (req, res) => {
 app.post('/api/pix/cob', async (req, res) => {
   try {
     const { nome, cpf, valorCentavos } = req.body || {};
-    if (!nome || !valorCentavos || valorCentavos < 1000) {
+    // valorCentavos precisa ser number (ex.: 1000 = R$10,00)
+    if (!nome || typeof valorCentavos !== 'number' || valorCentavos < 1000) {
       return res.status(400).json({ error: 'Dados inválidos (mínimo R$ 10,00)' });
     }
     const access = await getAccessToken();
@@ -293,11 +294,18 @@ app.post('/api/pix/cob', async (req, res) => {
 
     const payload = {
       calendario: { expiracao: 3600 },
-      devedor: cpf ? { cpf: (cpf||'').replace(/\D/g,''), nome } : { nome },
       valor: { original: valor },
       chave: EFI_PIX_KEY,
       infoAdicionais: [{ nome: 'Nome', valor: nome }]
     };
+    // Só inclui "devedor" se tiver CPF válido (11 dígitos)
+    if (cpf) {
+      const cpfNum = String(cpf).replace(/\D/g, '');
+      if (cpfNum.length !== 11) {
+        return res.status(400).json({ error: 'cpf_invalido' });
+      }
+      payload.devedor = { cpf: cpfNum, nome };
+    }
 
     const { data: cob } = await axios.post(
       `${EFI_BASE_URL}/v2/cob`,
@@ -471,7 +479,7 @@ app.post('/api/bancas', areaAuth, async (req, res) => {
     `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
      values ($1,$2,$3,$4,$5,$6, now())
      returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-               pix_type as "PixType", pix_key as "pixKey", created_at as "createdAt"`,
+               pix_type as "PixType", pix_key as "pixKey", created_at as "CreatedAt"`,
     [id, nome, depositoCents, null, pixType, pixKey]
   );
 
@@ -584,7 +592,7 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
      where id = $1
      returning id, nome,
                pagamento_cents as "pagamentoCents",
-               pix_type as "pixType",
+               pix_type as "PixType",
                pix_key  as "pixKey",
                status, created_at as "createdAt", paid_at as "paidAt"`,
     [req.params.id, status]
