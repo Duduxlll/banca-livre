@@ -536,10 +536,11 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
     // - banca_cents volta como null (o operador edita depois na UI)
     // - preserva created_at para manter ordenação consistente
     await client.query(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
-      [p.id, p.nome, p.pagamento_cents, null, p.pix_type, p.pix_key, p.created_at]
-    );
+   `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
+    values ($1,$2,$3,$4,$5,$6,$7)`,
+   // depósito volta com o mesmo valor e, PRINCIPALMENTE, banca_cents volta igual ao que você digitou (pagamento_cents)
+   [p.id, p.nome, p.pagamento_cents, p.pagamento_cents, p.pix_type, p.pix_key, p.created_at]
+ );
 
     await client.query(`delete from pagamentos where id = $1`, [p.id]);
 
