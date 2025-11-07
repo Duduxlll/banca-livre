@@ -1,4 +1,4 @@
-// server/server.js
+// server/server.js — versão com Extratos (depósitos + pagamentos) e filtros
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
@@ -17,6 +17,20 @@ import QRCode from 'qrcode';
 import pkg from 'pg';
 const { Pool } = pkg;
 
+/*
+SQL sugerido p/ criar tabela de extratos:
+
+CREATE TABLE IF NOT EXISTS extratos (
+  id           text PRIMARY KEY,
+  nome         text NOT NULL,
+  tipo         text NOT NULL,         -- 'deposito' | 'pagamento'
+  valor_cents  integer NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS extratos_created_at_idx ON extratos (created_at DESC);
+CREATE INDEX IF NOT EXISTS extratos_nome_idx       ON extratos (lower(nome));
+CREATE INDEX IF NOT EXISTS extratos_tipo_idx       ON extratos (tipo);
+*/
 
 const {
   PORT = 3000,
@@ -81,7 +95,6 @@ async function getAccessToken() {
 }
 
 function brlStrToCents(strOriginal) {
-  
   const n = Number.parseFloat(String(strOriginal).replace(',', '.'));
   if (Number.isNaN(n)) return null;
   return Math.round(n * 100);
@@ -105,40 +118,23 @@ setInterval(() => {
 const app = express();
 app.set('trust proxy', 1);
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json());
 app.use(cookieParser());
-
 app.use(cors({ origin: ORIGIN, credentials: true }));
 
 // Servir estáticos (site completo)
 app.use(express.static(ROOT, { extensions: ['html'] }));
 
 // ===== helpers de auth =====
-const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false
-});
+const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
-function signSession(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' });
-}
-function verifySession(token) {
-  try { return jwt.verify(token, JWT_SECRET); } catch { return null; }
-}
+function signSession(payload) { return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' }); }
+function verifySession(token) { try { return jwt.verify(token, JWT_SECRET); } catch { return null; } }
 function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
 
 function setAuthCookies(res, token) {
-  const common = {
-    sameSite: 'strict',
-    secure: PROD,
-    maxAge: 2 * 60 * 60 * 1000,
-    path: '/'
-  };
+  const common = { sameSite: 'strict', secure: PROD, maxAge: 2 * 60 * 60 * 1000, path: '/' };
   res.cookie('session', token, { ...common, httpOnly: true });
   res.cookie('csrf',    randomHex(16), { ...common, httpOnly: false });
 }
@@ -164,60 +160,43 @@ function requireAuth(req, res, next){
   next();
 }
 
-
+// ===== SSE =====
 const sseClients = new Set();
-
 function sseSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const msg = `event: ${event}\ndata: ${data}\n\n`;
-  for (const res of sseClients) {
-    try { res.write(msg); } catch {}
-  }
+  for (const res of sseClients) { try { res.write(msg); } catch {} }
 }
 
-// Stream protegido por sessão (mesmo cookie)
+// Stream protegido por sessão
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
-  // CORS c/ credenciais (se front/back em domínios diferentes)
   res.setHeader('Access-Control-Allow-Origin', ORIGIN);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   res.flushHeaders?.();
   sseClients.add(res);
 
-  // keepalive
-  const ping = setInterval(() => {
-    try { res.write(`event: ping\ndata: {}\n\n`); } catch {}
-  }, 25000);
+  const ping = setInterval(() => { try { res.write(`event: ping\ndata: {}\n\n`); } catch {} }, 25000);
 
-  req.on('close', () => {
-    clearInterval(ping);
-    sseClients.delete(res);
-    try { res.end(); } catch {}
-  });
+  req.on('close', () => { clearInterval(ping); sseClients.delete(res); try { res.end(); } catch {} });
 });
 
 // ===== rotas de auth =====
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'missing_fields' });
-
   const userOk = username === ADMIN_USER;
   const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-
   if (!userOk || !passOk) return res.status(401).json({ error: 'invalid_credentials' });
-
   const token = signSession({ sub: ADMIN_USER, role: 'admin' });
   setAuthCookies(res, token);
   return res.json({ ok: true });
 });
 
-app.post('/api/auth/logout', (req, res) => {
-  clearAuthCookies(res);
-  return res.json({ ok:true });
-});
+app.post('/api/auth/logout', (req, res) => { clearAuthCookies(res); return res.json({ ok:true }); });
 
 app.get('/api/auth/me', (req, res) => {
   const token = req.cookies?.session;
@@ -235,68 +214,40 @@ app.get('/area.html', (req, res) => {
 
 // ===== endpoints de verificação geral =====
 app.get('/health', async (req, res) => {
-  try {
-    fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH);
-    await q('select 1');
-    return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
-  } catch (e) {
-    return res.status(500).json({ ok:false, error: e.message });
-  }
+  try { fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH); await q('select 1'); return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true }); }
+  catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
 });
 app.get('/api/pix/ping', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    return res.json({ ok:true, token:true });
-  } catch (e) {
-    return res.status(500).json({ ok:false, error: e.response?.data || e.message });
-  }
+  try { const token = await getAccessToken(); return res.json({ ok:true, token:true }); }
+  catch (e) { return res.status(500).json({ ok:false, error: e.response?.data || e.message }); }
 });
 
 // ===== API PIX (Efi) — NUNCA devolver txid para o front =====
 app.post('/api/pix/cob', async (req, res) => {
   try {
     const { nome, cpf, valorCentavos } = req.body || {};
-    // valorCentavos precisa ser number (ex.: 1000 = R$10,00)
     if (!nome || typeof valorCentavos !== 'number' || valorCentavos < 1000) {
       return res.status(400).json({ error: 'Dados inválidos (mínimo R$ 10,00)' });
     }
     const access = await getAccessToken();
     const valor = (valorCentavos / 100).toFixed(2);
 
-    const payload = {
-      calendario: { expiracao: 3600 },
-      valor: { original: valor },
-      chave: EFI_PIX_KEY,
-      infoAdicionais: [{ nome: 'Nome', valor: nome }]
-    };
-    // Só inclui "devedor" se tiver CPF válido (11 dígitos)
+    const payload = { calendario: { expiracao: 3600 }, valor: { original: valor }, chave: EFI_PIX_KEY, infoAdicionais: [{ nome: 'Nome', valor: nome }] };
     if (cpf) {
       const cpfNum = String(cpf).replace(/\D/g, '');
-      if (cpfNum.length !== 11) {
-        return res.status(400).json({ error: 'cpf_invalido' });
-      }
+      if (cpfNum.length !== 11) return res.status(400).json({ error: 'cpf_invalido' });
       payload.devedor = { cpf: cpfNum, nome };
     }
 
-    const { data: cob } = await axios.post(
-      `${EFI_BASE_URL}/v2/cob`,
-      payload,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
+    const { data: cob } = await axios.post(`${EFI_BASE_URL}/v2/cob`, payload, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
     const { txid, loc } = cob;
+    const { data: qr } = await axios.get(`${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
 
-    const { data: qr } = await axios.get(
-      `${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-
-    // Gera token opaco e associa ao txid no servidor
     const tokenOpaque = tok();
     tokenStore.set(tokenOpaque, { txid, createdAt: Date.now() });
 
     const emv = qr.qrcode;
     const qrPng = qr.imagemQrcode || (await QRCode.toDataURL(emv));
-    // Devolve só token + QR (sem txid)
     res.json({ token: tokenOpaque, emv, qrPng });
   } catch (err) {
     console.error('Erro /api/pix/cob:', err.response?.data || err.message);
@@ -309,12 +260,8 @@ app.get('/api/pix/status/:token', async (req, res) => {
   try {
     const rec = tokenStore.get(req.params.token);
     if (!rec) return res.status(404).json({ error: 'token_not_found' });
-
     const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
+    const { data } = await axios.get(`${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
     res.json({ status: data.status });
   } catch (err) {
     console.error('Erro status:', err.response?.data || err.message);
@@ -338,22 +285,13 @@ app.post('/api/pix/confirmar', async (req, res) => {
 
     // 1) consulta na Efi usando o txid associado ao token
     const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
+    const { data } = await axios.get(`${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
 
     // 2) valida status + valor
-    if (data.status !== 'CONCLUIDA') {
-      return res.status(409).json({ error:'pix_nao_concluido' });
-    }
+    if (data.status !== 'CONCLUIDA') return res.status(409).json({ error:'pix_nao_concluido' });
     const valorEfiCents = brlStrToCents(data?.valor?.original);
-    if (valorEfiCents == null) {
-      return res.status(500).json({ error:'valor_invalido_efi' });
-    }
-    if (valorEfiCents !== valorCentavos) {
-      return res.status(409).json({ error:'valor_divergente' });
-    }
+    if (valorEfiCents == null) return res.status(500).json({ error:'valor_invalido_efi' });
+    if (valorEfiCents !== valorCentavos) return res.status(409).json({ error:'valor_divergente' });
 
     // 3) insere em bancas
     const id = uid();
@@ -369,6 +307,14 @@ app.post('/api/pix/confirmar', async (req, res) => {
       [id, nome, valorCentavos, null, tipo, chave]
     );
 
+    // 3.1) registra no extrato (DEPÓSITO)
+    await q(
+      `insert into extratos (id, nome, tipo, valor_cents, created_at)
+       values ($1,$2,'deposito',$3, now())`,
+      [uid(), nome, valorCentavos]
+    );
+    sseSendAll('extratos-changed', { reason: 'deposito' });
+
     // 4) limpa token e notifica SSE
     tokenStore.delete(token);
     sseSendAll('bancas-changed', { reason: 'insert-confirmed' });
@@ -380,7 +326,7 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-
+// (Opcional) criar banca pública manual também pode registrar no extrato como depósito manual
 app.post('/api/public/bancas', async (req, res) => {
   try{
     if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
@@ -401,8 +347,15 @@ app.post('/api/public/bancas', async (req, res) => {
       [id, nome, depositoCents, null, pixType, pixKey]
     );
 
-    sseSendAll('bancas-changed', { reason: 'insert-public' });
+    // registra depósito manual no extrato
+    await q(
+      `insert into extratos (id, nome, tipo, valor_cents, created_at)
+       values ($1,$2,'deposito',$3, now())`,
+      [uid(), nome, depositoCents]
+    );
+    sseSendAll('extratos-changed', { reason: 'deposito-manual' });
 
+    sseSendAll('bancas-changed', { reason: 'insert-public' });
     return res.json(rows[0]);
   }catch(e){
     console.error('public/bancas:', e.message);
@@ -410,10 +363,9 @@ app.post('/api/public/bancas', async (req, res) => {
   }
 });
 
-
 const areaAuth = [requireAuth];
 
-
+// ===== BANCAS =====
 app.get('/api/bancas', areaAuth, async (req, res) => {
   const { rows } = await q(
     `select id, nome,
@@ -438,12 +390,11 @@ app.post('/api/bancas', areaAuth, async (req, res) => {
     `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
      values ($1,$2,$3,$4,$5,$6, now())
      returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-               pix_type as "PixType", pix_key as "pixKey", created_at as "CreatedAt"`,
+               pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
     [id, nome, depositoCents, null, pixType, pixKey]
   );
 
   sseSendAll('bancas-changed', { reason: 'insert' });
-
   res.json(rows[0]);
 });
 
@@ -466,7 +417,6 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
   if (!rows.length) return res.status(404).json({ error:'not_found' });
 
   sseSendAll('bancas-changed', { reason: 'update' });
-
   res.json(rows[0]);
 });
 
@@ -481,10 +431,7 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
        from bancas where id = $1 for update`,
       [req.params.id]
     );
-    if (!sel.rows.length) {
-      await client.query('rollback');
-      return res.status(404).json({ error:'not_found' });
-    }
+    if (!sel.rows.length) { await client.query('rollback'); return res.status(404).json({ error:'not_found' }); }
     const b = sel.rows[0];
 
     const bancaFinal = (typeof bancaCents === 'number' && bancaCents >= 0)
@@ -508,11 +455,10 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
     await client.query('rollback');
     console.error('to-pagamento:', e.message);
     res.status(500).json({ error:'falha_mover' });
-  }finally{
-    client.release();
-  }
+  }finally{ client.release(); }
 });
 
+// ===== PAGAMENTOS <-> BANCAS (voltar) =====
 app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
   const client = await pool.connect();
   try {
@@ -520,33 +466,21 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
 
     const sel = await client.query(
       `select id, nome, pagamento_cents, pix_type, pix_key, created_at
-         from pagamentos
-        where id = $1
-        for update`,
+         from pagamentos where id = $1 for update`,
       [req.params.id]
     );
-    if (!sel.rows.length) {
-      await client.query('rollback');
-      return res.status(404).json({ error: 'not_found' });
-    }
+    if (!sel.rows.length) { await client.query('rollback'); return res.status(404).json({ error: 'not_found' }); }
     const p = sel.rows[0];
 
-    // volta para bancas:
-    // - deposito_cents recebe o pagamento_cents atual
-    // - banca_cents volta como null (o operador edita depois na UI)
-    // - preserva created_at para manter ordenação consistente
     await client.query(
-   `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-    values ($1,$2,$3,$4,$5,$6,$7)`,
-   // depósito volta com o mesmo valor e, PRINCIPALMENTE, banca_cents volta igual ao que você digitou (pagamento_cents)
-   [p.id, p.nome, p.pagamento_cents, p.pagamento_cents, p.pix_type, p.pix_key, p.created_at]
- );
-
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7)`,
+      [p.id, p.nome, p.pagamento_cents, p.pagamento_cents, p.pix_type, p.pix_key, p.created_at]
+    );
     await client.query(`delete from pagamentos where id = $1`, [p.id]);
 
     await client.query('commit');
 
-    // Notifica as duas listas pelo SSE
     sseSendAll('bancas-changed', { reason: 'moved-back' });
     sseSendAll('pagamentos-changed', { reason: 'moved-back' });
 
@@ -555,21 +489,15 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
     await client.query('rollback');
     console.error('to-banca:', e.message);
     return res.status(500).json({ error: 'falha_mover' });
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
 });
-
 
 app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
   const r = await q(`delete from bancas where id = $1`, [req.params.id]);
   if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('bancas-changed', { reason: 'delete' });
-
   res.json({ ok:true });
 });
-
 
 app.get('/api/pagamentos', areaAuth, async (req, res) => {
   const { rows } = await q(
@@ -597,35 +525,75 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
      where id = $1
      returning id, nome,
                pagamento_cents as "pagamentoCents",
-               pix_type as "PixType",
+               pix_type as "pixType",
                pix_key  as "pixKey",
                status, created_at as "createdAt", paid_at as "paidAt"`,
     [req.params.id, status]
   );
   if (!rows.length) return res.status(404).json({ error:'not_found' });
 
-  sseSendAll('pagamentos-changed', { reason: 'update-status' });
+  // se virou 'pago', registra no extrato
+  if (rows[0]?.status === 'pago') {
+    await q(
+      `insert into extratos (id, nome, tipo, valor_cents, created_at)
+       values ($1,$2,'pagamento',$3, now())`,
+      [uid(), rows[0].nome, rows[0].pagamentoCents]
+    );
+    sseSendAll('extratos-changed', { reason: 'pagamento' });
+  }
 
+  sseSendAll('pagamentos-changed', { reason: 'update-status' });
   res.json(rows[0]);
 });
 
 app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
   const r = await q(`delete from pagamentos where id = $1`, [req.params.id]);
   if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-
   sseSendAll('pagamentos-changed', { reason: 'delete' });
-
   res.json({ ok:true });
 });
 
+// ===== EXTRATOS (com filtros) =====
+// Suporta: ?tipo=deposito|pagamento  &nome=  &from=YYYY-MM-DD  &to=YYYY-MM-DD  &range=today|last7|last30  &limit=200
+app.get('/api/extratos', areaAuth, async (req, res) => {
+  let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
+
+  const conds = [];
+  const params = [];
+  let i = 1;
+
+  if (tipo && ['deposito','pagamento'].includes(tipo)) { conds.push(`tipo = $${i++}`); params.push(tipo); }
+  if (nome) { conds.push(`lower(nome) LIKE $${i++}`); params.push(`%${String(nome).toLowerCase()}%`); }
+
+  // atalhos de período
+  const now = new Date();
+  const startOfDay = (d)=>{ const x = new Date(d); x.setHours(0,0,0,0); return x; };
+  const addDays = (d,n)=>{ const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+
+  if (range) {
+    if (range === 'today') { from = startOfDay(now).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
+    if (range === 'last7') { from = addDays(startOfDay(now), -6).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
+    if (range === 'last30'){ from = addDays(startOfDay(now), -29).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
+  }
+
+  if (from) { conds.push(`created_at >= $${i++}`); params.push(new Date(from)); }
+  if (to)   { conds.push(`created_at <  $${i++}`); params.push(new Date(to)); }
+
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const sql = `
+    SELECT id, nome, tipo, valor_cents AS "valorCents", created_at AS "createdAt"
+    FROM extratos
+    ${where}
+    ORDER BY created_at DESC
+    LIMIT ${Math.min(parseInt(limit,10)||200, 1000)}
+  `;
+  const { rows } = await q(sql, params);
+  res.json(rows);
+});
 
 app.listen(PORT, async () => {
-  try{
-    await q('select 1');
-    console.log('🗄️  Postgres conectado');
-  }catch(e){
-    console.error('❌ Postgres falhou:', e.message);
-  }
+  try{ await q('select 1'); console.log('🗄️  Postgres conectado'); }
+  catch(e){ console.error('❌ Postgres falhou:', e.message); }
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`🔒 /area.html protegido por sessão; login em /login.html`);

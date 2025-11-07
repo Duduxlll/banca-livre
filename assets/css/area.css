@@ -138,8 +138,7 @@ body{
 .ok{ color: var(--ok); font-weight:700 }
 .warn{ color: var(--warn); font-weight:700 }
 
-/* ---------- ABAS (transição suave) ---------- */
-/* A content já está position:relative acima */
+
 .tab{
   position: absolute;
   inset: 0;
@@ -336,4 +335,127 @@ body{
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;                /* sem espaçamento entre células */
+}
+
+/* =========================
+   AJUSTES DA ABA EXTRATOS
+   (apenas adições — não remove nada)
+========================= */
+
+/* 1) Barra de filtros do Extratos */
+#tab-extratos .card .bar{
+  display: grid !important;
+  gap: 12px !important;
+  grid-template-columns: 1fr !important;
+  align-items: start;
+  margin-bottom: 8px !important;
+}
+
+/* Linha 1: grid dos campos (Tipo/Período/De/Até) */
+#tab-extratos .card .bar > div:first-child{
+  display: grid !important;
+  gap: 8px !important;
+  grid-template-columns: repeat(6, minmax(0,1fr)) !important;
+  align-items: end !important;
+}
+
+/* Mantém os dois primeiros blocos maiores (como no HTML) */
+#tab-extratos .card .bar > div:first-child > div:nth-child(1),
+#tab-extratos .card .bar > div:first-child > div:nth-child(2){
+  grid-column: span 2;
+}
+
+/* Linha 2: busca + botões */
+#tab-extratos .card .bar > div:last-child{
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+}
+
+/* Busca mais flexível */
+#tab-extratos #busca-extrato{
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+/* Labels discretas e alinhadas */
+#tab-extratos label.muted{
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Inputs e selects com mesma “altura visual” */
+#tab-extratos .input{
+  height: 42px; /* combina com .btn */
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Botões da barra de filtro */
+#tab-extratos #btn-filtrar.btn{ min-width: 160px; }
+#tab-extratos #btn-limpar.btn { min-width: 120px; }
+
+/* 2) Cartões de listas “Depósitos” e “Pagamentos” */
+#tab-extratos [data-card="deps"],
+#tab-extratos [data-card="pags"]{
+  margin-top: 14px;
+}
+
+/* Títulos dos cartões */
+#tab-extratos [data-card] > h3{
+  margin: 0 0 10px;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+/* Colunas: valor à direita; data com fonte monoespaçada sutil */
+#tblExtratosDepositos td:nth-child(2),
+#tblExtratosPagamentos td:nth-child(2){ /* Valor */
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#tblExtratosDepositos td:nth-child(3),
+#tblExtratosPagamentos td:nth-child(3){ /* Data */
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 3) Responsividade dos filtros (quebra em telas menores) */
+@media (max-width: 1100px){
+  #tab-extratos .card .bar > div:first-child{
+    grid-template-columns: repeat(4, minmax(0,1fr)) !important;
+  }
+  #tab-extratos .card .bar > div:first-child > div:nth-child(1),
+  #tab-extratos .card .bar > div:first-child > div:nth-child(2){
+    grid-column: span 2;
+  }
+}
+@media (max-width: 780px){
+  #tab-extratos .card .bar > div:first-child{
+    grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  }
+  #tab-extratos .card .bar > div:first-child > div{
+    grid-column: span 2 !important; /* cada bloco em uma linha */
+  }
+}
+
+/* 4) Harmoniza espaçamento das tabelas em todas as abas */
+#tab-bancas .table-wrap,
+#tab-pagamentos .table-wrap,
+#tab-extratos .table-wrap{
+  max-height: 520px; /* um pouco mais alto na visão de extratos */
+}
+
+/* 5) Garante que o botão "Bancas" (em Pagamentos) siga o estilo primary */
+#tab-pagamentos [data-action="to-banca"].btn{
+  /* já recebe .btn--primary no HTML; aqui só reforço sombras */
+  box-shadow: 0 12px 30px rgba(110,140,255,.25), 0 8px 20px rgba(43,180,255,.18);
+}
+#tab-pagamentos [data-action="to-banca"].btn:hover{
+  box-shadow: 0 10px 26px rgba(110,140,255,.18);
 }
