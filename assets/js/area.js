@@ -1,5 +1,4 @@
-
-const API = window.location.origin; 
+const API = window.location.origin;
 const qs  = (s, r=document) => r.querySelector(s);
 const qsa = (s, r=document) => [...r.querySelectorAll(s)];
 
@@ -10,7 +9,6 @@ function getCookie(name) {
 
 async function apiFetch(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers||{}) };
-  
   if (['POST','PUT','PATCH','DELETE'].includes((opts.method||'GET').toUpperCase())) {
     const csrf = getCookie('csrf');
     if (csrf) headers['X-CSRF-Token'] = csrf;
@@ -28,12 +26,10 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
-
 function debounce(fn, wait = 300){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
 }
-
 
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
@@ -42,19 +38,16 @@ const tabExtratosEl   = qs('#tab-extratos');
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
 
-
 const tbodyExtDeps    = qs('#tblExtratosDepositos tbody');
 const tbodyExtPags    = qs('#tblExtratosPagamentos tbody');
-
 
 const buscaInput        = qs('#busca');
 const buscaExtratoInput = qs('#busca-extrato');
 
-
-const filtroTipo  = qs('#filtro-tipo');    
-const filtroRange = qs('#filtro-range');   
-const filtroFrom  = qs('#filtro-from');    
-const filtroTo    = qs('#filtro-to');      
+const filtroTipo  = qs('#filtro-tipo');
+const filtroRange = qs('#filtro-range');
+const filtroFrom  = qs('#filtro-from');
+const filtroTo    = qs('#filtro-to');
 const btnFiltrar  = qs('#btn-filtrar');
 const btnLimpar   = qs('#btn-limpar');
 
@@ -63,10 +56,10 @@ const STATE = {
   bancas: [],
   pagamentos: [],
   extratos: { depositos: [], pagamentos: [] },
-  timers: new Map(), 
+  timers: new Map(),
   filtrosExtratos: { tipo:'all', range:'last30', from:null, to:null },
+  editingBancaId: null
 };
-
 
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
@@ -79,35 +72,30 @@ async function loadPagamentos() {
   return STATE.pagamentos;
 }
 
-
 function buildExtratosQuery(){
   const f = STATE.filtrosExtratos || {};
   const params = new URLSearchParams();
-
   if (f.tipo && f.tipo !== 'all') params.set('tipo', f.tipo);
-
   if (f.range && f.range !== 'custom') {
     params.set('range', f.range);
   } else if (f.range === 'custom') {
     if (f.from) params.set('from', f.from);
     if (f.to)   params.set('to',   f.to);
   } else {
-    params.set('range', 'last30'); 
+    params.set('range', 'last30');
   }
-
   params.set('limit', '500');
   return params.toString();
 }
 
 async function loadExtratos(){
-  if (!tabExtratosEl) return STATE.extratos; 
+  if (!tabExtratosEl) return STATE.extratos;
   const qsBase = buildExtratosQuery();
   const f = STATE.filtrosExtratos || {};
-
   if (!f.tipo || f.tipo === 'all') {
     const [deps, pags] = await Promise.all([
       apiFetch(`/api/extratos?${qsBase}&tipo=deposito`),
-      apiFetch(`/api/extratos?${qsBase}&tipo=pagamento`),
+      apiFetch(`/api/extratos?${qsBase}&tipo=pagamento`)
     ]);
     STATE.extratos.depositos  = deps;
     STATE.extratos.pagamentos = pags;
@@ -120,7 +108,6 @@ async function loadExtratos(){
   }
   return STATE.extratos;
 }
-
 
 async function render(){
   if (TAB==='bancas'){
@@ -143,20 +130,31 @@ async function render(){
 
 function renderBancas(){
   if (!tbodyBancas) return;
-  const lista = STATE.bancas;
 
+  const focused = document.activeElement;
+  const isEditing = !!focused?.matches?.('input[data-role="banca"]');
+  if (isEditing) return;
+
+  const lista = STATE.bancas;
   tbodyBancas.innerHTML = lista.length ? lista.map(b => {
     const bancaTxt = typeof b.bancaCents === 'number' ? fmtBRL(b.bancaCents) : '';
+    const hasMsg = !!(b.message && String(b.message).trim());
     return `
       <tr data-id="${b.id}">
         <td>${esc(b.nome)}</td>
         <td>${fmtBRL(b.depositoCents||0)}</td>
         <td>
-          <input type="text" class="input input-money" data-role="banca" data-id="${b.id}" placeholder="R$ 0,00" value="${bancaTxt}">
+          <input type="text"
+                 class="input input-money"
+                 data-role="banca"
+                 data-id="${b.id}"
+                 placeholder="R$ 0,00"
+                 value="${bancaTxt}">
         </td>
         <td class="col-acoes">
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;align-items:center">
             <button class="btn btn--primary" data-action="to-pagamento" data-id="${b.id}">Pagamento</button>
+            <button class="btn" data-action="ver-msg" data-id="${b.id}" ${hasMsg?'':'disabled'}>Ver mensagem</button>
             <button class="btn btn--danger"  data-action="del-banca"    data-id="${b.id}">Excluir</button>
           </div>
         </td>
@@ -189,7 +187,6 @@ function renderPagamentos(){
               ${statusTxt} <span class="caret"></span>
             </button>
 
-            <!-- Voltar para Bancas -->
             <button class="btn btn--primary" data-action="to-banca" data-id="${p.id}">Bancas</button>
 
             <button class="btn btn--primary" data-action="fazer-pix" data-id="${p.id}">Fazer PIX</button>
@@ -205,7 +202,6 @@ function renderPagamentos(){
 function renderExtratos(){
   if (!tabExtratosEl) return;
 
- 
   if (tbodyExtDeps) {
     const L1 = STATE.extratos.depositos;
     tbodyExtDeps.innerHTML = L1.length ? L1.map(x => `
@@ -217,7 +213,6 @@ function renderExtratos(){
     `).join('') : `<tr><td colspan="3" class="muted" style="padding:14px">Sem depósitos ainda.</td></tr>`;
   }
 
- 
   if (tbodyExtPags) {
     const L2 = STATE.extratos.pagamentos;
     tbodyExtPags.innerHTML = L2.length ? L2.map(x => `
@@ -229,14 +224,12 @@ function renderExtratos(){
     `).join('') : `<tr><td colspan="3" class="muted" style="padding:14px">Sem pagamentos ainda.</td></tr>`;
   }
 
-  
   const q = (buscaExtratoInput?.value || '').trim().toLowerCase();
   if (q) {
     if (tbodyExtDeps) filtrarTabela(tbodyExtDeps, q);
     if (tbodyExtPags) filtrarTabela(tbodyExtPags, q);
   }
 
- 
   if (filtroTipo && tabExtratosEl) {
     const t = (filtroTipo.value||'all');
     const cardDeps = tabExtratosEl.querySelector('[data-card="deps"]') || tabExtratosEl.querySelector('#tblExtratosDepositos')?.closest('.card');
@@ -248,13 +241,10 @@ function renderExtratos(){
   }
 }
 
-
 async function setTab(tab){
   TAB = tab;
   localStorage.setItem('area_tab', tab);
-  qsa('.nav-btn').forEach(btn=>{
-    btn.classList.toggle('active', btn.dataset.tab === tab);
-  });
+  qsa('.nav-btn').forEach(btn=> btn.classList.toggle('active', btn.dataset.tab === tab));
   await refresh();
 }
 
@@ -274,7 +264,6 @@ function getBancaInputById(id){
 }
 
 async function toPagamento(id){
-  
   const inp = getBancaInputById(id);
   if (inp) {
     const cents = toCents(inp.value);
@@ -283,22 +272,16 @@ async function toPagamento(id){
       body: JSON.stringify({ bancaCents: cents })
     });
   }
-
-  
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}/to-pagamento`, { method:'POST' });
-
-  
   await Promise.all([loadBancas(), loadPagamentos()]);
   render();
   setupAutoDeleteTimers();
 }
 
-
 async function toBanca(id){
   await apiFetch(`/api/pagamentos/${encodeURIComponent(id)}/to-banca`, { method:'POST' });
   await Promise.all([loadPagamentos(), loadBancas()]);
   render();
-  
   const t = STATE.timers.get(id);
   if (t){ clearTimeout(t); STATE.timers.delete(id); }
 }
@@ -325,16 +308,13 @@ async function setStatus(id, value){
 
   const item = STATE.pagamentos.find(x=>x.id===id);
   if (!item) return;
-
   if (value === 'pago') {
-    
     scheduleAutoDelete(item);
   } else {
     const t = STATE.timers.get(id);
     if (t){ clearTimeout(t); STATE.timers.delete(id); }
   }
 }
-
 
 function scheduleAutoDelete(item){
   const { id, paidAt } = item;
@@ -355,7 +335,6 @@ function setupAutoDeleteTimers(){
   });
 }
 
-
 function abrirPixModal(id){
   const p = STATE.pagamentos.find(x=>x.id===id);
   if(!p) return;
@@ -364,6 +343,11 @@ function abrirPixModal(id){
     dlg = document.createElement('dialog');
     dlg.id = 'payModal';
     dlg.style.border='0'; dlg.style.padding='0'; dlg.style.background='transparent';
+
+    injectOnce('payModalBackdropCSS', `
+      #payModal::backdrop{ background: rgba(8,12,26,.65); backdrop-filter: blur(6px) saturate(.9); }
+    `);
+
     const box = document.createElement('div');
     box.style.width='min(94vw,520px)';
     box.style.background='linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))';
@@ -401,6 +385,60 @@ function abrirPixModal(id){
   dlg.showModal();
 }
 
+let msgModalEl = null;
+function injectOnce(id, css){
+  if (document.getElementById(id)) return;
+  const st = document.createElement('style');
+  st.id = id;
+  st.textContent = css;
+  document.head.appendChild(st);
+}
+function ensureMsgModal(){
+  if (msgModalEl) return msgModalEl;
+
+  injectOnce('msgModalBackdropCSS', `
+    #msgModal::backdrop{ background: rgba(8,12,26,.65); backdrop-filter: blur(6px) saturate(.9); }
+    #msgModal .box h3{ margin:0 0 8px; font-weight:800 }
+    #msgModal .box p{ margin:0 0 12px; color:#cfd2e8; white-space:pre-wrap; line-height:1.5 }
+  `);
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'msgModal';
+  dlg.style.border='0'; dlg.style.padding='0'; dlg.style.background='transparent';
+
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.style.width='min(94vw,560px)';
+  box.style.background='linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05))';
+  box.style.border='1px solid rgba(255,255,255,.18)';
+  box.style.borderRadius='16px';
+  box.style.boxShadow='0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04)';
+  box.style.padding='18px';
+  box.style.color='#e7e9f3';
+  box.innerHTML = `
+    <h3>Mensagem</h3>
+    <p id="msgText"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn--ghost" data-action="close-msg">Fechar</button>
+    </div>
+  `;
+  dlg.appendChild(box);
+  document.body.appendChild(dlg);
+
+  dlg.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-action="close-msg"]');
+    if (b) dlg.close();
+  });
+
+  msgModalEl = dlg;
+  return dlg;
+}
+function abrirMensagem(texto){
+  const dlg = ensureMsgModal();
+  const p = dlg.querySelector('#msgText');
+  p.textContent = (texto && String(texto).trim()) ? String(texto) : '(sem mensagem)';
+  dlg.showModal();
+}
 
 let statusMenuEl = null;
 let statusMenuId = null;
@@ -432,12 +470,8 @@ function showStatusMenu(anchorBtn, id, current){
   const m = ensureStatusMenu();
   statusMenuId = id;
 
- 
-  qsa('.status-item', m).forEach(b=>{
-    b.classList.toggle('active', b.dataset.value === current);
-  });
+  qsa('.status-item', m).forEach(b=> b.classList.toggle('active', b.dataset.value === current));
 
-  
   const r = anchorBtn.getBoundingClientRect();
   m.style.display = 'block';
   m.style.visibility = 'hidden';
@@ -447,9 +481,7 @@ function showStatusMenu(anchorBtn, id, current){
 
   const spaceBelow = window.innerHeight - r.bottom;
   let top = r.bottom + 6;
-  if(spaceBelow < mh + 8){
-    top = r.top - mh - 6; 
-  }
+  if(spaceBelow < mh + 8){ top = r.top - mh - 6; }
   const left = Math.min(Math.max(8, r.left), window.innerWidth - mw - 8);
 
   m.style.top  = `${Math.round(top)}px`;
@@ -465,7 +497,6 @@ function hideStatusMenu(){
   statusMenuId = null;
 }
 
-
 document.addEventListener('click', (e)=>{
   const openBtn = e.target.closest('button[data-action="status-open"]');
   if(openBtn){
@@ -479,29 +510,54 @@ document.addEventListener('click', (e)=>{
   if(!e.target.closest('.status-float')) hideStatusMenu();
 });
 
-
-['scroll','resize'].forEach(ev=>{
-  window.addEventListener(ev, hideStatusMenu, {passive:true});
-});
-qsa('.table-wrap').forEach(w=> w.addEventListener('scroll', hideStatusMenu, {passive:true}));
-
-
-qsa('.nav-btn').forEach(btn=>{
-  btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="ver-msg"]');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  const b = STATE.bancas.find(x=>x.id===id);
+  const p = STATE.pagamentos.find(x=>x.id===id);
+  const msg = (b?.message ?? p?.message) || '';
+  abrirMensagem(msg);
 });
 
 document.addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
-
   const {action, id} = btn.dataset;
   if(action==='to-pagamento') return toPagamento(id).catch(console.error);
   if(action==='del-banca')    return deleteBanca(id).catch(console.error);
   if(action==='fazer-pix')    return abrirPixModal(id);
   if(action==='del-pag')      return deletePagamento(id).catch(console.error);
-  if(action==='to-banca')     return toBanca(id).catch(console.error); 
+  if(action==='to-banca')     return toBanca(id).catch(console.error);
 });
 
+document.addEventListener('focusin', (e)=>{
+  const inp = e.target.closest('input[data-role="banca"]');
+  if(!inp) return;
+  STATE.editingBancaId = inp.dataset.id || null;
+});
+document.addEventListener('focusout', (e)=>{
+  const inp = e.target.closest('input[data-role="banca"]');
+  if(!inp) return;
+  saveBancaInline(inp).catch(console.error).finally(()=>{
+    const still = document.activeElement?.closest?.('input[data-role="banca"]');
+    STATE.editingBancaId = still ? still.dataset.id : null;
+  });
+}, true);
+
+async function saveBancaInline(inp){
+  const id = inp.dataset.id;
+  const cents = toCents(inp.value);
+  const item = STATE.bancas.find(x=>x.id===id);
+  if (item) item.bancaCents = cents;
+
+  try{
+    await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, {
+      method:'PATCH',
+      body: JSON.stringify({ bancaCents: cents })
+    });
+  }catch(err){ console.error(err); }
+}
 
 document.addEventListener('input', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
@@ -513,24 +569,14 @@ document.addEventListener('input', (e)=>{
   inp.value = fmtBRL(parseInt(v,10));
 });
 
-
-document.addEventListener('blur', async (e)=>{
+document.addEventListener('keydown', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
   if(!inp) return;
-  const id = inp.dataset.id;
-  const cents = toCents(inp.value);
-  try{
-    await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, {
-      method:'PATCH',
-      body: JSON.stringify({ bancaCents: cents })
-    });
-    await loadBancas();
-    render();
-  }catch(err){
-    console.error(err);
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    inp.blur();
   }
-}, true);
-
+});
 
 function filtrarTabela(tbody, q){
   if(!tbody) return;
@@ -545,13 +591,12 @@ buscaInput?.addEventListener('input', ()=>{
   else                filtrarTabela(tbodyPags,   q);
 });
 
-
 function readExtratoFiltersFromDOM(){
   const f = STATE.filtrosExtratos;
   if (filtroTipo)  f.tipo  = filtroTipo.value || 'all';
   if (filtroRange) f.range = filtroRange.value || 'last30';
-  if (filtroFrom)  f.from  = filtroFrom.value || null;  
-  if (filtroTo)    f.to    = filtroTo.value   || null;  
+  if (filtroFrom)  f.from  = filtroFrom.value || null;
+  if (filtroTo)    f.to    = filtroTo.value   || null;
 }
 function applyExtratoFiltersUIRules(){
   if (!filtroRange) return;
@@ -575,15 +620,15 @@ btnLimpar?.addEventListener('click',    async ()=>{
   renderExtratos();
 });
 
-
 let es = null;
-
 function startStream(){
   if (es) try { es.close(); } catch {}
-  
   es = new EventSource(`${API}/api/stream`);
 
   const softRefreshBancas = debounce(async () => {
+    const focused = document.activeElement;
+    const isEditing = !!focused?.matches?.('input[data-role="banca"]');
+    if (isEditing) return;
     await loadBancas();
     if (TAB === 'bancas') render();
   }, 200);
@@ -604,25 +649,23 @@ function startStream(){
   es.addEventListener('bancas-changed',     softRefreshBancas);
   es.addEventListener('pagamentos-changed', softRefreshPags);
   es.addEventListener('extratos-changed',   softRefreshExt);
-  es.addEventListener('ping', () => {}); 
+  es.addEventListener('ping', () => {});
 
   es.onerror = () => {
     try { es.close(); } catch {}
-    setTimeout(startStream, 3000); 
+    setTimeout(startStream, 3000);
   };
 }
-
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   qsa('.nav-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.tab === TAB);
+    btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
 
-  
   applyExtratoFiltersUIRules();
   readExtratoFiltersFromDOM();
 
-  
   const loaders = [loadBancas(), loadPagamentos()];
   if (tabExtratosEl) loaders.push(loadExtratos());
   await Promise.all(loaders);
@@ -630,6 +673,5 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setupAutoDeleteTimers();
   render();
 
- 
   startStream();
 });

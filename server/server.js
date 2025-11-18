@@ -1,4 +1,3 @@
-
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
@@ -16,7 +15,6 @@ import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
 const { Pool } = pkg;
-
 
 const {
   PORT = 3000,
@@ -38,7 +36,6 @@ const {
 
 const PROD = process.env.NODE_ENV === 'production';
 
-
 ['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
   if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (login)`); process.exit(1); }
 });
@@ -48,15 +45,13 @@ const PROD = process.env.NODE_ENV === 'production';
 
 if (!DATABASE_URL) { console.error('❌ Falta DATABASE_URL no .env'); process.exit(1); }
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..'); 
-
+const ROOT       = path.resolve(__dirname, STATIC_ROOT || '..');
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false } 
+  ssl: { rejectUnauthorized: false }
 });
 const q = (text, params) => pool.query(text, params);
 
@@ -88,7 +83,6 @@ function brlStrToCents(strOriginal) {
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function tok(){ return 'tok_' + crypto.randomBytes(18).toString('hex'); }
 
-
 const tokenStore = new Map();
 const TOKEN_TTL_MS = 15 * 60 * 1000;
 setInterval(() => {
@@ -96,9 +90,8 @@ setInterval(() => {
   for (const [k, v] of tokenStore) {
     if (now - v.createdAt > TOKEN_TTL_MS) tokenStore.delete(k);
   }
-}, 60_000);
+}, 60000);
 
-// ===== app base =====
 const app = express();
 app.set('trust proxy', 1);
 
@@ -107,9 +100,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
 
-
 app.use(express.static(ROOT, { extensions: ['html'] }));
-
 
 const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
 
@@ -144,14 +135,12 @@ function requireAuth(req, res, next){
   next();
 }
 
-// ===== SSE =====
 const sseClients = new Set();
 function sseSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const msg = `event: ${event}\ndata: ${data}\n\n`;
   for (const res of sseClients) { try { res.write(msg); } catch {} }
 }
-
 
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -167,7 +156,6 @@ app.get('/api/stream', requireAuth, (req, res) => {
 
   req.on('close', () => { clearInterval(ping); sseClients.delete(res); try { res.end(); } catch {} });
 });
-
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
@@ -189,13 +177,11 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
-// Protege a área
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
-
 
 app.get('/health', async (req, res) => {
   try { fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH); await q('select 1'); return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true }); }
@@ -206,11 +192,10 @@ app.get('/api/pix/ping', async (req, res) => {
   catch (e) { return res.status(500).json({ ok:false, error: e.response?.data || e.message }); }
 });
 
-
 app.post('/api/pix/cob', async (req, res) => {
   try {
     const { nome, cpf, valorCentavos } = req.body || {};
-    if (!nome || typeof valorCentavos !== 'number' || valorCentavos < 1000) {
+    if (!nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
       return res.status(400).json({ error: 'Dados inválidos (mínimo R$ 10,00)' });
     }
     const access = await getAccessToken();
@@ -239,7 +224,6 @@ app.post('/api/pix/cob', async (req, res) => {
   }
 });
 
-
 app.get('/api/pix/status/:token', async (req, res) => {
   try {
     const rec = tokenStore.get(req.params.token);
@@ -259,7 +243,7 @@ app.post('/api/pix/confirmar', async (req, res) => {
     const key = req.get('X-APP-KEY');
     if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
 
-    const { token, nome, valorCentavos, tipo=null, chave=null } = req.body || {};
+    const { token, nome, valorCentavos, tipo=null, chave=null, message=null } = req.body || {};
     if (!token || !nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
       return res.status(400).json({ error:'dados_invalidos' });
     }
@@ -267,31 +251,28 @@ app.post('/api/pix/confirmar', async (req, res) => {
     const rec = tokenStore.get(token);
     if (!rec) return res.status(404).json({ error:'token_not_found' });
 
-    // 1) consulta na Efi usando o txid associado ao token
     const access = await getAccessToken();
     const { data } = await axios.get(`${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
 
-    // 2) valida status + valor
     if (data.status !== 'CONCLUIDA') return res.status(409).json({ error:'pix_nao_concluido' });
     const valorEfiCents = brlStrToCents(data?.valor?.original);
     if (valorEfiCents == null) return res.status(500).json({ error:'valor_invalido_efi' });
     if (valorEfiCents !== valorCentavos) return res.status(409).json({ error:'valor_divergente' });
 
-    // 3) insere em bancas
     const id = uid();
     const { rows } = await q(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       values ($1,$2,$3,$4,$5,$6, now())
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7, now())
        returning id, nome,
                  deposito_cents as "depositoCents",
                  banca_cents    as "bancaCents",
                  pix_type       as "pixType",
                  pix_key        as "pixKey",
+                 message        as "message",
                  created_at     as "createdAt"`,
-      [id, nome, valorCentavos, null, tipo, chave]
+      [id, nome, valorCentavos, null, tipo, chave, message]
     );
 
-    // 3.1) registra no extrato (DEPÓSITO) com ref_id = id da banca
     await q(
       `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
        values ($1,$2,$3,'deposito',$4, now())`,
@@ -299,7 +280,6 @@ app.post('/api/pix/confirmar', async (req, res) => {
     );
     sseSendAll('extratos-changed', { reason: 'deposito' });
 
-    // 4) limpa token e notifica SSE
     tokenStore.delete(token);
     sseSendAll('bancas-changed', { reason: 'insert-confirmed' });
 
@@ -310,28 +290,26 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-
 app.post('/api/public/bancas', async (req, res) => {
   try{
     if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
     const key = req.get('X-APP-KEY');
     if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
 
-    const { nome, depositoCents, pixType=null, pixKey=null } = req.body || {};
+    const { nome, depositoCents, pixType=null, pixKey=null, message=null } = req.body || {};
     if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
       return res.status(400).json({ error: 'dados_invalidos' });
     }
 
     const id = uid();
     const { rows } = await q(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       values ($1,$2,$3,$4,$5,$6, now())
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7, now())
        returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-                 pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
-      [id, nome, depositoCents, null, pixType, pixKey]
+                 pix_type as "PixType", pix_key as "pixKey", message as "message", created_at as "createdAt"`,
+      [id, nome, depositoCents, null, pixType, pixKey, message]
     );
 
-    
     await q(
       `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
        values ($1,$2,$3,'deposito',$4, now())`,
@@ -349,7 +327,6 @@ app.post('/api/public/bancas', async (req, res) => {
 
 const areaAuth = [requireAuth];
 
-
 app.get('/api/bancas', areaAuth, async (req, res) => {
   const { rows } = await q(
     `select id, nome,
@@ -357,6 +334,7 @@ app.get('/api/bancas', areaAuth, async (req, res) => {
             banca_cents    as "bancaCents",
             pix_type       as "pixType",
             pix_key        as "pixKey",
+            message        as "message",
             created_at     as "createdAt"
      from bancas
      order by created_at desc`
@@ -365,17 +343,17 @@ app.get('/api/bancas', areaAuth, async (req, res) => {
 });
 
 app.post('/api/bancas', areaAuth, async (req, res) => {
-  const { nome, depositoCents, pixType=null, pixKey=null } = req.body || {};
+  const { nome, depositoCents, pixType=null, pixKey=null, message=null } = req.body || {};
   if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
     return res.status(400).json({ error: 'dados_invalidos' });
   }
   const id = uid();
   const { rows } = await q(
-    `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-     values ($1,$2,$3,$4,$5,$6, now())
+    `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+     values ($1,$2,$3,$4,$5,$6,$7, now())
      returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-               pix_type as "pixType", pix_key as "pixKey", created_at as "createdAt"`,
-    [id, nome, depositoCents, null, pixType, pixKey]
+               pix_type as "pixType", pix_key as "pixKey", message as "message", created_at as "createdAt"`,
+    [id, nome, depositoCents, null, pixType, pixKey, message]
   );
 
   sseSendAll('bancas-changed', { reason: 'insert' });
@@ -395,6 +373,7 @@ app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
                banca_cents    as "bancaCents",
                pix_type       as "pixType",
                pix_key        as "pixKey",
+               message        as "message",
                created_at     as "createdAt"`,
     [req.params.id, bancaCents]
   );
@@ -411,7 +390,7 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
     await client.query('begin');
 
     const sel = await client.query(
-      `select id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at
+      `select id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at
        from bancas where id = $1 for update`,
       [req.params.id]
     );
@@ -423,9 +402,9 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
       : (typeof b.banca_cents === 'number' && b.banca_cents > 0 ? b.banca_cents : b.deposito_cents);
 
     await client.query(
-      `insert into pagamentos (id, nome, pagamento_cents, pix_type, pix_key, status, created_at, paid_at)
-       values ($1,$2,$3,$4,$5,'nao_pago',$6,null)`,
-      [b.id, b.nome, bancaFinal, b.pix_type, b.pix_key, b.created_at]
+      `insert into pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
+       values ($1,$2,$3,$4,$5,$6,'nao_pago',$7,null)`,
+      [b.id, b.nome, bancaFinal, b.pix_type, b.pix_key, b.message || null, b.created_at]
     );
     await client.query(`delete from bancas where id = $1`, [b.id]);
 
@@ -442,14 +421,13 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
   }finally{ client.release(); }
 });
 
-// ===== PAGAMENTOS <-> BANCAS (voltar) =====
 app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('begin');
 
     const sel = await client.query(
-      `select id, nome, pagamento_cents, pix_type, pix_key, created_at
+      `select id, nome, pagamento_cents, pix_type, pix_key, message, created_at
          from pagamentos where id = $1 for update`,
       [req.params.id]
     );
@@ -457,9 +435,9 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
     const p = sel.rows[0];
 
     await client.query(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
-      [p.id, p.nome, p.pagamento_cents, p.pagamento_cents, p.pix_type, p.pix_key, p.created_at]
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [p.id, p.nome, p.pagamento_cents, p.pagamento_cents, p.pix_type, p.pix_key, p.message || null, p.created_at]
     );
     await client.query(`delete from pagamentos where id = $1`, [p.id]);
 
@@ -489,6 +467,7 @@ app.get('/api/pagamentos', areaAuth, async (req, res) => {
             pagamento_cents as "pagamentoCents",
             pix_type        as "pixType",
             pix_key         as "pixKey",
+            message         as "message",
             status,
             created_at      as "createdAt",
             paid_at         as "paidAt"
@@ -502,13 +481,11 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
   const { status } = req.body || {};
   if (!['pago','nao_pago'].includes(status)) return res.status(400).json({ error: 'status_invalido' });
 
-  // lê antes para checar transição
   const beforeQ = await q(
     `select id, nome, pagamento_cents, status, paid_at from pagamentos where id = $1`,
     [req.params.id]
   );
   if (!beforeQ.rows.length) return res.status(404).json({ error:'not_found' });
-  const before = beforeQ.rows[0];
 
   const { rows } = await q(
     `update pagamentos
@@ -519,32 +496,63 @@ app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
                pagamento_cents as "pagamentoCents",
                pix_type as "PixType",
                pix_key  as "pixKey",
-               status, created_at as "createdAt", paid_at as "paidAt"`,
+               status, created_at as "CreatedAt", paid_at as "paidAt"`,
     [req.params.id, status]
   );
   if (!rows.length) return res.status(404).json({ error:'not_found' });
-
-  // se mudou de nao_pago -> pago, registra extrato (ref_id = id do pagamento)
-  if (status === 'pago' && before.status !== 'pago') {
-    await q(
-      `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
-       values ($1,$2,$3,'pagamento',$4, coalesce($5, now()))`,
-      [uid(), rows[0].id, rows[0].nome, rows[0].pagamentoCents, rows[0].paidAt]
-    );
-    sseSendAll('extratos-changed', { reason: 'pagamento' });
-  }
 
   sseSendAll('pagamentos-changed', { reason: 'update-status' });
   res.json(rows[0]);
 });
 
 app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
-  const r = await q(`delete from pagamentos where id = $1`, [req.params.id]);
-  if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-  sseSendAll('pagamentos-changed', { reason: 'delete' });
-  res.json({ ok:true });
-});
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
 
+    const sel = await client.query(
+      `select id, nome, pagamento_cents, status, paid_at
+         from pagamentos
+        where id = $1
+        for update`,
+      [req.params.id]
+    );
+    if (!sel.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error:'not_found' });
+    }
+    const p = sel.rows[0];
+
+    let insertedExtrato = false;
+    if (p.status === 'pago') {
+      await client.query(
+        `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
+         values ($1,$2,$3,'pagamento',$4, coalesce($5, now()))`,
+        [uid(), p.id, p.nome, p.pagamento_cents, p.paid_at]
+      );
+      insertedExtrato = true;
+    }
+
+    const del = await client.query(`delete from pagamentos where id = $1`, [p.id]);
+    if (del.rowCount === 0) {
+      await client.query('rollback');
+      return res.status(404).json({ error:'not_found' });
+    }
+
+    await client.query('commit');
+
+    if (insertedExtrato) sseSendAll('extratos-changed', { reason: 'pagamento-finalizado' });
+    sseSendAll('pagamentos-changed', { reason: 'delete' });
+
+    return res.json({ ok:true });
+  } catch (e) {
+    await client.query('rollback');
+    console.error('delete pagamento:', e.message);
+    return res.status(500).json({ error:'falha_delete' });
+  } finally {
+    client.release();
+  }
+});
 
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
@@ -556,7 +564,6 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   if (tipo && ['deposito','pagamento'].includes(tipo)) { conds.push(`tipo = $${i++}`); params.push(tipo); }
   if (nome) { conds.push(`lower(nome) LIKE $${i++}`); params.push(`%${String(nome).toLowerCase()}%`); }
 
-  // atalhos de período
   const now = new Date();
   const startOfDay = (d)=>{ const x = new Date(d); x.setHours(0,0,0,0); return x; };
   const addDays = (d,n)=>{ const x = new Date(d); x.setDate(x.getDate()+n); return x; };
@@ -588,8 +595,21 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
+async function ensureMessageColumns(){
+  try{
+    await q(`alter table if exists bancas add column if not exists message text`);
+    await q(`alter table if exists pagamentos add column if not exists message text`);
+  }catch(e){
+    console.error('ensureMessageColumns:', e.message);
+  }
+}
+
 app.listen(PORT, async () => {
-  try{ await q('select 1'); console.log('🗄️  Postgres conectado'); }
+  try{
+    await q('select 1');
+    await ensureMessageColumns();
+    console.log('🗄️  Postgres conectado');
+  }
   catch(e){ console.error('❌ Postgres falhou:', e.message); }
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);

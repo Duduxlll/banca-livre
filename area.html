@@ -22,7 +22,7 @@
   </header>
 
   <main class="layout">
-  
+    
     <aside class="sidebar">
       <div class="brand">
         <img src="assets/img/banner.jpg" alt="Bancas" class="brand-img">
@@ -36,9 +36,9 @@
       </nav>
     </aside>
 
-  
-    <section class="content">
     
+    <section class="content">
+      
       <div class="tab tab-view show" id="tab-bancas">
         <div class="bar">
           <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
@@ -55,7 +55,7 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody></tbody>
+              <tbody>  </tbody>
             </table>
           </div>
         </div>
@@ -73,15 +73,14 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody></tbody>
+              <tbody>    </tbody>
             </table>
           </div>
         </div>
       </div>
 
-
       <div class="tab tab-view" id="tab-extratos">
-       
+        
         <div class="card">
           <div class="bar" style="display:grid; gap:10px; grid-template-columns: 1fr; margin-bottom:8px">
             <div style="display:grid; gap:8px; grid-template-columns: repeat(6, minmax(0,1fr)); align-items:end">
@@ -124,7 +123,7 @@
           </div>
         </div>
 
-       
+        
         <div class="card" data-card="deps">
           <h3 style="margin:0 0 10px">Depósitos</h3>
           <div class="table-wrap">
@@ -141,7 +140,7 @@
           </div>
         </div>
 
-       
+        
         <div class="card" data-card="pags">
           <h3 style="margin:0 0 10px">Pagamentos</h3>
           <div class="table-wrap">
@@ -164,7 +163,23 @@
 
   <div class="toast" id="toast"></div>
 
- 
+  
+  <dialog id="msgModal" style="border:0; padding:0; background:transparent;">
+    <div style="
+      width:min(94vw,520px);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      box-shadow:0 28px 80px rgba(0,0,0,.55);
+      padding:16px; color:#e7e9f3;">
+      <h3 style="margin:0 0 8px; font-weight:800">Mensagem</h3>
+      <p id="msgText" style="white-space:pre-wrap; margin:0 0 12px; color:#cfd2e8"></p>
+      <div style="display:flex; gap:8px; justify-content:flex-end">
+        <button class="btn btn--ghost" data-action="close-msg">Fechar</button>
+      </div>
+    </div>
+  </dialog>
+  
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
 </body>
