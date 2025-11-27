@@ -96,7 +96,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// ✅ BLOQUEIO TOTAL DO .git (FECHA A VULNERABILIDADE)
+
 app.use((req, res, next) => {
   if (req.url.includes('/.git')) {
     return res.status(403).send('Forbidden');
@@ -104,7 +104,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ PERMISSIONS-POLICY (NÃO PEDE PERMISSÃO — BLOQUEIA)
+
 app.use((req, res, next) => {
   res.setHeader(
     "Permissions-Policy",
@@ -161,6 +161,35 @@ function sseSendAll(event, payload = {}) {
   const msg = `event: ${event}\ndata: ${data}\n\n`;
   for (const res of sseClients) { try { res.write(msg); } catch {} }
 }
+
+
+
+app.use('/api', (req, res, next) => {
+  const openRoutes = [
+    '/api/auth/login',
+    '/api/auth/logout',
+    '/api/auth/me',
+    '/api/pix/cob',
+    '/api/pix/status',
+    '/api/public/bancas'
+  ];
+
+  if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
+    return next();
+  }
+
+  const token = req.cookies?.session;
+  const data  = token && verifySession(token);
+
+  if (!data) {
+    return res.status(401).json({ error: 'unauthorized_global' });
+  }
+
+  req.user = data;
+  next();
+});
+
+
 
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
