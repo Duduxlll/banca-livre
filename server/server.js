@@ -94,6 +94,26 @@ setInterval(() => {
 
 const app = express();
 app.set('trust proxy', 1);
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// ✅ BLOQUEIO TOTAL DO .git (FECHA A VULNERABILIDADE)
+app.use((req, res, next) => {
+  if (req.url.includes('/.git')) {
+    return res.status(403).send('Forbidden');
+  }
+  next();
+});
+
+// ✅ PERMISSIONS-POLICY (NÃO PEDE PERMISSÃO — BLOQUEIA)
+app.use((req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+  );
+  next();
+});
+
+
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json());
