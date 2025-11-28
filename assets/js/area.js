@@ -61,23 +61,30 @@ const STATE = {
   editingBancaId: null
 };
 
-/* -----------------------------------------
-   🔢 SOMA DOS TOTAIS (Depósitos + Bancas)
------------------------------------------ */
+function getTotalDepEl(){
+  return qs('#totalDepositos') || qs('#openTotalDepositos');
+}
+function getTotalBanEl(){
+  return qs('#totalBancas') || qs('#openTotalBancas');
+}
+
 function updateTotals() {
   const totalDepositos = STATE.bancas.reduce((acc, b) => acc + (b.depositoCents || 0), 0);
   const totalBancas    = STATE.bancas.reduce((acc, b) => acc + (b.bancaCents || 0), 0);
 
-  const elDep = qs('#totalDepositos');
-  const elBan = qs('#totalBancas');
+  const elDep = getTotalDepEl();
+  const elBan = getTotalBanEl();
 
-  if (elDep) elDep.textContent = `Soma dos Depósitos: ${fmtBRL(totalDepositos)}`;
-  if (elBan) elBan.textContent = `Soma das Bancas: ${fmtBRL(totalBancas)}`;
+  if (elDep) {
+    if (elDep.id === 'totalDepositos') elDep.textContent = fmtBRL(totalDepositos);
+    else elDep.textContent = `Soma dos Depósitos: ${fmtBRL(totalDepositos)}`;
+  }
+  if (elBan) {
+    if (elBan.id === 'totalBancas') elBan.textContent = fmtBRL(totalBancas);
+    else elBan.textContent = `Soma das Bancas: ${fmtBRL(totalBancas)}`;
+  }
 }
 
-/* -----------------------------------------
-   🪟 POPUP DAS SOMAS (animação pra cima)
------------------------------------------ */
 let totaisPopupEl = null;
 
 function ensureTotaisPopup(){
@@ -150,9 +157,7 @@ function ensureTotaisPopup(){
   document.body.appendChild(el);
 
   const closeBtn = el.querySelector('.totais-popup-close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', hideTotaisPopup);
-  }
+  if (closeBtn) closeBtn.addEventListener('click', hideTotaisPopup);
 
   totaisPopupEl = el;
   return el;
@@ -179,7 +184,6 @@ function showTotaisPopup(kind, anchorEl){
   popup.style.display = 'block';
   popup.classList.remove('show');
 
-  // posiciona acima do span clicado
   requestAnimationFrame(() => {
     const r  = anchorEl.getBoundingClientRect();
     const pw = popup.offsetWidth;
@@ -206,8 +210,6 @@ function hideTotaisPopup(){
   totaisPopupEl.classList.remove('show');
   totaisPopupEl.style.display = 'none';
 }
-
-/* -------------------------------------- */
 
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
@@ -495,7 +497,9 @@ function abrirPixModal(id){
   if(!dlg){
     dlg = document.createElement('dialog');
     dlg.id = 'payModal';
-    dlg.style.border='0'; dlg.style.padding='0'; dlg.style.background='transparent';
+    dlg.style.border='0';
+    dlg.style.padding='0';
+    dlg.style.background='transparent';
 
     injectOnce('payModalBackdropCSS', `
       #payModal::backdrop{ background: rgba(8,12,26,.65); backdrop-filter: blur(6px) saturate(.9); }
@@ -507,7 +511,8 @@ function abrirPixModal(id){
     box.style.border='1px solid rgba(255,255,255,.12)';
     box.style.borderRadius='14px';
     box.style.boxShadow='0 28px 80px rgba(0,0,0,.55)';
-    box.style.padding='16px'; box.style.color='#e7e9f3';
+    box.style.padding='16px';
+    box.style.color='#e7e9f3';
     box.innerHTML = `
       <h3 style="margin:0 0 6px">Fazer PIX para <span data-field="nome"></span></h3>
       <p class="muted" style="margin:0 0 10px">Chave (<span data-field="tipo"></span>)</p>
@@ -557,7 +562,9 @@ function ensureMsgModal(){
 
   const dlg = document.createElement('dialog');
   dlg.id = 'msgModal';
-  dlg.style.border='0'; dlg.style.padding='0'; dlg.style.background='transparent';
+  dlg.style.border='0';
+  dlg.style.padding='0';
+  dlg.style.background='transparent';
 
   const box = document.createElement('div');
   box.className = 'box';
@@ -674,7 +681,7 @@ document.addEventListener('click', (e)=>{
 });
 
 document.addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');
+  const btn = e.target.closest('button[data-action]');  
   if(!btn) return;
   const {action, id} = btn.dataset;
   if(action==='to-pagamento') return toPagamento(id).catch(console.error);
@@ -684,10 +691,9 @@ document.addEventListener('click', (e)=>{
   if(action==='to-banca')     return toBanca(id).catch(console.error);
 });
 
-// fecha popup das somas ao clicar fora
 document.addEventListener('click', (e)=>{
   if (e.target.closest('#totaisPopup')) return;
-  if (e.target.closest('#totaisContainer')) return;
+  if (e.target.closest('.totais')) return;
   hideTotaisPopup();
 });
 
@@ -834,15 +840,16 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   setupAutoDeleteTimers();
   render();
 
-  // clique nas somas para abrir popup
-  const totalDepEl = qs('#totalDepositos');
-  const totalBanEl = qs('#totalBancas');
+  const totalDepEl = getTotalDepEl();
+  const totalBanEl = getTotalBanEl();
   if (totalDepEl) {
     totalDepEl.style.cursor = 'pointer';
+    totalDepEl.classList.add('totais-pill');
     totalDepEl.addEventListener('click', ()=> showTotaisPopup('depositos', totalDepEl));
   }
   if (totalBanEl) {
     totalBanEl.style.cursor = 'pointer';
+    totalBanEl.classList.add('totais-pill');
     totalBanEl.addEventListener('click', ()=> showTotaisPopup('bancas', totalBanEl));
   }
 
