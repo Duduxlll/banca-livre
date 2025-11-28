@@ -72,18 +72,13 @@ function updateTotals() {
   const totalDepositos = STATE.bancas.reduce((acc, b) => acc + (b.depositoCents || 0), 0);
   const totalBancas    = STATE.bancas.reduce((acc, b) => acc + (b.bancaCents || 0), 0);
 
-  const elDep = getTotalDepEl();
-  const elBan = getTotalBanEl();
+  const elDep = qs('#totalDepositos');
+  const elBan = qs('#totalBancas');
 
-  if (elDep) {
-    if (elDep.id === 'totalDepositos') elDep.textContent = fmtBRL(totalDepositos);
-    else elDep.textContent = `Soma dos Depósitos: ${fmtBRL(totalDepositos)}`;
-  }
-  if (elBan) {
-    if (elBan.id === 'totalBancas') elBan.textContent = fmtBRL(totalBancas);
-    else elBan.textContent = `Soma das Bancas: ${fmtBRL(totalBancas)}`;
-  }
+  if (elDep) elDep.dataset.total = fmtBRL(totalDepositos);
+  if (elBan) elBan.dataset.total = fmtBRL(totalBancas);
 }
+
 
 let totaisPopupEl = null;
 
