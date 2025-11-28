@@ -1,4 +1,4 @@
-<!doctype html>
+   <!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -7,14 +7,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/area.css">
-
-  <!-- Backdrop blur do modal de mensagem (deixa pronto já) -->
-  <style>
-    #msgModal::backdrop { backdrop-filter: blur(6px) brightness(.7); }
-  </style>
 </head>
 <body>
-  <!-- Banner grande com logo -->
+  
   <header class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-wrap">
@@ -27,7 +22,7 @@
   </header>
 
   <main class="layout">
-    <!-- Menu lateral -->
+    
     <aside class="sidebar">
       <div class="brand">
         <img src="assets/img/banner.jpg" alt="Bancas" class="brand-img">
@@ -41,22 +36,12 @@
       </nav>
     </aside>
 
-    <!-- Conteúdo -->
+    
     <section class="content">
-      <!-- TAB: BANCAS -->
+      
       <div class="tab tab-view show" id="tab-bancas">
-        <!-- Barra com busca menor + totais -->
-        <div class="bar bar--totals">
-          <input id="busca" class="input input--search" type="text" placeholder="Buscar por nome…">
-
-          <div class="totals-wrap">
-            <button id="btnTotalDepositos" class="total-btn" title="Clique para copiar">
-              Soma dos Depósitos: <strong>R$ 0,00</strong>
-            </button>
-            <button id="btnTotalBancas" class="total-btn" title="Clique para copiar">
-              Soma das Bancas: <strong>R$ 0,00</strong>
-            </button>
-          </div>
+        <div class="bar">
+          <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
         </div>
 
         <div class="card">
@@ -70,13 +55,13 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody><!-- linhas via JS --></tbody>
+              <tbody>  </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- TAB: PAGAMENTOS -->
+      
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -88,15 +73,14 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody><!-- linhas via JS --></tbody>
+              <tbody>    </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- TAB: EXTRATOS -->
       <div class="tab tab-view" id="tab-extratos">
-        <!-- Barra de filtros -->
+        
         <div class="card">
           <div class="bar" style="display:grid; gap:10px; grid-template-columns: 1fr; margin-bottom:8px">
             <div style="display:grid; gap:8px; grid-template-columns: repeat(6, minmax(0,1fr)); align-items:end">
@@ -139,7 +123,7 @@
           </div>
         </div>
 
-        <!-- Lista: Depósitos -->
+        
         <div class="card" data-card="deps">
           <h3 style="margin:0 0 10px">Depósitos</h3>
           <div class="table-wrap">
@@ -151,12 +135,12 @@
                   <th>Data</th>
                 </tr>
               </thead>
-              <tbody><!-- linhas via JS --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Lista: Pagamentos -->
+        
         <div class="card" data-card="pags">
           <h3 style="margin:0 0 10px">Pagamentos</h3>
           <div class="table-wrap">
@@ -168,18 +152,18 @@
                   <th>Data</th>
                 </tr>
               </thead>
-              <tbody><!-- linhas via JS --></tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
-      <!-- /TAB: EXTRATOS -->
+      
     </section>
   </main>
 
   <div class="toast" id="toast"></div>
 
-  <!-- Modal “Ver mensagem” com backdrop desfocado -->
+  
   <dialog id="msgModal" style="border:0; padding:0; background:transparent;">
     <div style="
       width:min(94vw,520px);
@@ -195,8 +179,7 @@
       </div>
     </div>
   </dialog>
-
-  <!-- Ordem correta: primeiro sessão, depois área -->
+  
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
 </body>
