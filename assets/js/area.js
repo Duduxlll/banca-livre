@@ -115,6 +115,15 @@ function ensureBancasTopBar(){
   });
 }
 
+/* ====== SOMAS ====== */
+// roda após o render “assentar” no DOM
+function afterRenderTotals(){
+  requestAnimationFrame(() => {
+    requestAnimationFrame(updateTotals);
+  });
+}
+
+// mais robusta: considera estilo inline e computado, percorre apenas TRs visíveis
 function updateTotals(){
   if (TAB !== 'bancas') return;
   const depEl   = qs('#sum-dep');
@@ -122,19 +131,17 @@ function updateTotals(){
   if(!depEl || !bancaEl || !tbodyBancas) return;
 
   let somaDep = 0, somaBanca = 0;
-  qsa('tr', tbodyBancas).forEach(tr=>{
-    // respeita o filtro visual
-    const hidden = tr.style.display === 'none';
-    if(hidden) return;
 
-    const tds = tr.querySelectorAll('td');
-    // Depósito está na 2ª coluna (index 1)
-    const depTxt = tds[1]?.textContent || '';
-    somaDep += toCents(depTxt);
+  Array.from(tbodyBancas.rows).forEach(tr => {
+    const isHiddenInline = tr.style.display === 'none';
+    const isHiddenCSS = getComputedStyle(tr).display === 'none';
+    if (isHiddenInline || isHiddenCSS) return;
 
-    // Banca: input na 3ª coluna
-    const inp = tr.querySelector('input[data-role="banca"]');
-    somaBanca += toCents(inp?.value || '');
+    const depTd   = tr.cells[1]; // 2ª coluna (Depósito)
+    const bancaIn = tr.querySelector('input[data-role="banca"]');
+
+    somaDep   += toCents(depTd ? depTd.textContent : '');
+    somaBanca += toCents(bancaIn ? bancaIn.value : '');
   });
 
   depEl.textContent   = fmtBRL(somaDep);
@@ -199,7 +206,7 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     ensureBancasTopBar();
     renderBancas();
-    updateTotals();
+    afterRenderTotals();
   } else if (TAB==='pagamentos'){
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
@@ -362,7 +369,7 @@ async function toPagamento(id){
   await Promise.all([loadBancas(), loadPagamentos()]);
   render();
   setupAutoDeleteTimers();
-  updateTotals();
+  afterRenderTotals();
 }
 
 async function toBanca(id){
@@ -371,14 +378,14 @@ async function toBanca(id){
   render();
   const t = STATE.timers.get(id);
   if (t){ clearTimeout(t); STATE.timers.delete(id); }
-  updateTotals();
+  afterRenderTotals();
 }
 
 async function deleteBanca(id){
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, { method:'DELETE' });
   await loadBancas();
   render();
-  updateTotals();
+  afterRenderTotals();
 }
 
 async function deletePagamento(id){
@@ -635,7 +642,7 @@ document.addEventListener('focusout', (e)=>{
   saveBancaInline(inp).catch(console.error).finally(()=>{
     const still = document.activeElement?.closest?.('input[data-role="banca"]');
     STATE.editingBancaId = still ? still.dataset.id : null;
-    updateTotals();
+    afterRenderTotals();
   });
 }, true);
 
@@ -657,11 +664,11 @@ document.addEventListener('input', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
   if(!inp) return;
   let v = inp.value.replace(/\D/g,'');
-  if(!v){ inp.value=''; updateTotals(); return; }
+  if(!v){ inp.value=''; afterRenderTotals(); return; }
   v = v.replace(/^0+/, '');
   if(v.length<3) v = v.padStart(3,'0');
   inp.value = fmtBRL(parseInt(v,10));
-  updateTotals();
+  afterRenderTotals();
 });
 
 document.addEventListener('keydown', (e)=>{
@@ -725,7 +732,7 @@ function startStream(){
     await loadBancas();
     if (TAB === 'bancas') {
       render();
-      updateTotals();
+      afterRenderTotals();
     }
   }, 200);
 
@@ -772,7 +779,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   setupAutoDeleteTimers();
   render();
-  updateTotals();
+  afterRenderTotals();
 
   startStream();
 });
