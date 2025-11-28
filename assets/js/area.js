@@ -118,8 +118,9 @@ function afterRenderTotals(){
 
 function updateTotals(){
   if (TAB !== 'bancas') return;
-  const depEl   = qs('#sum-dep');
-  const bancaEl = qs('#sum-banca');
+  const depEl   = tabBancasEl?.querySelector('#sum-dep');
+const bancaEl = tabBancasEl?.querySelector('#sum-banca');
+
   if(!depEl || !bancaEl || !tbodyBancas) return;
 
   let somaDep = 0, somaBanca = 0;
