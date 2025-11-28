@@ -62,7 +62,7 @@ const STATE = {
 };
 
 /* -----------------------------------------
-   🔥 FUNÇÃO NOVA: SOMA DOS TOTAIS
+   🔢 SOMA DOS TOTAIS (Depósitos + Bancas)
 ----------------------------------------- */
 function updateTotals() {
   const totalDepositos = STATE.bancas.reduce((acc, b) => acc + (b.depositoCents || 0), 0);
@@ -71,16 +71,148 @@ function updateTotals() {
   const elDep = qs('#totalDepositos');
   const elBan = qs('#totalBancas');
 
-  if (elDep) elDep.textContent = fmtBRL(totalDepositos);
-  if (elBan) elBan.textContent = fmtBRL(totalBancas);
+  if (elDep) elDep.textContent = `Soma dos Depósitos: ${fmtBRL(totalDepositos)}`;
+  if (elBan) elBan.textContent = `Soma das Bancas: ${fmtBRL(totalBancas)}`;
 }
-/* -------------------------------------- */
 
+/* -----------------------------------------
+   🪟 POPUP DAS SOMAS (animação pra cima)
+----------------------------------------- */
+let totaisPopupEl = null;
+
+function ensureTotaisPopup(){
+  if (totaisPopupEl) return totaisPopupEl;
+
+  injectOnce('totaisPopupCSS', `
+    .totais-popup{
+      position:fixed;
+      z-index:9999;
+      background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.25);
+      box-shadow:0 24px 70px rgba(0,0,0,.7);
+      padding:12px 14px 14px;
+      min-width:220px;
+      max-width:260px;
+      opacity:0;
+      transform:translateY(6px) scale(.97);
+      pointer-events:none;
+    }
+    .totais-popup.show{
+      opacity:1;
+      transform:translateY(0) scale(1);
+      pointer-events:auto;
+      animation:totaisPopupIn .16s ease-out;
+    }
+    @keyframes totaisPopupIn{
+      from{ opacity:0; transform:translateY(6px) scale(0.97); }
+      to  { opacity:1; transform:translateY(0)    scale(1);    }
+    }
+    .totais-popup-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:6px;
+    }
+    .totais-popup-title{
+      font-size:14px;
+      font-weight:800;
+    }
+    .totais-popup-value{
+      font-size:16px;
+      font-weight:800;
+      margin:0;
+      color:#fff;
+      font-variant-numeric:tabular-nums;
+    }
+    .totais-popup-close{
+      border:0;
+      background:transparent;
+      color:#fff;
+      cursor:pointer;
+      font-size:16px;
+      line-height:1;
+      padding:2px 4px;
+    }
+  `);
+
+  const el = document.createElement('div');
+  el.id = 'totaisPopup';
+  el.className = 'totais-popup';
+  el.innerHTML = `
+    <div class="totais-popup-header">
+      <span class="totais-popup-title"></span>
+      <button type="button" class="totais-popup-close" aria-label="Fechar">×</button>
+    </div>
+    <p class="totais-popup-value"></p>
+  `;
+  document.body.appendChild(el);
+
+  const closeBtn = el.querySelector('.totais-popup-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideTotaisPopup);
+  }
+
+  totaisPopupEl = el;
+  return el;
+}
+
+function showTotaisPopup(kind, anchorEl){
+  if (!anchorEl) return;
+  const popup = ensureTotaisPopup();
+  const titleEl = popup.querySelector('.totais-popup-title');
+  const valueEl = popup.querySelector('.totais-popup-value');
+  if (!titleEl || !valueEl) return;
+
+  const totalDepositos = STATE.bancas.reduce((acc, b) => acc + (b.depositoCents || 0), 0);
+  const totalBancas    = STATE.bancas.reduce((acc, b) => acc + (b.bancaCents || 0), 0);
+
+  if (kind === 'depositos') {
+    titleEl.textContent = 'Soma dos Depósitos';
+    valueEl.textContent = fmtBRL(totalDepositos);
+  } else {
+    titleEl.textContent = 'Soma das Bancas';
+    valueEl.textContent = fmtBRL(totalBancas);
+  }
+
+  popup.style.display = 'block';
+  popup.classList.remove('show');
+
+  // posiciona acima do span clicado
+  requestAnimationFrame(() => {
+    const r  = anchorEl.getBoundingClientRect();
+    const pw = popup.offsetWidth;
+    const ph = popup.offsetHeight;
+
+    let top  = r.top - ph - 8;
+    if (top < 8) top = r.bottom + 8;
+
+    let left = r.left + (r.width/2) - (pw/2);
+    if (left < 8) left = 8;
+    if (left + pw > window.innerWidth - 8) {
+      left = window.innerWidth - pw - 8;
+    }
+
+    popup.style.top  = `${Math.round(top)}px`;
+    popup.style.left = `${Math.round(left)}px`;
+
+    popup.classList.add('show');
+  });
+}
+
+function hideTotaisPopup(){
+  if (!totaisPopupEl) return;
+  totaisPopupEl.classList.remove('show');
+  totaisPopupEl.style.display = 'none';
+}
+
+/* -------------------------------------- */
 
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
   STATE.bancas = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
-  updateTotals(); // <-- ATUALIZA AQUI
+  updateTotals();
   return STATE.bancas;
 }
 
@@ -133,7 +265,7 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     renderBancas();
-    updateTotals(); // <-- ATUALIZA SEMPRE AO RENDERIZAR A ABA
+    updateTotals();
   } else if (TAB==='pagamentos'){
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
@@ -181,7 +313,7 @@ function renderBancas(){
   }).join('') : `<tr><td colspan="4" class="muted" style="padding:14px">Sem registros ainda.</td></tr>`;
 
   filtrarTabela(tbodyBancas, buscaInput?.value || '');
-  updateTotals(); // <-- ATUALIZA QUANDO RENDERIZA
+  updateTotals();
 }
 
 function renderPagamentos(){
@@ -266,6 +398,7 @@ async function setTab(tab){
   localStorage.setItem('area_tab', tab);
   qsa('.nav-btn').forEach(btn=> btn.classList.toggle('active', btn.dataset.tab === tab));
   await refresh();
+  if (TAB !== 'bancas') hideTotaisPopup();
 }
 
 async function refresh(){
@@ -551,6 +684,13 @@ document.addEventListener('click', (e)=>{
   if(action==='to-banca')     return toBanca(id).catch(console.error);
 });
 
+// fecha popup das somas ao clicar fora
+document.addEventListener('click', (e)=>{
+  if (e.target.closest('#totaisPopup')) return;
+  if (e.target.closest('#totaisContainer')) return;
+  hideTotaisPopup();
+});
+
 document.addEventListener('focusin', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
   if(!inp) return;
@@ -577,7 +717,7 @@ async function saveBancaInline(inp){
       body: JSON.stringify({ bancaCents: cents })
     });
   }catch(err){ console.error(err); }
-  updateTotals(); // <-- ATUALIZA AO EDITAR Banca
+  updateTotals();
 }
 
 document.addEventListener('input', (e)=>{
@@ -693,6 +833,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   setupAutoDeleteTimers();
   render();
+
+  // clique nas somas para abrir popup
+  const totalDepEl = qs('#totalDepositos');
+  const totalBanEl = qs('#totalBancas');
+  if (totalDepEl) {
+    totalDepEl.style.cursor = 'pointer';
+    totalDepEl.addEventListener('click', ()=> showTotaisPopup('depositos', totalDepEl));
+  }
+  if (totalBanEl) {
+    totalBanEl.style.cursor = 'pointer';
+    totalBanEl.addEventListener('click', ()=> showTotaisPopup('bancas', totalBanEl));
+  }
 
   startStream();
 });

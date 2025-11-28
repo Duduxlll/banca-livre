@@ -4,12 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Banquinhas • Área</title>
+
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="assets/css/area.css">
 </head>
 <body>
   
+  <!-- HEADER -->
   <header class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-wrap">
@@ -21,37 +24,54 @@
     </div>
   </header>
 
+  <!-- LAYOUT PRINCIPAL -->
   <main class="layout">
     
+    <!-- MENU LATERAL -->
     <aside class="sidebar">
       <div class="brand">
         <img src="assets/img/banner.jpg" alt="Bancas" class="brand-img">
         <strong>Bancas</strong>
       </div>
+
       <nav class="nav">
         <button class="nav-btn active" data-tab="bancas">Bancas</button>
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
-        <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">Sair</button>
+
+        <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
+          Sair
+        </button>
       </nav>
     </aside>
 
     
+    <!-- CONTEÚDO DAS ABAS -->
     <section class="content">
       
-      <!-- ABA BANCAS -->
+      <!-- ========================= ABA BANCAS ========================= -->
       <div class="tab tab-view show" id="tab-bancas">
 
-       <div class="bar">
-    <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
+        <!-- BARRA SUPERIOR DA TABELA -->
+        <div class="bar totbar">
 
-    <div id="totaisContainer">
-        <span id="totalDepositos">Depósitos: R$ 0,00</span>
-        <span id="totalBancas">Bancas: R$ 0,00</span>
-    </div>
-</div>
+          <!-- CAMPO DE BUSCA -->
+          <input id="busca" class="input busca-nome" type="text" placeholder="Buscar por nome…">
 
+          <!-- BOTÕES DE SOMA -->
+          <div class="totais">
+            <span class="totalBtn" id="openTotalDepositos">Soma dos Depósitos</span>
+            <span class="totalBtn" id="openTotalBancas">Soma das Bancas</span>
+          </div>
+        </div>
 
+        <!-- POPUP VIDRO FOSCO DAS SOMAS -->
+        <div id="popupTotal" class="popup-total">
+          <button class="popup-close" id="popupClose">✕</button>
+          <p id="popupTexto"></p>
+        </div>
+
+        <!-- TABELA DAS BANCAS -->
         <div class="card">
           <div class="table-wrap">
             <table class="table" id="tblBancas" aria-label="Tabela de Bancas">
@@ -63,14 +83,14 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody>  </tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
 
       
-      <!-- ABA PAGAMENTOS -->
+      <!-- ========================= ABA PAGAMENTOS ========================= -->
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -82,18 +102,21 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody>    </tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- ABA EXTRATOS -->
+
+      <!-- ========================= ABA EXTRATOS ========================= -->
       <div class="tab tab-view" id="tab-extratos">
-        
+
         <div class="card">
           <div class="bar" style="display:grid; gap:10px; grid-template-columns: 1fr; margin-bottom:8px">
+
             <div style="display:grid; gap:8px; grid-template-columns: repeat(6, minmax(0,1fr)); align-items:end">
+
               <div style="grid-column: span 2;">
                 <label class="muted" for="filtro-tipo">Tipo</label>
                 <select id="filtro-tipo" class="input">
@@ -122,20 +145,23 @@
                 <label class="muted" for="filtro-to">Até</label>
                 <input id="filtro-to" type="date" class="input" disabled>
               </div>
+
             </div>
 
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-              <input id="busca-extrato" class="input" type="text" placeholder="Buscar por nome…"
-                     style="flex:1 1 260px; min-width:200px">
+              <input id="busca-extrato" class="input" type="text" placeholder="Buscar por nome…" style="flex:1 1 260px; min-width:200px">
               <button id="btn-filtrar" class="btn btn--primary">Aplicar filtros</button>
-              <button id="btn-limpar"  class="btn btn--ghost">Limpar</button>
+              <button id="btn-limpar" class="btn btn--ghost">Limpar</button>
             </div>
+
           </div>
         </div>
 
         
+        <!-- TABELA DE DEPÓSITOS -->
         <div class="card" data-card="deps">
           <h3 style="margin:0 0 10px">Depósitos</h3>
+
           <div class="table-wrap">
             <table class="table" id="tblExtratosDepositos" aria-label="Extratos - Depósitos">
               <thead>
@@ -151,8 +177,10 @@
         </div>
 
         
+        <!-- TABELA DE PAGAMENTOS -->
         <div class="card" data-card="pags">
           <h3 style="margin:0 0 10px">Pagamentos</h3>
+
           <div class="table-wrap">
             <table class="table" id="tblExtratosPagamentos" aria-label="Extratos - Pagamentos">
               <thead>
@@ -166,14 +194,17 @@
             </table>
           </div>
         </div>
+
       </div>
       
     </section>
   </main>
 
+  <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
   
+  <!-- MODAL DE MENSAGENS -->
   <dialog id="msgModal" style="border:0; padding:0; background:transparent;">
     <div style="
       width:min(94vw,520px);
@@ -181,16 +212,21 @@
       border:1px solid rgba(255,255,255,.12);
       border-radius:14px;
       box-shadow:0 28px 80px rgba(0,0,0,.55);
-      padding:16px; color:#e7e9f3;">
+      padding:16px;
+      color:#e7e9f3;">
+      
       <h3 style="margin:0 0 8px; font-weight:800">Mensagem</h3>
       <p id="msgText" style="white-space:pre-wrap; margin:0 0 12px; color:#cfd2e8"></p>
+
       <div style="display:flex; gap:8px; justify-content:flex-end">
         <button class="btn btn--ghost" data-action="close-msg">Fechar</button>
       </div>
     </div>
   </dialog>
   
+  <!-- SCRIPTS -->
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
+
 </body>
 </html>
