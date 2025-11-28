@@ -1,5 +1,4 @@
-:root{
- 
+:root{ 
   --bg:#110904;           
   --card:#1A1209;         
   --card-2:#140C06;       
@@ -25,7 +24,6 @@ body{
   color:var(--text);
 }
 
-
 .hero{
   position:relative; min-height:160px; display:flex; align-items:flex-end;
   background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
@@ -41,7 +39,6 @@ body{
 .hero-logo{width:56px;height:56px;border-radius:14px;object-fit:cover; box-shadow:0 8px 28px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.08)}
 .hero-title{margin:0; font-weight:800; font-size:2.1rem; letter-spacing:.4px}
 .hero-sub{margin:4px 0 0; color:var(--muted)}
-
 
 .layout{width:min(1120px,92vw); margin:28px auto; display:grid; grid-template-columns:260px 1fr; gap:22px}
 @media (max-width: 900px){ .layout{ grid-template-columns:1fr } }
@@ -75,6 +72,7 @@ body{
 
 .content{align-self:start; position: relative;}
 .bar{display:flex; justify-content:flex-end; margin:0 0 12px}
+
 .input{
   width:100%; padding:12px 14px; border-radius:12px; background:#161006; 
   border:1px solid var(--line); color:var(--text); outline:none;
@@ -100,11 +98,9 @@ body{
 }
 .col-acoes{width:1%; white-space:nowrap}
 
-
 .table input.input-money{
   min-width:140px;
 }
-
 
 .btn{
   display:inline-flex; align-items:center; justify-content:center;
@@ -126,7 +122,6 @@ body{
   border-color:rgba(255,255,255,.18);
 }
 
-
 .btn--danger{
   background: rgba(255,92,122,.08);
   border-color: rgba(255,92,122,.35);
@@ -134,9 +129,37 @@ body{
 }
 .btn--danger:hover{ filter: brightness(1.05); }
 
-
 .ok{ color: var(--ok); font-weight:700 }
 .warn{ color: var(--warn); font-weight:700 }
+
+/* ============================================================
+   ⬇ NOVO CSS PARA OS TOTAIS (Depósitos + Bancas)
+   ============================================================ */
+
+#tab-bancas #busca {
+  max-width: 260px !important;
+}
+
+#totaisContainer {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-weight: 700;
+  color: var(--brand-2);
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  #tab-bancas .bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  #totaisContainer {
+    flex-wrap: wrap;
+  }
+}
 
 .tab{
   position: absolute;

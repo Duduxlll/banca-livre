@@ -61,11 +61,29 @@ const STATE = {
   editingBancaId: null
 };
 
+/* -----------------------------------------
+   🔥 FUNÇÃO NOVA: SOMA DOS TOTAIS
+----------------------------------------- */
+function updateTotals() {
+  const totalDepositos = STATE.bancas.reduce((acc, b) => acc + (b.depositoCents || 0), 0);
+  const totalBancas    = STATE.bancas.reduce((acc, b) => acc + (b.bancaCents || 0), 0);
+
+  const elDep = qs('#totalDepositos');
+  const elBan = qs('#totalBancas');
+
+  if (elDep) elDep.textContent = fmtBRL(totalDepositos);
+  if (elBan) elBan.textContent = fmtBRL(totalBancas);
+}
+/* -------------------------------------- */
+
+
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
   STATE.bancas = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
+  updateTotals(); // <-- ATUALIZA AQUI
   return STATE.bancas;
 }
+
 async function loadPagamentos() {
   const list = await apiFetch(`/api/pagamentos`);
   STATE.pagamentos = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
@@ -115,6 +133,7 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     renderBancas();
+    updateTotals(); // <-- ATUALIZA SEMPRE AO RENDERIZAR A ABA
   } else if (TAB==='pagamentos'){
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
@@ -162,6 +181,7 @@ function renderBancas(){
   }).join('') : `<tr><td colspan="4" class="muted" style="padding:14px">Sem registros ainda.</td></tr>`;
 
   filtrarTabela(tbodyBancas, buscaInput?.value || '');
+  updateTotals(); // <-- ATUALIZA QUANDO RENDERIZA
 }
 
 function renderPagamentos(){
@@ -557,6 +577,7 @@ async function saveBancaInline(inp){
       body: JSON.stringify({ bancaCents: cents })
     });
   }catch(err){ console.error(err); }
+  updateTotals(); // <-- ATUALIZA AO EDITAR Banca
 }
 
 document.addEventListener('input', (e)=>{

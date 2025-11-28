@@ -1,4 +1,4 @@
-   <!doctype html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -39,10 +39,18 @@
     
     <section class="content">
       
+      <!-- ABA BANCAS -->
       <div class="tab tab-view show" id="tab-bancas">
-        <div class="bar">
-          <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
-        </div>
+
+       <div class="bar">
+    <input id="busca" class="input" type="text" placeholder="Buscar por nome…">
+
+    <div id="totaisContainer">
+        <span id="totalDepositos">Depósitos: R$ 0,00</span>
+        <span id="totalBancas">Bancas: R$ 0,00</span>
+    </div>
+</div>
+
 
         <div class="card">
           <div class="table-wrap">
@@ -62,6 +70,7 @@
       </div>
 
       
+      <!-- ABA PAGAMENTOS -->
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -79,6 +88,7 @@
         </div>
       </div>
 
+      <!-- ABA EXTRATOS -->
       <div class="tab tab-view" id="tab-extratos">
         
         <div class="card">
