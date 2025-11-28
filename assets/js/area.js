@@ -42,7 +42,7 @@ const tbodyPags       = qs('#tblPagamentos tbody');
 const tbodyExtDeps    = qs('#tblExtratosDepositos tbody');
 const tbodyExtPags    = qs('#tblExtratosPagamentos tbody');
 
-let buscaInput        = qs('#busca');           // será reatribuído depois que montarmos a barra nova
+let buscaInput        = qs('#busca'); // será reatribuído depois que montarmos a barra nova
 const buscaExtratoInput = qs('#busca-extrato');
 
 const filtroTipo  = qs('#filtro-tipo');
@@ -78,8 +78,6 @@ function ensureBancasTopBar(){
   if(!tabBancasEl) return;
   const bar = tabBancasEl.querySelector('.bar');
   if(!bar) return;
-
-  // já montada?
   if(bar.classList.contains('bar--totals')) return;
 
   bar.classList.add('bar--totals');
@@ -94,10 +92,8 @@ function ensureBancasTopBar(){
       </button>
     </div>
   `;
-  // re-referenciar o input de busca
   buscaInput = tabBancasEl.querySelector('#busca');
 
-  // listeners
   buscaInput?.addEventListener('input', ()=>{
     const q = buscaInput.value || '';
     filtrarTabela(tbodyBancas, q);
@@ -116,14 +112,10 @@ function ensureBancasTopBar(){
 }
 
 /* ====== SOMAS ====== */
-// roda após o render “assentar” no DOM
 function afterRenderTotals(){
-  requestAnimationFrame(() => {
-    requestAnimationFrame(updateTotals);
-  });
+  requestAnimationFrame(()=> requestAnimationFrame(updateTotals));
 }
 
-// mais robusta: considera estilo inline e computado, percorre apenas TRs visíveis
 function updateTotals(){
   if (TAB !== 'bancas') return;
   const depEl   = qs('#sum-dep');
@@ -132,15 +124,16 @@ function updateTotals(){
 
   let somaDep = 0, somaBanca = 0;
 
+  // Soma apenas TRs visíveis (filtrados visualmente)
   Array.from(tbodyBancas.rows).forEach(tr => {
-    const isHiddenInline = tr.style.display === 'none';
-    const isHiddenCSS = getComputedStyle(tr).display === 'none';
-    if (isHiddenInline || isHiddenCSS) return;
+    if (tr.style.display === 'none') return;
 
-    const depTd   = tr.cells[1]; // 2ª coluna (Depósito)
+    // 1) Depósito por dataset (mais robusto)
+    const depCents = parseInt(tr.dataset.depositoCents || '0', 10) || 0;
+    somaDep += depCents;
+
+    // 2) Banca pelo valor do input visível
     const bancaIn = tr.querySelector('input[data-role="banca"]');
-
-    somaDep   += toCents(depTd ? depTd.textContent : '');
     somaBanca += toCents(bancaIn ? bancaIn.value : '');
   });
 
@@ -232,7 +225,7 @@ function renderBancas(){
     const bancaTxt = typeof b.bancaCents === 'number' ? fmtBRL(b.bancaCents) : '';
     const hasMsg = !!(b.message && String(b.message).trim());
     return `
-      <tr data-id="${b.id}">
+      <tr data-id="${b.id}" data-deposito-cents="${b.depositoCents||0}">
         <td>${esc(b.nome)}</td>
         <td>${fmtBRL(b.depositoCents||0)}</td>
         <td>
@@ -719,6 +712,13 @@ btnLimpar?.addEventListener('click',    async ()=>{
   renderExtratos();
 });
 
+/* ====== OBSERVADOR: recalcula ao mudar a tabela ====== */
+(function observeBancasTable(){
+  if (!tbodyBancas) return;
+  const mo = new MutationObserver(() => afterRenderTotals());
+  mo.observe(tbodyBancas, { childList: true, subtree: true, characterData: true });
+})();
+
 /* ====== SSE ====== */
 let es = null;
 function startStream(){
@@ -767,7 +767,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
 
-  // monta a barra de totais desde o início
   ensureBancasTopBar();
 
   applyExtratoFiltersUIRules();
