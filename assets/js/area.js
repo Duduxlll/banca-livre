@@ -31,6 +31,7 @@ function debounce(fn, wait = 300){
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
 }
 
+/* ====== ELEMENTOS ====== */
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
@@ -41,7 +42,7 @@ const tbodyPags       = qs('#tblPagamentos tbody');
 const tbodyExtDeps    = qs('#tblExtratosDepositos tbody');
 const tbodyExtPags    = qs('#tblExtratosPagamentos tbody');
 
-const buscaInput        = qs('#busca');
+let buscaInput        = qs('#busca');           // será reatribuído depois que montarmos a barra nova
 const buscaExtratoInput = qs('#busca-extrato');
 
 const filtroTipo  = qs('#filtro-tipo');
@@ -61,6 +62,86 @@ const STATE = {
   editingBancaId: null
 };
 
+/* ====== TOAST ====== */
+let toastTid = null;
+function showToast(txt){
+  const el = qs('#toast');
+  if(!el) return;
+  el.textContent = txt;
+  el.classList.add('show');
+  clearTimeout(toastTid);
+  toastTid = setTimeout(()=> el.classList.remove('show'), 1800);
+}
+
+/* ====== TOP BAR DA ABA BANCAS (BUSCA + TOTAIS) ====== */
+function ensureBancasTopBar(){
+  if(!tabBancasEl) return;
+  const bar = tabBancasEl.querySelector('.bar');
+  if(!bar) return;
+
+  // já montada?
+  if(bar.classList.contains('bar--totals')) return;
+
+  bar.classList.add('bar--totals');
+  bar.innerHTML = `
+    <input id="busca" class="input input--search" type="text" placeholder="Buscar por nome…">
+    <div class="totals-wrap">
+      <button class="total-btn" id="btn-soma-dep" title="Copiar soma dos depósitos">
+        <span>Soma dos Depósitos:</span> <strong id="sum-dep">R$ 0,00</strong>
+      </button>
+      <button class="total-btn" id="btn-soma-banca" title="Copiar soma das bancas">
+        <span>Soma das Bancas:</span> <strong id="sum-banca">R$ 0,00</strong>
+      </button>
+    </div>
+  `;
+  // re-referenciar o input de busca
+  buscaInput = tabBancasEl.querySelector('#busca');
+
+  // listeners
+  buscaInput?.addEventListener('input', ()=>{
+    const q = buscaInput.value || '';
+    filtrarTabela(tbodyBancas, q);
+    updateTotals();
+  });
+
+  document.addEventListener('click', (e)=>{
+    const b = e.target.closest('#btn-soma-dep, #btn-soma-banca');
+    if(!b) return;
+    const val = b.querySelector('strong')?.textContent?.trim();
+    if(val){
+      navigator.clipboard?.writeText(val).catch(()=>{});
+      showToast('Valor copiado: ' + val);
+    }
+  });
+}
+
+function updateTotals(){
+  if (TAB !== 'bancas') return;
+  const depEl   = qs('#sum-dep');
+  const bancaEl = qs('#sum-banca');
+  if(!depEl || !bancaEl || !tbodyBancas) return;
+
+  let somaDep = 0, somaBanca = 0;
+  qsa('tr', tbodyBancas).forEach(tr=>{
+    // respeita o filtro visual
+    const hidden = tr.style.display === 'none';
+    if(hidden) return;
+
+    const tds = tr.querySelectorAll('td');
+    // Depósito está na 2ª coluna (index 1)
+    const depTxt = tds[1]?.textContent || '';
+    somaDep += toCents(depTxt);
+
+    // Banca: input na 3ª coluna
+    const inp = tr.querySelector('input[data-role="banca"]');
+    somaBanca += toCents(inp?.value || '');
+  });
+
+  depEl.textContent   = fmtBRL(somaDep);
+  bancaEl.textContent = fmtBRL(somaBanca);
+}
+
+/* ====== CARREGAMENTO ====== */
 async function loadBancas() {
   const list = await apiFetch(`/api/bancas`);
   STATE.bancas = list.sort((a,b)=> (a.createdAt||'') < (b.createdAt||'') ? 1 : -1);
@@ -72,6 +153,7 @@ async function loadPagamentos() {
   return STATE.pagamentos;
 }
 
+/* ====== EXTRATOS ====== */
 function buildExtratosQuery(){
   const f = STATE.filtrosExtratos || {};
   const params = new URLSearchParams();
@@ -109,12 +191,15 @@ async function loadExtratos(){
   return STATE.extratos;
 }
 
+/* ====== RENDER ====== */
 async function render(){
   if (TAB==='bancas'){
     tabBancasEl?.classList.add('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    ensureBancasTopBar();
     renderBancas();
+    updateTotals();
   } else if (TAB==='pagamentos'){
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
@@ -241,6 +326,7 @@ function renderExtratos(){
   }
 }
 
+/* ====== AÇÕES ====== */
 async function setTab(tab){
   TAB = tab;
   localStorage.setItem('area_tab', tab);
@@ -276,6 +362,7 @@ async function toPagamento(id){
   await Promise.all([loadBancas(), loadPagamentos()]);
   render();
   setupAutoDeleteTimers();
+  updateTotals();
 }
 
 async function toBanca(id){
@@ -284,12 +371,14 @@ async function toBanca(id){
   render();
   const t = STATE.timers.get(id);
   if (t){ clearTimeout(t); STATE.timers.delete(id); }
+  updateTotals();
 }
 
 async function deleteBanca(id){
   await apiFetch(`/api/bancas/${encodeURIComponent(id)}`, { method:'DELETE' });
   await loadBancas();
   render();
+  updateTotals();
 }
 
 async function deletePagamento(id){
@@ -335,6 +424,7 @@ function setupAutoDeleteTimers(){
   });
 }
 
+/* ====== PIX MODAL ====== */
 function abrirPixModal(id){
   const p = STATE.pagamentos.find(x=>x.id===id);
   if(!p) return;
@@ -385,6 +475,7 @@ function abrirPixModal(id){
   dlg.showModal();
 }
 
+/* ====== MODAL MENSAGEM ====== */
 let msgModalEl = null;
 function injectOnce(id, css){
   if (document.getElementById(id)) return;
@@ -440,6 +531,7 @@ function abrirMensagem(texto){
   dlg.showModal();
 }
 
+/* ====== MENU STATUS ====== */
 let statusMenuEl = null;
 let statusMenuId = null;
 
@@ -497,6 +589,7 @@ function hideStatusMenu(){
   statusMenuId = null;
 }
 
+/* ====== LISTENERS GERAIS ====== */
 document.addEventListener('click', (e)=>{
   const openBtn = e.target.closest('button[data-action="status-open"]');
   if(openBtn){
@@ -542,6 +635,7 @@ document.addEventListener('focusout', (e)=>{
   saveBancaInline(inp).catch(console.error).finally(()=>{
     const still = document.activeElement?.closest?.('input[data-role="banca"]');
     STATE.editingBancaId = still ? still.dataset.id : null;
+    updateTotals();
   });
 }, true);
 
@@ -563,10 +657,11 @@ document.addEventListener('input', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
   if(!inp) return;
   let v = inp.value.replace(/\D/g,'');
-  if(!v){ inp.value=''; return; }
+  if(!v){ inp.value=''; updateTotals(); return; }
   v = v.replace(/^0+/, '');
   if(v.length<3) v = v.padStart(3,'0');
   inp.value = fmtBRL(parseInt(v,10));
+  updateTotals();
 });
 
 document.addEventListener('keydown', (e)=>{
@@ -578,6 +673,7 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 
+/* ====== FILTRO TABELA ====== */
 function filtrarTabela(tbody, q){
   if(!tbody) return;
   const query = (q||'').trim().toLowerCase();
@@ -585,12 +681,8 @@ function filtrarTabela(tbody, q){
     tr.style.display = tr.textContent.toLowerCase().includes(query) ? '' : 'none';
   });
 }
-buscaInput?.addEventListener('input', ()=>{
-  const q = buscaInput.value || '';
-  if (TAB==='bancas') filtrarTabela(tbodyBancas, q);
-  else                filtrarTabela(tbodyPags,   q);
-});
 
+/* ====== EXTRATOS – filtros ====== */
 function readExtratoFiltersFromDOM(){
   const f = STATE.filtrosExtratos;
   if (filtroTipo)  f.tipo  = filtroTipo.value || 'all';
@@ -620,6 +712,7 @@ btnLimpar?.addEventListener('click',    async ()=>{
   renderExtratos();
 });
 
+/* ====== SSE ====== */
 let es = null;
 function startStream(){
   if (es) try { es.close(); } catch {}
@@ -630,7 +723,10 @@ function startStream(){
     const isEditing = !!focused?.matches?.('input[data-role="banca"]');
     if (isEditing) return;
     await loadBancas();
-    if (TAB === 'bancas') render();
+    if (TAB === 'bancas') {
+      render();
+      updateTotals();
+    }
   }, 200);
 
   const softRefreshPags = debounce(async () => {
@@ -657,11 +753,15 @@ function startStream(){
   };
 }
 
+/* ====== START ====== */
 document.addEventListener('DOMContentLoaded', async ()=>{
   qsa('.nav-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.tab === TAB);
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
+
+  // monta a barra de totais desde o início
+  ensureBancasTopBar();
 
   applyExtratoFiltersUIRules();
   readExtratoFiltersFromDOM();
@@ -672,6 +772,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   setupAutoDeleteTimers();
   render();
+  updateTotals();
 
   startStream();
 });

@@ -1,13 +1,12 @@
 :root{
- 
-  --bg:#110904;           
-  --card:#1A1209;         
-  --card-2:#140C06;       
+  --bg:#110904;
+  --card:#1A1209;
+  --card-2:#140C06;
   --line:rgba(255,180,120,.16);
   --muted:#fafafa;
   --text:#e7e9f3;
-  --brand:#FF7A00;        
-  --brand-2:#FFC266;      
+  --brand:#FF7A00;
+  --brand-2:#FFC266;
   --warn:#ffc857;
   --danger:#ff5c7a;
   --shadow:0 28px 80px rgba(40,20,5,.65);
@@ -25,7 +24,7 @@ body{
   color:var(--text);
 }
 
-
+/* Hero */
 .hero{
   position:relative; min-height:160px; display:flex; align-items:flex-end;
   background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
@@ -42,7 +41,7 @@ body{
 .hero-title{margin:0; font-weight:800; font-size:2.1rem; letter-spacing:.4px}
 .hero-sub{margin:4px 0 0; color:var(--muted)}
 
-
+/* Layout */
 .layout{width:min(1120px,92vw); margin:28px auto; display:grid; grid-template-columns:260px 1fr; gap:22px}
 @media (max-width: 900px){ .layout{ grid-template-columns:1fr } }
 
@@ -61,7 +60,6 @@ body{
   border-color: rgba(255,122,0,.35);
   box-shadow: inset 0 0 0 1px rgba(255,122,0,.22);
 }
-
 .nav-btn{ position: relative; overflow: hidden; }
 .nav-btn.active::after{
   content:"";
@@ -75,8 +73,10 @@ body{
 
 .content{align-self:start; position: relative;}
 .bar{display:flex; justify-content:flex-end; margin:0 0 12px}
+
+/* Inputs & Cards */
 .input{
-  width:100%; padding:12px 14px; border-radius:12px; background:#161006; 
+  width:100%; padding:12px 14px; border-radius:12px; background:#161006;
   border:1px solid var(--line); color:var(--text); outline:none;
   transition: border-color .2s, box-shadow .2s, transform .06s ease;
 }
@@ -100,12 +100,9 @@ body{
 }
 .col-acoes{width:1%; white-space:nowrap}
 
+.table input.input-money{ min-width:140px; }
 
-.table input.input-money{
-  min-width:140px;
-}
-
-
+/* Botões */
 .btn{
   display:inline-flex; align-items:center; justify-content:center;
   padding:10px 12px; border-radius:10px; font-weight:700; letter-spacing:.2px;
@@ -113,20 +110,16 @@ body{
   cursor:pointer; transition:transform .06s ease, filter .2s ease, box-shadow .2s ease;
 }
 .btn:active{transform:translateY(1px)}
-
 .btn--primary{
   background:linear-gradient(90deg, var(--brand), var(--brand-2));
   color:#281300; border:none;
   box-shadow: 0 12px 30px rgba(255,122,0,.28), 0 8px 20px rgba(255,194,102,.18);
 }
 .btn--primary:hover{ box-shadow: 0 10px 26px rgba(255,122,0,.22); }
-
 .btn--ghost{
   background:rgba(255,255,255,.02);
   border-color:rgba(255,255,255,.18);
 }
-
-
 .btn--danger{
   background: rgba(255,92,122,.08);
   border-color: rgba(255,92,122,.35);
@@ -134,10 +127,10 @@ body{
 }
 .btn--danger:hover{ filter: brightness(1.05); }
 
-
 .ok{ color: var(--ok); font-weight:700 }
 .warn{ color: var(--warn); font-weight:700 }
 
+/* Tabs */
 .tab{
   position: absolute;
   inset: 0;
@@ -161,7 +154,7 @@ body{
   to   { opacity: 1; transform: translateY(0); }
 }
 
-
+/* Tables com cabeçalho sticky */
 .table-wrap{
   max-height: 460px;
   overflow: auto;
@@ -172,28 +165,18 @@ body{
   position: sticky;
   top: 0;
   z-index: 5;
-  background: rgba(32,18,8,.82);  
+  background: rgba(32,18,8,.82);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
 }
 .table tbody tr{ position: relative; }
 .table tbody td{ position: relative; }
 
-
-.status-select{
-  position: relative;
-  z-index: 10;
-  transform: translateZ(0);
-}
+/* Status (menu flutuante) */
+.status-select{ position: relative; z-index: 10; transform: translateZ(0); }
 .table-wrap, .card, .content, .layout { z-index: 0; position: relative; }
 
-.status-menu.dropup{
-  top: auto;
-  bottom: 100%;
-  margin-top: 0;
-  margin-bottom: 6px;
-}
-
+.status-menu.dropup{ top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
 .status-menu{ z-index: 9999; }
 .status-btn{ position: relative; z-index: 10; }
 .table tbody tr, .table tbody td { overflow: visible; }
@@ -241,33 +224,23 @@ body{
   min-width: 160px;
 }
 .status-float.show{ display:block; }
-
 .status-item{
-  display:block;
-  width:100%;
-  text-align:left;
-  padding:10px 12px;
-  background:transparent;
-  border:0;
-  color:var(--text);
-  cursor:pointer;
+  display:block; width:100%; text-align:left; padding:10px 12px; background:transparent; border:0; color:var(--text); cursor:pointer;
 }
 .status-item:hover{ background: rgba(255,255,255,.06); }
 .status-item.active{ background: rgba(255,255,255,.08); }
-
 .status-item.pago{ color: var(--ok); }
 .status-item.nao { color: var(--danger); }
-
 .status-btn{ position: relative; z-index: 1; }
 
-
+/* Toast */
 .toast{
   position:fixed; right:16px; bottom:16px; background:#1A1209; border:1px solid var(--line);
   padding:14px 16px; border-radius:12px; display:none
 }
 .toast.show{display:block}
 
-
+/* Pay modal */
 #payModal::backdrop{
   background: rgba(16, 8, 4, .65);
   backdrop-filter: blur(6px) saturate(.9);
@@ -283,7 +256,7 @@ body{
   box-shadow: 0 30px 90px rgba(40,20,5,.65), 0 0 0 1px rgba(255,255,255,.04) !important;
 }
 
-
+/* Acessibilidade de motion */
 @media (prefers-reduced-motion: reduce){
   .tab, .table-wrap, #payModal[open], .nav-btn.active::after{
     animation:none !important;
@@ -291,14 +264,12 @@ body{
   }
 }
 
-
+/* Canto arredondado no cabeçalho da tabela dentro do card */
 .card .table-wrap{
-  overflow: hidden;                
-  border-top-left-radius: 16px;     
+  overflow: hidden;
+  border-top-left-radius: 16px;
   border-top-right-radius: 16px;
 }
-
-
 .table thead th{
   position: sticky;
   top: 0;
@@ -306,25 +277,18 @@ body{
   background: rgba(32,18,8,.82);
   backdrop-filter: blur(6px);
   border-bottom: 1px solid var(--line);
-  background-clip: padding-box;     
+  background-clip: padding-box;
 }
-
-
-.table thead th:first-child{
-  border-top-left-radius: 16px;
-}
-.table thead th:last-child{
-  border-top-right-radius: 16px;
-}
-
+.table thead th:first-child{ border-top-left-radius: 16px; }
+.table thead th:last-child{  border-top-right-radius: 16px; }
 
 .table{
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0;              
+  border-spacing: 0;
 }
 
-
+/* Extratos — barra e listas */
 #tab-extratos .card .bar{
   display: grid !important;
   gap: 12px !important;
@@ -332,81 +296,57 @@ body{
   align-items: start;
   margin-bottom: 8px !important;
 }
-
-
 #tab-extratos .card .bar > div:first-child{
   display: grid !important;
   gap: 8px !important;
   grid-template-columns: repeat(6, minmax(0,1fr)) !important;
   align-items: end !important;
 }
-
-
 #tab-extratos .card .bar > div:first-child > div:nth-child(1),
 #tab-extratos .card .bar > div:first-child > div:nth-child(2){
   grid-column: span 2;
 }
-
-
 #tab-extratos .card .bar > div:last-child{
   display: flex !important;
   gap: 8px !important;
   align-items: center !important;
   flex-wrap: wrap !important;
 }
-
-
 #tab-extratos #busca-extrato{
   flex: 1 1 260px;
   min-width: 220px;
 }
-
-
 #tab-extratos label.muted{
   display: inline-block;
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--muted);
 }
-
-
 #tab-extratos .input{
-  height: 42px; 
+  height: 42px;
   padding-top: 10px;
   padding-bottom: 10px;
 }
-
-
 #tab-extratos #btn-filtrar.btn{ min-width: 160px; }
 #tab-extratos #btn-limpar.btn { min-width: 120px; }
-
-
 #tab-extratos [data-card="deps"],
-#tab-extratos [data-card="pags"]{
-  margin-top: 14px;
-}
-
+#tab-extratos [data-card="pags"]{ margin-top: 14px; }
 #tab-extratos [data-card] > h3{
   margin: 0 0 10px;
   font-weight: 800;
   letter-spacing: .2px;
 }
-
-
 #tblExtratosDepositos td:nth-child(2),
-#tblExtratosPagamentos td:nth-child(2){ 
+#tblExtratosPagamentos td:nth-child(2){
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-
 #tblExtratosDepositos td:nth-child(3),
-#tblExtratosPagamentos td:nth-child(3){ 
+#tblExtratosPagamentos td:nth-child(3){
   white-space: nowrap;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-
-
 @media (max-width: 1100px){
   #tab-extratos .card .bar > div:first-child{
     grid-template-columns: repeat(4, minmax(0,1fr)) !important;
@@ -421,18 +361,16 @@ body{
     grid-template-columns: repeat(2, minmax(0,1fr)) !important;
   }
   #tab-extratos .card .bar > div:first-child > div{
-    grid-column: span 2 !important; 
+    grid-column: span 2 !important;
   }
 }
 
-
+/* Altura das tabelas por tab */
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap,
-#tab-extratos .table-wrap{
-  max-height: 520px; 
-}
+#tab-extratos .table-wrap{ max-height: 520px; }
 
-
+/* Botão “Bancas” na aba de Pagamentos */
 #tab-pagamentos [data-action="to-banca"].btn{
   box-shadow: 0 12px 30px rgba(255,122,0,.28), 0 8px 20px rgba(255,194,102,.18);
 }
@@ -440,3 +378,62 @@ body{
   box-shadow: 0 10px 26px rgba(255,122,0,.22);
 }
 
+/* ============================
+   NOVO: Barra com totais (Bancas)
+   ============================ */
+
+.bar--totals{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+
+/* Busca menor */
+.input--search{
+  width: min(360px, 100%);
+}
+
+/* Wrap dos botões de total */
+.totals-wrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+/* Botões de total */
+.total-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: transform .06s ease, filter .2s ease, box-shadow .2s ease, border-color .2s ease;
+  font-weight:700;
+}
+.total-btn strong{
+  font-variant-numeric: tabular-nums;
+}
+.total-btn:hover{
+  border-color: rgba(255,122,0,.35);
+  box-shadow: 0 10px 26px rgba(255,122,0,.16);
+}
+.total-btn:active{ transform: translateY(1px); }
+
+@media (max-width: 720px){
+  .bar--totals{ gap:10px; }
+  .totals-wrap{ width:100%; }
+}
+
+/* Modal de Mensagem – backdrop por CSS (reforço) */
+#msgModal::backdrop{
+  backdrop-filter: blur(6px) brightness(.7);
+}
