@@ -185,7 +185,7 @@ body{
   border:1px solid rgba(255,255,255,.22);
   background:linear-gradient(90deg,var(--brand),var(--brand-2));
   box-shadow:0 12px 30px rgba(255,122,0,.28),0 8px 20px rgba(255,194,102,.18);
-  color:#fff;
+  color:#000;
   font-size:14px;
   font-weight:700;
   cursor:pointer;
@@ -193,6 +193,7 @@ body{
   position:relative;
   transition:transform .06s ease,filter .2s ease,box-shadow .2s ease;
 }
+
 .totais-pill:hover{
   box-shadow:0 10px 26px rgba(255,122,0,.22);
   filter:brightness(1.03);
