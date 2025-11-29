@@ -104,6 +104,7 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
+const tabSorteioEl    = qs('#tab-sorteio'); // NOVO
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -309,22 +310,37 @@ async function loadExtratos(){
 }
 
 async function render(){
-  if (TAB==='bancas'){
+  if (TAB === 'bancas') {
     tabBancasEl?.classList.add('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+
     renderBancas();
     updateTotals();
-  } else if (TAB==='pagamentos'){
+
+  } else if (TAB === 'pagamentos') {
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+
     renderPagamentos();
-  } else if (TAB==='extratos'){
+
+  } else if (TAB === 'extratos') {
     tabExtratosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+
     renderExtratos();
+
+  } else if (TAB === 'sorteio') {
+    tabSorteioEl?.classList.add('show');
+    tabBancasEl?.classList.remove('show');
+    tabPagamentosEl?.classList.remove('show');
+    tabExtratosEl?.classList.remove('show');
+    // o conteúdo da aba é controlado pelo sorteio.js
   }
 }
 
@@ -457,6 +473,8 @@ async function refresh(){
     await loadPagamentos();
   } else if (TAB==='extratos'){
     await loadExtratos();
+  } else if (TAB==='sorteio') {
+    // Sorteio usa sorteio.js pra carregar a lista, aqui não precisa fazer nada
   }
   render();
 }
