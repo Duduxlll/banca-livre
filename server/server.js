@@ -602,6 +602,25 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
     client.release();
   }
 });
+app.get('/qr', async (req, res) => {
+  try {
+    const data = String(req.query.data || '');
+    const size = Math.max(120, Math.min(1024, parseInt(req.query.size || '240', 10)));
+    if (!data) return res.status(400).send('missing data');
+
+    const png = await QRCode.toBuffer(data, {
+      type: 'png',
+      errorCorrectionLevel: 'M', // suficiente p/ EMV
+      margin: 1,
+      width: size
+    });
+
+    res.set('Content-Type', 'image/png');
+    res.send(png);
+  } catch (e) {
+    res.status(500).send('qr error');
+  }
+});
 
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};

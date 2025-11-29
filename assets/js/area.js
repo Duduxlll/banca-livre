@@ -46,10 +46,7 @@ function toASCIIUpper(s = '') {
 
 function cleanPixKey(raw = '') {
   let k = String(raw || '').trim();
-  // Se parece telefone (tem sinais/dígitos), mantém só dígitos (DDI+DDD+num)
   if (/^\+?\d[\d\s().-]*$/.test(k)) k = k.replace(/\D/g, '');
-  // CPF/CNPJ já são só dígitos: ok
-  // E-mail / chave aleatória ficam como estão, só tirar espaços
   return k;
 }
 
@@ -82,7 +79,6 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
     ? '***'
     : String(txid).replace(/[^A-Za-z0-9.-]/g, '').slice(1, 25) || '***';
 
-  // Merchant Account Info (26)
   const mai = TLV('26',
     TLV('00', 'br.gov.bcb.pix') +
     TLV('01', String(chaveOK))
@@ -90,11 +86,11 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
 
   const payloadSemCRC =
       TLV('00','01') +                                     // Payload Format Indicator
-      TLV('01','11') +                                     // Point of Initiation Method = 11 (estático)
+      TLV('01','11') +                                     // POI Method 11 (estático)
       mai +
       TLV('52','0000') +                                   // MCC
-      TLV('53','986') +                                    // Moeda BRL
-      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  // valor com ponto e 2 casas
+      TLV('53','986') +                                    // BRL
+      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  // valor 0.00
       TLV('58','BR') +
       TLV('59', nomeOK) +
       TLV('60', cidadeOK) +
@@ -400,7 +396,7 @@ function renderPagamentos(){
           </div>
         </td>
       </tr>`;
-  }).join('') : `<tr><td colspan="3" class="muted" style="padding:14px">Sem registros ainda.</td></tr>`;
+  }).join('') : `<tr><td colspan="3" class="muted" style="padding:14px">Sem pagamentos ainda.</td></tr>`;
 
   filtrarTabela(tbodyPags, buscaInput?.value || '');
 }
@@ -606,7 +602,7 @@ function abrirPixModal(id){
     valorCents: Number(p.pagamentoCents || 0),
     nome: p.nome || 'RECEBEDOR',
     cidade: 'BRASILIA',
-    txid: '***' // estático
+    txid: '***' // estático (evita “vencido” nos apps)
   });
 
   const dlg = ensurePayPixModal();
@@ -615,10 +611,12 @@ function abrirPixModal(id){
 
   emvEl.value = emv;
 
-  // tenta QR externo; se CSP bloquear, esconde a imagem e segue com copia-e-cola
-  const url = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(emv)}`;
+  // QR local por mesma origem -> passa no CSP (img-src 'self')
+  const size = 240;
+  const url  = `${API}/qr?size=${size}&data=${encodeURIComponent(emv)}`;
   img.style.display = '';
-  img.onerror = () => { img.style.display = 'none'; };
+  img.removeAttribute('src');
+  img.onerror = () => { img.style.display = 'none'; }; // fallback: só copia-e-cola
   img.src = url;
 
   if (typeof dlg.showModal === 'function') dlg.showModal();
