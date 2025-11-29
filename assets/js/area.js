@@ -36,8 +36,9 @@ function debounce(fn, wait = 300){
    PIX BR Code (copia-e-cola)
    =========================== */
 function TLV(id, value) {
-  const len = String(value.length).padStart(2, '0');
-  return `${id}${len}${value}`;
+  const v = String(value ?? '');
+  const len = String(v.length).padStart(2, '0');
+  return `${id}${len}${v}`;
 }
 
 function crc16_ccitt(payload) {
@@ -53,16 +54,17 @@ function crc16_ccitt(payload) {
 }
 
 function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '***' }) {
+  // Estático (não vence): 000201 (PFI) + 010211 (POI=11)
   const gui = TLV('00', 'br.gov.bcb.pix');
-  const mai = TLV('26', gui + TLV('01', String(chave)));
+  const mai = TLV('26', gui + TLV('01', String(chave).trim()));
 
   const mcc   = TLV('52', '0000');
   const curr  = TLV('53', '986');
-  const valor = TLV('54', (valorCents / 100).toFixed(2));
+  const valor = TLV('54', (Number(valorCents||0) / 100).toFixed(2)); // ponto e 2 casas
   const pais  = TLV('58', 'BR');
   const nomeR = TLV('59', (nome || 'RECEBEDOR').slice(0, 25));
   const cid   = TLV('60', (cidade || 'BRASILIA').slice(0, 15));
-  const add   = TLV('62', TLV('05', String(txid).slice(0, 25)));
+  const add   = TLV('62', TLV('05', String(txid).slice(0, 25)));     // TXID simples
 
   const semCRC = TLV('00','01') + TLV('01','11') + mai + mcc + curr + valor + pais + nomeR + cid + add + '6304';
   const crc = crc16_ccitt(semCRC);
@@ -155,26 +157,9 @@ function ensureTotaisPopup(){
       gap:8px;
       margin-bottom:6px;
     }
-    .totais-popup-title{
-      font-size:14px;
-      font-weight:800;
-    }
-    .totais-popup-value{
-      font-size:16px;
-      font-weight:800;
-      margin:0;
-      color:#fff;
-      font-variant-numeric:tabular-nums;
-    }
-    .totais-popup-close{
-      border:0;
-      background:transparent;
-      color:#fff;
-      cursor:pointer;
-      font-size:16px;
-      line-height:1;
-      padding:2px 4px;
-    }
+    .totais-popup-title{ font-size:14px; font-weight:800; }
+    .totais-popup-value{ font-size:16px; font-weight:800; margin:0; color:#fff; font-variant-numeric:tabular-nums; }
+    .totais-popup-close{ border:0; background:transparent; color:#fff; cursor:pointer; font-size:16px; line-height:1; padding:2px 4px; }
   `);
 
   const el = document.createElement('div');
@@ -523,7 +508,7 @@ function setupAutoDeleteTimers(){
   });
 }
 
-/* ========== Modal “Fazer PIX” — BR Code com valor ========== */
+/* ========== Modal “Fazer PIX” — BR Code com valor (estático) ========== */
 let payPixModalEl = null;
 
 function ensurePayPixModal() {
@@ -582,10 +567,11 @@ function abrirPixModal(id){
   const p = STATE.pagamentos.find(x=>x.id===id);
   if(!p) return;
 
-  const chave = p.pixKey || '';
+  const chave = (p.pixKey || '').trim();
   const valorCents = Number(p.pagamentoCents || 0);
   const nome = p.nome || 'RECEBEDOR';
-  const txid = `PG-${p.id}`;
+  // TXID simples para estático (evita “vencido” em apps)
+  const txid = '***';
 
   const emv = buildPixBRCode({ chave, valorCents, nome, cidade: 'BRASILIA', txid });
 
