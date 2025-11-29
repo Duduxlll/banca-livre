@@ -71,9 +71,12 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   const chaveOK  = cleanPixKey(chave);
   const nomeOK   = toASCIIUpper((nome || 'RECEBEDOR')).slice(0, 25) || 'RECEBEDOR';
   const cidadeOK = toASCIIUpper(cidade || 'BRASILIA').slice(0, 15) || 'BRASILIA';
+
   const txidOK   = txid === '***'
     ? '***'
-    : String(txid).replace(/[^A-Za-z0-9.-]/g, '').slice(1, 25) || '***';
+    : String(txid)
+        .replace(/[^A-Za-z0-9.-]/g, '')
+        .slice(0, 25) || '***';
 
   const mai = TLV('26',
     TLV('00', 'br.gov.bcb.pix') +
@@ -86,7 +89,8 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
       mai +
       TLV('52','0000') +                                   
       TLV('53','986') +                                    
-      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  
+      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +
+      TLV('58', 'BR') +           // código do país
       TLV('59', nomeOK) +
       TLV('60', cidadeOK) +
       TLV('62', TLV('05', txidOK)) +
@@ -157,7 +161,7 @@ function ensureTotaisPopup(){
       background:linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.06));
       border-radius:14px;
       border:1px solid rgba(255,255,255,.25);
-      box-shadow:0 24px 70px rgba(0,0,0,.7);
+      box-shadow:0 22px 60px rgba(40,20,5,.65);
       padding:12px 14px 14px;
       min-width:220px;
       max-width:260px;
@@ -606,7 +610,6 @@ function abrirPixModal(id){
 
   emvEl.value = emv;
 
-  
   const size = 240;
   const url  = `${API}/qr?size=${size}&data=${encodeURIComponent(emv)}`;
   img.style.display = '';
