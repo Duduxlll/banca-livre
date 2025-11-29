@@ -148,19 +148,40 @@
     ctx.fillText('SORTEIO', cx, cy + 6);
   }
 
+  function calcularIndiceVencedorPeloAngulo(angleFinal) {
+    if (!inscritos.length) return -1;
+    const n = inscritos.length;
+    const arc = (Math.PI * 2) / n;
+    const pointerAngle = (3 * Math.PI) / 2;
+
+    let diff = pointerAngle - angleFinal;
+    const twoPi = Math.PI * 2;
+    diff = ((diff % twoPi) + twoPi) % twoPi;
+
+    const idx = Math.floor(diff / arc);
+    return idx % n;
+  }
+
   function girarRoletaSorteio() {
     if (spinning || !inscritos.length) return;
     spinning = true;
 
-    const n = inscritos.length;
-    const arc = (Math.PI * 2) / n;
-    const winnerIndex = Math.floor(Math.random() * n);
+    if (animId) {
+      cancelAnimationFrame(animId);
+      animId = null;
+    }
 
-    const pointerAngle = (3 * Math.PI) / 2;
-    const rotations = 5 + Math.random() * 3;
-    const initialAngle = startAngle % (Math.PI * 2);
-    const finalAngle = rotations * Math.PI * 2 + pointerAngle - (winnerIndex * arc + arc / 2);
-    const duration = 4000;
+    const n = inscritos.length;
+    const twoPi = Math.PI * 2;
+
+    const initialAngle =
+      ((startAngle % twoPi) + twoPi) % twoPi;
+
+    const voltasExtras = 5 + Math.random() * 3;
+    const offsetAleatorio = Math.random() * twoPi;
+    const finalAngle = initialAngle + voltasExtras * twoPi + offsetAleatorio;
+
+    const duration = 3500;
     const startTime = performance.now();
 
     const winnerBox = document.getElementById('sorteioWinnerBox');
@@ -185,20 +206,26 @@
       if (t < 1) {
         animId = requestAnimationFrame(step);
       } else {
-        if (animId) cancelAnimationFrame(animId);
         animId = null;
         spinning = false;
-        startAngle = startAngle % (Math.PI * 2);
 
+        const normalized =
+          ((startAngle % twoPi) + twoPi) % twoPi;
+        startAngle = normalized;
+
+        const winnerIndex = calcularIndiceVencedorPeloAngulo(normalized);
         const vencedor = inscritos[winnerIndex] || null;
+
         if (winnerBox) {
           const nome = vencedor && vencedor.nome_twitch ? vencedor.nome_twitch : '';
           winnerBox.innerHTML = `Vencedor: <strong>${nome}</strong>`;
         }
+
         if (btnGirar) {
           btnGirar.disabled = false;
           btnGirar.classList.remove('is-spinning');
         }
+
         if (vencedor && typeof notify === 'function') {
           notify(`Vencedor: ${vencedor.nome_twitch}`);
         }
