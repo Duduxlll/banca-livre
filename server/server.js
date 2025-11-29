@@ -638,12 +638,12 @@ app.get('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-// inscrição pública (vamos usar depois no sorteio-publico.html)
 app.post('/api/sorteio/inscrever', async (req, res) => {
   try {
     const { nomeTwitch, mensagem } = req.body || {};
+
     if (!nomeTwitch || !nomeTwitch.trim()) {
-      return res.status(400).json({ error: 'Informe o nome da Twitch' });
+      return res.status(400).json({ ok: false, error: 'Informe o nome da Twitch' });
     }
 
     const ip =
@@ -661,9 +661,10 @@ app.post('/api/sorteio/inscrever', async (req, res) => {
     res.status(201).json({ ok: true, inscrito: rows[0] });
   } catch (err) {
     console.error('POST /api/sorteio/inscrever', err);
-    res.status(500).json({ error: 'Erro ao inscrever no sorteio' });
+    res.status(500).json({ ok: false, error: 'Erro ao inscrever no sorteio' });
   }
 });
+
 
 // excluir UM inscrito
 app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
