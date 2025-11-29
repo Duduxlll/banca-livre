@@ -4,9 +4,10 @@
   let inscritos = [];
   let spinning = false;
   let startAngle = 0;
+  let animId = null;
 
   const canvas = document.getElementById('sorteioWheel');
-  if (!canvas) return; // segurança se a aba não existir por algum motivo
+  if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
 
@@ -20,7 +21,6 @@
       const res = await fetch(`${API}/api/sorteio/inscricoes`);
       inscritos = await res.json();
       if (!Array.isArray(inscritos)) inscritos = [];
-
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
     } catch (err) {
@@ -134,7 +134,6 @@
       ctx.restore();
     }
 
-    // círculo interno
     ctx.beginPath();
     ctx.arc(cx, cy, 55, 0, Math.PI * 2);
     ctx.fillStyle = '#120806';
@@ -157,43 +156,65 @@
     const arc = (Math.PI * 2) / n;
     const winnerIndex = Math.floor(Math.random() * n);
 
-    const pointerAngle = (3 * Math.PI) / 2; // 270°
+    const pointerAngle = (3 * Math.PI) / 2;
     const rotations = 5 + Math.random() * 3;
-    const start = startAngle;
-    const final = rotations * Math.PI * 2 + pointerAngle - (winnerIndex * arc + arc / 2);
+    const initialAngle = startAngle % (Math.PI * 2);
+    const finalAngle = rotations * Math.PI * 2 + pointerAngle - (winnerIndex * arc + arc / 2);
     const duration = 4000;
-    const t0 = performance.now();
+    const startTime = performance.now();
 
     const winnerBox = document.getElementById('sorteioWinnerBox');
-    if (winnerBox) {
-      winnerBox.textContent = 'Girando…';
+    const btnGirar = document.getElementById('btnSorteioGirar');
+
+    if (winnerBox) winnerBox.textContent = 'Girando…';
+    if (btnGirar) {
+      btnGirar.disabled = true;
+      btnGirar.classList.add('is-spinning');
     }
 
-    function anim(now) {
-      const t = Math.min((now - t0) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      startAngle = start + (final - start) * ease;
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function step(now) {
+      const t = Math.min(1, (now - startTime) / duration);
+      const eased = easeOutCubic(t);
+      startAngle = initialAngle + (finalAngle - initialAngle) * eased;
       desenharRoletaSorteio();
 
       if (t < 1) {
-        requestAnimationFrame(anim);
+        animId = requestAnimationFrame(step);
       } else {
+        if (animId) cancelAnimationFrame(animId);
+        animId = null;
         spinning = false;
-        const vencedor = inscritos[winnerIndex];
+        startAngle = startAngle % (Math.PI * 2);
+
+        const vencedor = inscritos[winnerIndex] || null;
         if (winnerBox) {
-          winnerBox.innerHTML = `Vencedor: <strong>${vencedor.nome_twitch}</strong>`;
+          const nome = vencedor && vencedor.nome_twitch ? vencedor.nome_twitch : '';
+          winnerBox.innerHTML = `Vencedor: <strong>${nome}</strong>`;
+        }
+        if (btnGirar) {
+          btnGirar.disabled = false;
+          btnGirar.classList.remove('is-spinning');
+        }
+        if (vencedor && typeof notify === 'function') {
+          notify(`Vencedor: ${vencedor.nome_twitch}`);
         }
       }
     }
 
-    requestAnimationFrame(anim);
+    animId = requestAnimationFrame(step);
   }
 
-  // Botões
-  document.getElementById('btnSorteioGirar')?.addEventListener('click', girarRoletaSorteio);
-  document.getElementById('btnSorteioAtualizar')?.addEventListener('click', carregarInscritosSorteio);
-  document.getElementById('btnSorteioLimpar')?.addEventListener('click', limparTodosSorteio);
+  const btnGirarEl = document.getElementById('btnSorteioGirar');
+  const btnAtualizarEl = document.getElementById('btnSorteioAtualizar');
+  const btnLimparEl = document.getElementById('btnSorteioLimpar');
 
-  // Carregar logo que entrar na página
+  if (btnGirarEl) btnGirarEl.addEventListener('click', girarRoletaSorteio);
+  if (btnAtualizarEl) btnAtualizarEl.addEventListener('click', carregarInscritosSorteio);
+  if (btnLimparEl) btnLimparEl.addEventListener('click', limparTodosSorteio);
+
   carregarInscritosSorteio();
 })();

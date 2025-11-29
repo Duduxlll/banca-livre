@@ -70,17 +70,31 @@
   display: block;
 }
 
+/* seta estilo flecha pra baixo */
 .wheel-pointer {
   position: absolute;
-  top: 6px;
+  top: -28px;
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 18px solid transparent;
-  border-right: 18px solid transparent;
-  border-bottom: 34px solid #ffd76b;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  border-left: 26px solid transparent;
+  border-right: 26px solid transparent;
+  border-top: 40px solid #ffc63b;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
+}
+
+/* basezinha escura embaixo da seta (opcional, só pra dar charme) */
+.wheel-pointer::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .btn-girar {
@@ -93,6 +107,21 @@
   color: #2b1207;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.btn-girar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* estado enquanto está girando / desabilitado */
+.btn-girar.is-spinning,
+.btn-girar:disabled {
+  opacity: 0.6;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
 }
 
 .winner-box {
@@ -108,7 +137,7 @@
   color: #ffd76b;
 }
 
-/* Lista de inscritos */
+
 .sorteio-list {
   max-height: 420px;
   overflow: auto;
@@ -166,7 +195,7 @@
   border-radius: 6px;
 }
 
-/* responsivo */
+
 @media (max-width: 900px) {
   .sorteio-layout {
     grid-template-columns: minmax(0, 1fr);
