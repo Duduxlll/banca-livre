@@ -26,11 +26,50 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
+/* debounce simples */
 function debounce(fn, wait = 300){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
 }
 
+/* ===========================
+   PIX BR Code (copia-e-cola)
+   =========================== */
+function TLV(id, value) {
+  const len = String(value.length).padStart(2, '0');
+  return `${id}${len}${value}`;
+}
+
+function crc16_ccitt(payload) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '***' }) {
+  const gui = TLV('00', 'br.gov.bcb.pix');
+  const mai = TLV('26', gui + TLV('01', String(chave)));
+
+  const mcc   = TLV('52', '0000');
+  const curr  = TLV('53', '986');
+  const valor = TLV('54', (valorCents / 100).toFixed(2));
+  const pais  = TLV('58', 'BR');
+  const nomeR = TLV('59', (nome || 'RECEBEDOR').slice(0, 25));
+  const cid   = TLV('60', (cidade || 'BRASILIA').slice(0, 15));
+  const add   = TLV('62', TLV('05', String(txid).slice(0, 25)));
+
+  const semCRC = TLV('00','01') + TLV('01','11') + mai + mcc + curr + valor + pais + nomeR + cid + add + '6304';
+  const crc = crc16_ccitt(semCRC);
+  return semCRC + crc;
+}
+
+/* ========== Elementos ========== */
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
@@ -78,7 +117,6 @@ function updateTotals() {
   if (elDep) elDep.dataset.total = fmtBRL(totalDepositos);
   if (elBan) elBan.dataset.total = fmtBRL(totalBancas);
 }
-
 
 let totaisPopupEl = null;
 
@@ -485,59 +523,86 @@ function setupAutoDeleteTimers(){
   });
 }
 
+/* ========== Modal “Fazer PIX” — BR Code com valor ========== */
+let payPixModalEl = null;
+
+function ensurePayPixModal() {
+  if (payPixModalEl) return payPixModalEl;
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'payPixModal';
+  dlg.className = 'pix-modal';
+
+  injectOnce('payPixBackdropCSS', `
+    dialog.pix-modal::backdrop{ background: rgba(8,12,26,.65); backdrop-filter: blur(6px) saturate(.9); }
+    .pix-card{ width:min(94vw,520px); color:#e7e9f3; background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12); border-radius:14px; box-shadow:0 28px 80px rgba(0,0,0,.55); padding:16px; }
+    .pix-title{ margin:0 0 8px; font-weight:800 }
+    .pix-qr-wrap{ display:flex; justify-content:center; margin:8px 0 12px }
+    .pix-qr{ display:block; width:240px; height:240px }
+    .pix-code{ display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center }
+    .pix-emv{ width:100% }
+    .pix-status{ margin:10px 0 0; color:#b3b8cc }
+    .pix-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px }
+  `);
+
+  const card = document.createElement('div');
+  card.className = 'pix-card';
+  card.innerHTML = `
+    <h3 class="pix-title">Escaneie para pagar</h3>
+    <div class="pix-qr-wrap"><img id="payPixQr" class="pix-qr" alt="QR Code Pix"></div>
+    <div class="pix-code">
+      <input id="payPixEmv" class="pix-emv" readonly>
+      <button id="payPixCopy" class="btn btn--primary">Copiar</button>
+    </div>
+    <p class="pix-status" id="payPixHint">O valor já está preenchido. Após enviar, feche e marque como <strong>Pago</strong>.</p>
+    <div class="pix-actions">
+      <button id="payPixClose" class="btn btn--ghost">Fechar</button>
+    </div>
+  `;
+  dlg.appendChild(card);
+  document.body.appendChild(dlg);
+
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+  dlg.addEventListener('cancel', (e) => { e.preventDefault(); dlg.close(); });
+
+  dlg.querySelector('#payPixCopy').onclick = async () => {
+    const emv = dlg.querySelector('#payPixEmv')?.value || '';
+    if (!emv) return;
+    await navigator.clipboard.writeText(emv);
+    if (typeof notify === 'function') notify('Código copia-e-cola copiado!');
+  };
+  dlg.querySelector('#payPixClose').onclick = () => dlg.close();
+
+  payPixModalEl = dlg;
+  return dlg;
+}
+
 function abrirPixModal(id){
   const p = STATE.pagamentos.find(x=>x.id===id);
   if(!p) return;
-  let dlg = qs('#payModal');
-  if(!dlg){
-    dlg = document.createElement('dialog');
-    dlg.id = 'payModal';
-    dlg.style.border='0';
-    dlg.style.padding='0';
-    dlg.style.background='transparent';
 
-    injectOnce('payModalBackdropCSS', `
-      #payModal::backdrop{ background: rgba(8,12,26,.65); backdrop-filter: blur(6px) saturate(.9); }
-    `);
+  const chave = p.pixKey || '';
+  const valorCents = Number(p.pagamentoCents || 0);
+  const nome = p.nome || 'RECEBEDOR';
+  const txid = `PG-${p.id}`;
 
-    const box = document.createElement('div');
-    box.style.width='min(94vw,520px)';
-    box.style.background='linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03))';
-    box.style.border='1px solid rgba(255,255,255,.12)';
-    box.style.borderRadius='14px';
-    box.style.boxShadow='0 28px 80px rgba(0,0,0,.55)';
-    box.style.padding='16px';
-    box.style.color='#e7e9f3';
-    box.innerHTML = `
-      <h3 style="margin:0 0 6px">Fazer PIX para <span data-field="nome"></span></h3>
-      <p class="muted" style="margin:0 0 10px">Chave (<span data-field="tipo"></span>)</p>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
-        <input class="input" data-field="key" readonly>
-        <button class="btn btn--primary" data-action="copy">Copiar</button>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
-        <button class="btn btn--ghost" data-action="close">Fechar</button>
-      </div>
-    `;
-    dlg.appendChild(box);
-    document.body.appendChild(dlg);
+  const emv = buildPixBRCode({ chave, valorCents, nome, cidade: 'BRASILIA', txid });
 
-    dlg.addEventListener('click', (e)=>{
-      const b = e.target.closest('[data-action]');
-      if(!b) return;
-      if(b.dataset.action==='close') dlg.close();
-      if(b.dataset.action==='copy'){
-        const input = dlg.querySelector('[data-field="key"]');
-        if(input?.value) navigator.clipboard.writeText(input.value);
-      }
-    });
-  }
-  qs('[data-field="nome"]', dlg).textContent = p.nome;
-  qs('[data-field="tipo"]', dlg).textContent = (p.pixType||'—').toUpperCase();
-  qs('[data-field="key"]',  dlg).value      = p.pixKey || '—';
-  dlg.showModal();
+  const dlg = ensurePayPixModal();
+  const img = dlg.querySelector('#payPixQr');
+  const emvEl = dlg.querySelector('#payPixEmv');
+
+  emvEl.value = emv;
+
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(emv)}`;
+  img.src = url;
+
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  else dlg.setAttribute('open', '');
 }
 
+/* ===== Modal de Mensagem ===== */
 let msgModalEl = null;
 function injectOnce(id, css){
   if (document.getElementById(id)) return;
@@ -595,6 +660,7 @@ function abrirMensagem(texto){
   dlg.showModal();
 }
 
+/* ===== Menu flutuante de status ===== */
 let statusMenuEl = null;
 let statusMenuId = null;
 
