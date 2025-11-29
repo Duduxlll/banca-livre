@@ -1,0 +1,174 @@
+/* Layout geral da aba de sorteio */
+.sorteio-header-card {
+  margin-bottom: 16px;
+}
+
+.sorteio-header-admin {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sorteio-header-admin h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.sorteio-header-admin p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.sorteio-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-soft {
+  border-radius: 999px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 180, 120, 0.3);
+  background: rgba(15, 8, 3, 0.8);
+  color: #f7f2e9;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-soft.danger {
+  border-color: rgba(255, 92, 122, 0.7);
+  color: #ffb8c8;
+}
+
+/* grid roleta + lista */
+.sorteio-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 8px;
+}
+
+.sorteio-wheel-card,
+.sorteio-list-card {
+  border-radius: 18px;
+}
+
+/* Roleta */
+.wheel-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#sorteioWheel {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.wheel-pointer {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 34px solid #ffd76b;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+.btn-girar {
+  margin-top: 10px;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #ff7a00, #ffc266);
+  color: #2b1207;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.winner-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(10, 5, 2, 0.9);
+  border: 1px solid rgba(255, 180, 120, 0.22);
+  font-size: 0.95rem;
+}
+
+.winner-box strong {
+  color: #ffd76b;
+}
+
+/* Lista de inscritos */
+.sorteio-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.sorteio-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.sorteio-list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.sorteio-list th,
+.sorteio-list td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 180, 120, 0.12);
+  text-align: left;
+}
+
+.sorteio-list th {
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.sorteio-list td small {
+  opacity: 0.7;
+}
+
+.btn-mini-del {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 92, 122, 0.7);
+  padding: 3px 9px;
+  background: rgba(40, 5, 10, 0.9);
+  color: #ffb8c8;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.sorteio-tip {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.sorteio-tip code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+/* responsivo */
+@media (max-width: 900px) {
+  .sorteio-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

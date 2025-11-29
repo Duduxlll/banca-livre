@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
- 
 
   <title>Banquinhas • Área</title>
 
@@ -11,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/area.css">
+  <!-- NOVO CSS DO SORTEIO -->
+  <link rel="stylesheet" href="assets/css/sorteio.css">
 </head>
 <body>
   
@@ -20,7 +21,7 @@
       <img src="assets/img/banner.jpg" alt="Banquinhas" class="hero-logo">
       <div>
         <h1 class="hero-title">Banquinhas</h1>
-        <p class="hero-sub">Gestão de Bancas, Pagamentos e Extratos</p>
+        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos e Sorteio</p>
       </div>
     </div>
   </header>
@@ -37,6 +38,8 @@
         <button class="nav-btn active" data-tab="bancas">Bancas</button>
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
+        <!-- NOVA ABA -->
+        <button class="nav-btn" data-tab="sorteio">Sorteio</button>
 
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
           Sair
@@ -46,6 +49,7 @@
 
     <section class="content">
       
+      <!-- BANCAS -->
       <div class="tab tab-view show" id="tab-bancas">
 
         <div class="bar totbar">
@@ -56,14 +60,14 @@
             placeholder="Buscar por nome…">
 
           <div class="totais">
-  <button type="button" class="totais-pill" id="totalDepositos">
-    Soma dos Depósitos
-  </button>
+            <button type="button" class="totais-pill" id="totalDepositos">
+              Soma dos Depósitos
+            </button>
 
-  <button type="button" class="totais-pill" id="totalBancas">
-    Soma das Bancas
-  </button>
-</div>
+            <button type="button" class="totais-pill" id="totalBancas">
+              Soma das Bancas
+            </button>
+          </div>
 
         </div>
 
@@ -84,6 +88,7 @@
         </div>
       </div>
 
+      <!-- PAGAMENTOS -->
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -101,6 +106,7 @@
         </div>
       </div>
 
+      <!-- EXTRATOS -->
       <div class="tab tab-view" id="tab-extratos">
 
         <div class="card">
@@ -183,6 +189,59 @@
         </div>
 
       </div>
+
+      <!-- SORTEIO (NOVA ABA) -->
+      <div class="tab tab-view" id="tab-sorteio">
+        <div class="card sorteio-header-card">
+          <div class="sorteio-header-admin">
+            <div>
+              <h2>Sorteio da Live</h2>
+              <p>Inscrições vindas do formulário público.</p>
+            </div>
+            <div class="sorteio-actions">
+              <button id="btnSorteioAtualizar" class="btn-soft">Atualizar lista</button>
+              <button id="btnSorteioLimpar" class="btn-soft danger">Limpar todos</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sorteio-layout">
+          <div class="card sorteio-wheel-card">
+            <div class="wheel-wrapper">
+              <canvas id="sorteioWheel" width="500" height="500"></canvas>
+              <div class="wheel-pointer"></div>
+            </div>
+            <button id="btnSorteioGirar" class="btn-girar">Girar roleta</button>
+            <div id="sorteioWinnerBox" class="winner-box">
+              Aguardando giro…
+            </div>
+          </div>
+
+          <div class="card sorteio-list-card">
+            <div class="sorteio-list-header">
+              <span id="sorteioTotalInscritos">0 inscritos</span>
+            </div>
+            <div class="sorteio-list">
+              <table class="table" aria-label="Inscritos no sorteio">
+                <thead>
+                  <tr>
+                    <th>Nome Twitch</th>
+                    <th>Mensagem</th>
+                    <th>Data</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tbodySorteio"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <p class="sorteio-tip">
+          Formulário público: 
+          <code>https://SEU-DOMINIO.onrender.com/sorteio-publico.html</code>
+        </p>
+      </div>
       
     </section>
   </main>
@@ -210,6 +269,8 @@
   
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
+  <!-- NOVO JS DO SORTEIO -->
+  <script src="assets/js/sorteio.js" defer></script>
 
 </body>
 </html>

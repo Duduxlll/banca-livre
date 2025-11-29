@@ -90,7 +90,7 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
       TLV('52','0000') +                                   
       TLV('53','986') +                                    
       TLV('54', (Number(valorCents||0)/100).toFixed(2)) +
-      TLV('58', 'BR') +           // código do país
+      TLV('58', 'BR') +           
       TLV('59', nomeOK) +
       TLV('60', cidadeOK) +
       TLV('62', TLV('05', txidOK)) +

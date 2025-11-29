@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Banquinhas • Sorteio Público</title>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Pode reaproveitar seu style.css se quiser (cores globais, .wrap, etc) -->
+  <link rel="stylesheet" href="assets/css/style.css">
+  <!-- CSS exclusivo do sorteio público -->
+  <link rel="stylesheet" href="assets/css/sorteio-publico.css">
+</head>
+<body class="sp-body">
+  <header class="sp-header">
+    <div class="sp-wrap sp-header-inner">
+      <div class="sp-logo-block">
+        <div class="sp-logo-img" aria-hidden="true"></div>
+        <div>
+          <h1 class="sp-title">Banquinhas</h1>
+          <p class="sp-subtitle">Sorteio Público da Live</p>
+        </div>
+      </div>
+      <div class="sp-header-badge">
+        🔥 Sorteio automático para o streamer
+      </div>
+    </div>
+  </header>
+
+  <main class="sp-main">
+    <div class="sp-wrap">
+      <section class="sp-card">
+
+        <!-- BANNER LÁ EM CIMA -->
+        <div class="sp-banner">
+          <!-- Troca essa imagem pelo banner que você quiser -->
+          <img src="assets/img/panel.png" alt="Sorteio Banquinhas" class="sp-banner-img">
+          <div class="sp-banner-overlay"></div>
+          <div class="sp-banner-text">
+            <h2>Sorteio da Banca</h2>
+            <p>
+              Preencha seu nome da Twitch para entrar na roleta do streamer.
+              Quanto mais organizado, mais fácil para ele conferir ao vivo.
+            </p>
+          </div>
+        </div>
+
+        <!-- CONTEÚDO DO PAINEL -->
+        <div class="sp-card-body">
+          <div class="sp-grid">
+
+            <!-- FORMULÁRIO -->
+            <div class="sp-column">
+              <h3 class="sp-section-title">Participar do sorteio</h3>
+              <p class="sp-section-sub">
+                Seu nome aparecerá na roleta da live. Use o mesmo nome que aparece na Twitch.
+              </p>
+
+              <form id="sp-form" autocomplete="off" class="sp-form">
+                <label class="sp-field">
+                  <span>Nome na Twitch <span class="sp-required">*</span></span>
+                  <input type="text" id="sp-nomeTwitch" maxlength="60"
+                         placeholder="ex: dudufpss" required>
+                </label>
+
+                <label class="sp-field">
+                  <span>Mensagem / Observação (opcional)</span>
+                  <textarea id="sp-mensagem" rows="3"
+                            placeholder="Ex: Sorteio da banca 50/50, quero jogar em tal jogo…"></textarea>
+                  <small class="sp-help">
+                    Essa mensagem é só para o streamer se organizar. Não é obrigatória.
+                  </small>
+                </label>
+
+                <button type="submit" class="sp-btn-primary" id="sp-btn-enviar">
+                  Entrar no sorteio
+                </button>
+
+                <p id="sp-status" class="sp-status"></p>
+              </form>
+            </div>
+
+            <!-- EXPLICAÇÃO / REGRAS -->
+            <div class="sp-column sp-column-info">
+              <h3 class="sp-section-title">Como funciona</h3>
+              <ol class="sp-steps">
+                <li>
+                  <strong>Preencha seu nome da Twitch</strong> exatamente igual ao que aparece na live.
+                </li>
+                <li>
+                  (Opcional) Escreva uma <strong>mensagem</strong> para o streamer se organizar
+                  com o sorteio, premiação, etc.
+                </li>
+                <li>
+                  Clique em <strong>Entrar no sorteio</strong>. Sua inscrição vai para o painel do streamer.
+                </li>
+                <li>
+                  Na tela dele existe uma <strong>roleta gigante</strong> com todos os nomes.
+                  Ele gira ao vivo e o resultado sai na hora.
+                </li>
+              </ol>
+
+              <div class="sp-alert">
+                <strong>Atenção:</strong> enviar o formulário não garante prêmio.
+                O sorteio e as regras são definidos pelo streamer.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+    </div>

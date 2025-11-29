@@ -622,6 +622,76 @@ app.get('/qr', async (req, res) => {
   }
 });
 
+
+// ====================== SORTEIO ======================
+
+// listar inscritos
+app.get('/api/sorteio/inscricoes', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, nome_twitch, mensagem, criado_em FROM sorteio_inscricoes ORDER BY criado_em DESC'
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /api/sorteio/inscricoes', err);
+    res.status(500).json({ error: 'Erro ao buscar inscritos' });
+  }
+});
+
+// inscrição pública (vamos usar depois no sorteio-publico.html)
+app.post('/api/sorteio/inscrever', async (req, res) => {
+  try {
+    const { nomeTwitch, mensagem } = req.body || {};
+    if (!nomeTwitch || !nomeTwitch.trim()) {
+      return res.status(400).json({ error: 'Informe o nome da Twitch' });
+    }
+
+    const ip =
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.socket.remoteAddress ||
+      null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem, ip)
+       VALUES ($1, $2, $3)
+       RETURNING id, nome_twitch, mensagem, criado_em`,
+      [nomeTwitch.trim(), (mensagem || '').trim() || null, ip]
+    );
+
+    res.status(201).json({ ok: true, inscrito: rows[0] });
+  } catch (err) {
+    console.error('POST /api/sorteio/inscrever', err);
+    res.status(500).json({ error: 'Erro ao inscrever no sorteio' });
+  }
+});
+
+// excluir UM inscrito
+app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+
+    await pool.query('DELETE FROM sorteio_inscricoes WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/sorteio/inscricoes/:id', err);
+    res.status(500).json({ error: 'Erro ao excluir inscrição' });
+  }
+});
+
+// apagar TODOS (opcional)
+app.delete('/api/sorteio/inscricoes', async (req, res) => {
+  try {
+    await pool.query('TRUNCATE TABLE sorteio_inscricoes');
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/sorteio/inscricoes', err);
+    res.status(500).json({ error: 'Erro ao limpar inscrições' });
+  }
+});
+
+
+
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
 
