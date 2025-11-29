@@ -33,11 +33,32 @@ function debounce(fn, wait = 300){
 }
 
 /* ===========================
+   Helpers de normalização PIX
+   =========================== */
+function toASCIIUpper(s = '') {
+  const noMarks = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  return noMarks
+    .replace(/[^A-Za-z0-9 .,_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function cleanPixKey(raw = '') {
+  let k = String(raw || '').trim();
+  // Se parece telefone (tem sinais/dígitos), mantém só dígitos (DDI+DDD+num)
+  if (/^\+?\d[\d\s().-]*$/.test(k)) k = k.replace(/\D/g, '');
+  // CPF/CNPJ já são só dígitos: ok
+  // E-mail / chave aleatória ficam como estão, só tirar espaços
+  return k;
+}
+
+/* ===========================
    PIX BR Code (copia-e-cola)
    =========================== */
 function TLV(id, value) {
   const v = String(value ?? '');
-  const len = String(v.length).padStart(2, '0');
+  const len = String(v.length).padStart(2, '0'); // após normalização é ASCII-safe
   return `${id}${len}${v}`;
 }
 
@@ -54,21 +75,34 @@ function crc16_ccitt(payload) {
 }
 
 function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '***' }) {
-  // Estático (não vence): 000201 (PFI) + 010211 (POI=11)
-  const gui = TLV('00', 'br.gov.bcb.pix');
-  const mai = TLV('26', gui + TLV('01', String(chave).trim()));
+  const chaveOK  = cleanPixKey(chave);
+  const nomeOK   = toASCIIUpper((nome || 'RECEBEDOR')).slice(0, 25) || 'RECEBEDOR';
+  const cidadeOK = toASCIIUpper(cidade || 'BRASILIA').slice(0, 15) || 'BRASILIA';
+  const txidOK   = txid === '***'
+    ? '***'
+    : String(txid).replace(/[^A-Za-z0-9.-]/g, '').slice(1, 25) || '***';
 
-  const mcc   = TLV('52', '0000');
-  const curr  = TLV('53', '986');
-  const valor = TLV('54', (Number(valorCents||0) / 100).toFixed(2)); // ponto e 2 casas
-  const pais  = TLV('58', 'BR');
-  const nomeR = TLV('59', (nome || 'RECEBEDOR').slice(0, 25));
-  const cid   = TLV('60', (cidade || 'BRASILIA').slice(0, 15));
-  const add   = TLV('62', TLV('05', String(txid).slice(0, 25)));     // TXID simples
+  // Merchant Account Info (26)
+  const mai = TLV('26',
+    TLV('00', 'br.gov.bcb.pix') +
+    TLV('01', String(chaveOK))
+  );
 
-  const semCRC = TLV('00','01') + TLV('01','11') + mai + mcc + curr + valor + pais + nomeR + cid + add + '6304';
-  const crc = crc16_ccitt(semCRC);
-  return semCRC + crc;
+  const payloadSemCRC =
+      TLV('00','01') +                                     // Payload Format Indicator
+      TLV('01','11') +                                     // Point of Initiation Method = 11 (estático)
+      mai +
+      TLV('52','0000') +                                   // MCC
+      TLV('53','986') +                                    // Moeda BRL
+      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  // valor com ponto e 2 casas
+      TLV('58','BR') +
+      TLV('59', nomeOK) +
+      TLV('60', cidadeOK) +
+      TLV('62', TLV('05', txidOK)) +
+      '6304';
+
+  const crc = crc16_ccitt(payloadSemCRC);
+  return payloadSemCRC + crc;
 }
 
 /* ========== Elementos ========== */
@@ -567,13 +601,13 @@ function abrirPixModal(id){
   const p = STATE.pagamentos.find(x=>x.id===id);
   if(!p) return;
 
-  const chave = (p.pixKey || '').trim();
-  const valorCents = Number(p.pagamentoCents || 0);
-  const nome = p.nome || 'RECEBEDOR';
-  // TXID simples para estático (evita “vencido” em apps)
-  const txid = '***';
-
-  const emv = buildPixBRCode({ chave, valorCents, nome, cidade: 'BRASILIA', txid });
+  const emv = buildPixBRCode({
+    chave: p.pixKey || '',
+    valorCents: Number(p.pagamentoCents || 0),
+    nome: p.nome || 'RECEBEDOR',
+    cidade: 'BRASILIA',
+    txid: '***' // estático
+  });
 
   const dlg = ensurePayPixModal();
   const img = dlg.querySelector('#payPixQr');
@@ -581,7 +615,10 @@ function abrirPixModal(id){
 
   emvEl.value = emv;
 
+  // tenta QR externo; se CSP bloquear, esconde a imagem e segue com copia-e-cola
   const url = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(emv)}`;
+  img.style.display = '';
+  img.onerror = () => { img.style.display = 'none'; };
   img.src = url;
 
   if (typeof dlg.showModal === 'function') dlg.showModal();
