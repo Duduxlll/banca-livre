@@ -610,7 +610,7 @@ app.get('/qr', async (req, res) => {
 
     const png = await QRCode.toBuffer(data, {
       type: 'png',
-      errorCorrectionLevel: 'M', // suficiente p/ EMV
+      errorCorrectionLevel: 'M', 
       margin: 1,
       width: size
     });

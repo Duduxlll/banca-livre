@@ -26,15 +26,13 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
-/* debounce simples */
+
 function debounce(fn, wait = 300){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
 }
 
-/* ===========================
-   Helpers de normalização PIX
-   =========================== */
+
 function toASCIIUpper(s = '') {
   const noMarks = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
   return noMarks
@@ -50,12 +48,10 @@ function cleanPixKey(raw = '') {
   return k;
 }
 
-/* ===========================
-   PIX BR Code (copia-e-cola)
-   =========================== */
+
 function TLV(id, value) {
   const v = String(value ?? '');
-  const len = String(v.length).padStart(2, '0'); // após normalização é ASCII-safe
+  const len = String(v.length).padStart(2, '0'); 
   return `${id}${len}${v}`;
 }
 
@@ -85,13 +81,12 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   );
 
   const payloadSemCRC =
-      TLV('00','01') +                                     // Payload Format Indicator
-      TLV('01','11') +                                     // POI Method 11 (estático)
+      TLV('00','01') +                                     
+      TLV('01','11') +                                     
       mai +
-      TLV('52','0000') +                                   // MCC
-      TLV('53','986') +                                    // BRL
-      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  // valor 0.00
-      TLV('58','BR') +
+      TLV('52','0000') +                                   
+      TLV('53','986') +                                    
+      TLV('54', (Number(valorCents||0)/100).toFixed(2)) +  
       TLV('59', nomeOK) +
       TLV('60', cidadeOK) +
       TLV('62', TLV('05', txidOK)) +
@@ -101,7 +96,7 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   return payloadSemCRC + crc;
 }
 
-/* ========== Elementos ========== */
+
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
@@ -538,7 +533,7 @@ function setupAutoDeleteTimers(){
   });
 }
 
-/* ========== Modal “Fazer PIX” — BR Code com valor (estático) ========== */
+
 let payPixModalEl = null;
 
 function ensurePayPixModal() {
@@ -602,7 +597,7 @@ function abrirPixModal(id){
     valorCents: Number(p.pagamentoCents || 0),
     nome: p.nome || 'RECEBEDOR',
     cidade: 'BRASILIA',
-    txid: '***' // estático (evita “vencido” nos apps)
+    txid: '***' 
   });
 
   const dlg = ensurePayPixModal();
@@ -611,19 +606,19 @@ function abrirPixModal(id){
 
   emvEl.value = emv;
 
-  // QR local por mesma origem -> passa no CSP (img-src 'self')
+  
   const size = 240;
   const url  = `${API}/qr?size=${size}&data=${encodeURIComponent(emv)}`;
   img.style.display = '';
   img.removeAttribute('src');
-  img.onerror = () => { img.style.display = 'none'; }; // fallback: só copia-e-cola
+  img.onerror = () => { img.style.display = 'none'; }; 
   img.src = url;
 
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
 }
 
-/* ===== Modal de Mensagem ===== */
+
 let msgModalEl = null;
 function injectOnce(id, css){
   if (document.getElementById(id)) return;
@@ -681,7 +676,7 @@ function abrirMensagem(texto){
   dlg.showModal();
 }
 
-/* ===== Menu flutuante de status ===== */
+
 let statusMenuEl = null;
 let statusMenuId = null;
 
