@@ -26,7 +26,6 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
-
 function formatMoneyInputEl(inp){
   if (!inp) return;
   let v = String(inp.value || '').replace(/\D/g,'');
@@ -39,18 +38,16 @@ function formatMoneyInputEl(inp){
   inp.value = fmtBRL(parseInt(v,10));
 }
 
-
 function normalizePixKeyByType(type, raw){
   let v = String(raw || '').trim();
   if (!v) return '';
   if (type === 'cpf' || type === 'phone') {
-    v = v.replace(/\D/g,''); 
+    v = v.replace(/\D/g,'');
   } else if (type === 'email') {
     v = v.toLowerCase();
   }
   return v;
 }
-
 
 function formatCPF(raw){
   const d = String(raw || '').replace(/\D/g,'').slice(0,11);
@@ -66,9 +63,8 @@ function formatCPF(raw){
   return out;
 }
 
-
 function formatPhoneBR(raw){
-  let d = String(raw || '').replace(/\D/g,'').slice(-11); 
+  let d = String(raw || '').replace(/\D/g,'').slice(-11);
   const has9 = d.length === 11;
   const ddd  = d.slice(0,2);
   const meio = has9 ? d.slice(2,7) : d.slice(2,6);
@@ -119,13 +115,10 @@ function crc16_ccitt(payload) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-
 function formatPixPhoneForPayload(raw){
   let d = String(raw || '').replace(/\D/g,'');
   if (!d) return '';
- 
   if (!d.startsWith('55')) {
-    
     if (d.length >= 10 && d.length <= 11) {
       d = '55' + d;
     }
@@ -178,6 +171,7 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
+const tabCuponsEl     = qs('#tab-cupons');
 const tabSorteioEl    = qs('#tab-sorteio');
 
 const tbodyBancas     = qs('#tblBancas tbody');
@@ -186,16 +180,20 @@ const tbodyPags       = qs('#tblPagamentos tbody');
 const tbodyExtDeps    = qs('#tblExtratosDepositos tbody');
 const tbodyExtPags    = qs('#tblExtratosPagamentos tbody');
 
+const tbodyCupons     = qs('#tblCupons tbody');
+
 const buscaInput        = qs('#busca');
 const buscaExtratoInput = qs('#busca-extrato');
+const buscaCupomInput   = qs('#busca-cupom');
 
-const filtroTipo  = qs('#filtro-tipo');
-const filtroRange = qs('#filtro-range');
-const filtroFrom  = qs('#filtro-from');
-const filtroTo    = qs('#filtro-to');
-const btnFiltrar  = qs('#btn-filtrar');
-const btnLimpar   = qs('#btn-limpar');
+const filtroTipo        = qs('#filtro-tipo');
+const filtroRange       = qs('#filtro-range');
+const filtroFrom        = qs('#filtro-from');
+const filtroTo          = qs('#filtro-to');
+const btnFiltrar        = qs('#btn-filtrar');
+const btnLimpar         = qs('#btn-limpar');
 
+const filtroCupomStatus = qs('#filtro-cupom-status');
 
 const formAddBanca = qs('#formAddBanca');
 
@@ -204,6 +202,7 @@ const STATE = {
   bancas: [],
   pagamentos: [],
   extratos: { depositos: [], pagamentos: [] },
+  cupons: [],
   timers: new Map(),
   filtrosExtratos: { tipo:'all', range:'last30', from:null, to:null },
   editingBancaId: null
@@ -370,7 +369,6 @@ function buildExtratosQuery(tipoOverride = null){
   return params.toString();
 }
 
-
 async function loadExtratos(){
   if (!tabExtratosEl) return STATE.extratos;
 
@@ -402,13 +400,23 @@ async function loadExtratos(){
   return STATE.extratos;
 }
 
-
+async function loadCupons(){
+  if (!tabCuponsEl && !tbodyCupons) return STATE.cupons;
+  const list = await apiFetch('/api/cupons');
+  STATE.cupons = (list || []).sort((a,b)=>{
+    const da = new Date(a.createdAt || a.criadoEm || 0).getTime();
+    const db = new Date(b.createdAt || b.criadoEm || 0).getTime();
+    return db - da;
+  });
+  return STATE.cupons;
+}
 
 async function render(){
   if (TAB === 'bancas') {
     tabBancasEl?.classList.add('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
     renderBancas();
     updateTotals();
@@ -416,19 +424,29 @@ async function render(){
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
     renderPagamentos();
   } else if (TAB === 'extratos') {
     tabExtratosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
     renderExtratos();
+  } else if (TAB === 'cupons') {
+    tabCuponsEl?.classList.add('show');
+    tabBancasEl?.classList.remove('show');
+    tabPagamentosEl?.classList.remove('show');
+    tabExtratosEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+    renderCupons();
   } else if (TAB === 'sorteio') {
     tabSorteioEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
   }
 }
 
@@ -546,6 +564,77 @@ function renderExtratos(){
   }
 }
 
+function renderCupons(){
+  if (!tbodyCupons) return;
+  let arr = STATE.cupons || [];
+  const q  = (buscaCupomInput?.value || '').trim().toLowerCase();
+  const fs = (filtroCupomStatus?.value || 'todos');
+
+  if (fs === 'ativos') {
+    arr = arr.filter(c => c.status === 'ativo');
+  } else if (fs === 'usados') {
+    arr = arr.filter(c => c.status === 'usado' || c.status === 'resgatado');
+  } else if (fs === 'expirados') {
+    arr = arr.filter(c => c.status === 'expirado');
+  }
+
+  if (q) {
+    arr = arr.filter(c =>
+      (c.codigo && c.codigo.toLowerCase().includes(q)) ||
+      (c.resgatadoPor && c.resgatadoPor.toLowerCase().includes(q))
+    );
+  }
+
+  if (!arr.length) {
+    tbodyCupons.innerHTML = `<tr><td colspan="6" class="muted" style="padding:14px">Sem cupons ainda.</td></tr>`;
+    return;
+  }
+
+  tbodyCupons.innerHTML = arr.map(c => {
+    const valTxt = typeof c.valorCentavos === 'number'
+      ? fmtBRL(c.valorCentavos)
+      : (typeof c.valorCents === 'number' ? fmtBRL(c.valorCents) : '');
+    const exp = c.expiraEm || c.expira_em || null;
+    const expTxt = exp ? new Date(exp).toLocaleString('pt-BR') : '—';
+    const resgPor = c.resgatadoPor || c.resgatado_por || '';
+
+    let status = c.status || 'ativo';
+    let statusLabel = 'Ativo';
+    let statusCls = 'badge';
+    if (status === 'ativo') {
+      statusLabel = 'Ativo';
+      statusCls = 'badge badge--ativo';
+    } else if (status === 'expirado') {
+      statusLabel = 'Expirado';
+      statusCls = 'badge badge--expirado';
+    } else if (status === 'usado' || status === 'resgatado') {
+      statusLabel = 'Resgatado';
+      statusCls = 'badge badge--usado';
+    } else {
+      statusLabel = esc(status);
+    }
+
+    const actions = status === 'ativo'
+      ? `
+        <button class="btn btn--ghost" data-action="cupom-copy" data-id="${c.id}">Copiar</button>
+        <button class="btn btn--danger" data-action="cupom-del" data-id="${c.id}">Excluir</button>`
+      : `
+        <button class="btn btn--danger" data-action="cupom-del" data-id="${c.id}">Excluir</button>`;
+
+    return `
+      <tr data-id="${c.id}">
+        <td>${esc(c.codigo || '')}</td>
+        <td>${valTxt}</td>
+        <td><span class="${statusCls}">${statusLabel}</span></td>
+        <td>${expTxt}</td>
+        <td>${resgPor ? esc(resgPor) : '—'}</td>
+        <td class="col-acoes">
+          <div style="display:flex;gap:8px;align-items:center">${actions}</div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
 async function setTab(tab){
   TAB = tab;
   localStorage.setItem('area_tab', tab);
@@ -561,6 +650,8 @@ async function refresh(){
     await loadPagamentos();
   } else if (TAB==='extratos'){
     await loadExtratos();
+  } else if (TAB==='cupons'){
+    await loadCupons();
   } else if (TAB==='sorteio') {
   }
   render();
@@ -605,6 +696,12 @@ async function deletePagamento(id){
   render();
   const t = STATE.timers.get(id);
   if (t){ clearTimeout(t); STATE.timers.delete(id); }
+}
+
+async function deleteCupom(id){
+  await apiFetch(`/api/cupons/${encodeURIComponent(id)}`, { method:'DELETE' });
+  await loadCupons();
+  if (TAB === 'cupons') renderCupons();
 }
 
 async function setStatus(id, value){
@@ -723,7 +820,7 @@ function abrirPixModal(id){
   img.src = url;
 
   if (typeof dlg.showModal === 'function') dlg.showModal();
-  else dlg.setAttribute('open', '');
+  else dlg.setAttribute('open','');
 }
 
 let msgModalEl = null;
@@ -936,7 +1033,6 @@ function ensureAddBancaModal(){
       else pixKeyEl.placeholder = 'chave PIX (e-mail, CPF, tel.)';
     };
     pixTypeEl.addEventListener('change', ()=>{
-      
       const t = pixTypeEl.value;
       const digits = pixKeyEl.value.replace(/\D/g,'');
       if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
@@ -952,7 +1048,6 @@ function ensureAddBancaModal(){
     });
 
     pixKeyEl.addEventListener('blur', ()=>{
-      
       const t = pixTypeEl.value;
       const digits = pixKeyEl.value.replace(/\D/g,'');
       if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
@@ -1013,6 +1108,192 @@ async function handleAddBancaSubmit(e){
     else alert('Erro ao criar banca manual.');
   }finally{
     if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+let cupomModalEl = null;
+
+function ensureCupomModal(){
+  if (cupomModalEl) return cupomModalEl;
+
+  injectOnce('cupomModalCSS', `
+    #cupomModal::backdrop{
+      background: rgba(8,12,26,.65);
+      backdrop-filter: blur(6px) saturate(.9);
+    }
+    #cupomModal{
+      border:0;
+      padding:0;
+      background:transparent;
+    }
+    .cupom-card{
+      width:min(96vw,520px);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.15);
+      box-shadow:0 30px 90px rgba(0,0,0,.7);
+      padding:18px 18px 16px;
+      color:#e7e9f3;
+    }
+    .cupom-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .cupom-title{
+      margin:0;
+      font-size:1.1rem;
+      font-weight:800;
+    }
+    .cupom-sub{
+      margin:2px 0 0;
+      font-size:0.8rem;
+      opacity:0.8;
+    }
+    .cupom-close{
+      border:0;
+      background:transparent;
+      color:#f5f5f5;
+      font-size:20px;
+      line-height:1;
+      cursor:pointer;
+    }
+    .cupom-form{
+      display:grid;
+      gap:10px;
+    }
+    .cupom-field{
+      display:grid;
+      gap:4px;
+      font-size:0.85rem;
+    }
+    .cupom-actions{
+      margin-top:4px;
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+    }
+  `);
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'cupomModal';
+  dlg.innerHTML = `
+    <div class="cupom-card">
+      <div class="cupom-header">
+        <div>
+          <h3 class="cupom-title">Gerar cupom</h3>
+          <p class="cupom-sub">Cupom válido para um único resgate.</p>
+        </div>
+        <button type="button" class="cupom-close" data-cupom-close>&times;</button>
+      </div>
+
+      <form id="cupomForm" class="cupom-form">
+        <div class="cupom-field">
+          <label class="muted" for="cupomValor">Valor do cupom (R$)</label>
+          <input id="cupomValor" class="input" autocomplete="off" placeholder="ex: 200,00">
+        </div>
+
+        <div class="cupom-field">
+          <label class="muted" for="cupomCodigo">Código (opcional)</label>
+          <input id="cupomCodigo" class="input" autocomplete="off" placeholder="se vazio, gera automático">
+        </div>
+
+        <div class="cupom-field">
+          <label class="muted" for="cupomDias">Validade em dias</label>
+          <input id="cupomDias" class="input" type="number" min="1" value="3">
+        </div>
+
+        <div class="cupom-actions">
+          <button type="button" class="btn btn--ghost" data-cupom-close>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Criar cupom</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(dlg);
+
+  dlg.addEventListener('click', (e)=>{
+    if (e.target === dlg || e.target.closest('[data-cupom-close]')) {
+      dlg.close();
+    }
+  });
+  dlg.addEventListener('cancel', (e)=>{ e.preventDefault(); dlg.close(); });
+
+  const form    = dlg.querySelector('#cupomForm');
+  const valorEl = dlg.querySelector('#cupomValor');
+  if (valorEl) {
+    valorEl.addEventListener('input', ()=> formatMoneyInputEl(valorEl));
+  }
+  form.addEventListener('submit', handleCupomSubmit);
+
+  cupomModalEl = dlg;
+  return dlg;
+}
+
+async function handleCupomSubmit(e){
+  e.preventDefault();
+  const dlg      = ensureCupomModal();
+  const valorEl  = dlg.querySelector('#cupomValor');
+  const codigoEl = dlg.querySelector('#cupomCodigo');
+  const diasEl   = dlg.querySelector('#cupomDias');
+
+  const valorCents = toCents(valorEl.value);
+  const codigo     = (codigoEl.value || '').trim();
+  let dias         = parseInt(diasEl.value,10);
+  if (!Number.isFinite(dias) || dias <= 0) dias = 3;
+
+  if (!valorCents){
+    if (typeof notify === 'function') notify('Informe o valor do cupom.', 'error');
+    else alert('Informe o valor do cupom.');
+    return;
+  }
+
+  const btn = dlg.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+
+  try{
+    const created = await apiFetch('/api/cupons', {
+      method:'POST',
+      body: JSON.stringify({
+        valorCentavos: valorCents,
+        validadeDias: dias,
+        codigo: codigo || undefined
+      })
+    });
+
+    valorEl.value  = '';
+    codigoEl.value = '';
+    diasEl.value   = '3';
+
+    dlg.close();
+
+    await loadCupons();
+    renderCupons();
+
+    const codeShown = created?.codigo || created?.code || codigo;
+    if (typeof notify === 'function' && codeShown) {
+      notify(`Cupom criado: ${codeShown}`, 'ok');
+    }
+  }catch(err){
+    console.error(err);
+    if (typeof notify === 'function') notify('Erro ao criar cupom.', 'error');
+    else alert('Erro ao criar cupom.');
+  }finally{
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function copyCupomCodigo(id){
+  const c = STATE.cupons.find(x=>x.id===id);
+  if (!c || !c.codigo) return;
+  try{
+    await navigator.clipboard.writeText(c.codigo);
+    if (typeof notify === 'function') notify('Código do cupom copiado!', 'ok');
+  }catch(err){
+    console.error(err);
   }
 }
 
@@ -1105,6 +1386,8 @@ document.addEventListener('click', (e)=>{
   if(action==='fazer-pix')    return abrirPixModal(id);
   if(action==='del-pag')      return deletePagamento(id).catch(console.error);
   if(action==='to-banca')     return toBanca(id).catch(console.error);
+  if(action==='cupom-del')    return deleteCupom(id).catch(console.error);
+  if(action==='cupom-copy')   return copyCupomCodigo(id).catch(console.error);
 });
 
 document.addEventListener('click', (e)=>{
@@ -1167,7 +1450,14 @@ function filtrarTabela(tbody, q){
 buscaInput?.addEventListener('input', ()=>{
   const q = buscaInput.value || '';
   if (TAB==='bancas') filtrarTabela(tbodyBancas, q);
-  else                filtrarTabela(tbodyPags,   q);
+  else if (TAB==='pagamentos') filtrarTabela(tbodyPags,   q);
+});
+
+buscaCupomInput?.addEventListener('input', ()=>{
+  if (TAB === 'cupons') renderCupons();
+});
+filtroCupomStatus?.addEventListener('change', ()=>{
+  if (TAB === 'cupons') renderCupons();
 });
 
 function readExtratoFiltersFromDOM(){
@@ -1225,9 +1515,15 @@ function startStream(){
     if (TAB === 'extratos') renderExtratos();
   }, 200);
 
+  const softRefreshCupons = debounce(async () => {
+    await loadCupons();
+    if (TAB === 'cupons') renderCupons();
+  }, 200);
+
   es.addEventListener('bancas-changed',     softRefreshBancas);
   es.addEventListener('pagamentos-changed', softRefreshPags);
   es.addEventListener('extratos-changed',   softRefreshExt);
+  es.addEventListener('cupons-changed',     softRefreshCupons);
   es.addEventListener('ping', () => {});
 
   es.onerror = () => {
@@ -1242,7 +1538,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
 
-  // botão "Adicionar banca" (lado das somas)
   const btnAddBanca = qs('#btnAddBanca');
   if (btnAddBanca) {
     btnAddBanca.addEventListener('click', ()=>{
@@ -1264,11 +1559,31 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     });
   }
 
+  const btnCupomNovo = qs('#btnCupomNovo');
+  if (btnCupomNovo) {
+    btnCupomNovo.addEventListener('click', ()=>{
+      const dlg = ensureCupomModal();
+      const valorEl  = dlg.querySelector('#cupomValor');
+      const codigoEl = dlg.querySelector('#cupomCodigo');
+      const diasEl   = dlg.querySelector('#cupomDias');
+
+      if (valorEl)  valorEl.value  = '';
+      if (codigoEl) codigoEl.value = '';
+      if (diasEl)   diasEl.value   = '3';
+
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open','');
+
+      valorEl?.focus();
+    });
+  }
+
   applyExtratoFiltersUIRules();
   readExtratoFiltersFromDOM();
 
   const loaders = [loadBancas(), loadPagamentos()];
   if (tabExtratosEl) loaders.push(loadExtratos());
+  if (tabCuponsEl)   loaders.push(loadCupons());
   await Promise.all(loaders);
 
   setupAutoDeleteTimers();

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bancas • Depósito PIX</title>
 
-  
   <meta name="app-key" content="82ba166463e0d2ae345b9649ebc976d71176c5afe887b5e83affa633122beb9a">
 
   <link rel="stylesheet" href="assets/css/style.css">
@@ -65,19 +64,23 @@
               <div class="error" id="nomeError">Informe seu nome.</div>
             </div>
 
-           
             <div style="margin-top:16px">
               <label for="mensagem">Mensagem (opcional)</label>
               <textarea class="input" id="mensagem" name="message" rows="3" maxlength="240"
                         placeholder="Escreva o jogo ou como voce quer para jogar o 50/50(máx. 240 caracteres)"></textarea>
               <p class="help">Essa mensagem será exibida para o  <strong>seu streamer</strong>.</p>
             </div>
-            
 
             <div style="margin-top:16px">
               <label for="valor">Valor do depósito</label>
               <input class="input" type="text" id="valor" name="valor" inputmode="decimal" placeholder="R$ 10,00 (mínimo)" required>
               <div class="error" id="valorError">O valor mínimo é R$ 10,00.</div>
+            </div>
+
+            <div style="margin-top:16px">
+              <label for="cupom">Cupom de banca (opcional)</label>
+              <input class="input" type="text" id="cupom" name="cupom" placeholder="Digite seu cupom, se tiver" autocomplete="off">
+              <div class="error" id="cupomError">Cupom inválido, expirado ou já utilizado.</div>
             </div>
 
             <button class="cta" id="btnDepositar" type="submit" style="width:100%">
@@ -88,7 +91,6 @@
         </div>
       </section>
 
-     
       <aside class="aside">
         <section class="card">
           <div class="card-body">
@@ -98,9 +100,7 @@
               <li><span class="k">Tipo de chave</span> <span id="r-tipo">CPF</span></li>
               <li><span class="k">Chave</span> <span id="r-chave">—</span></li>
               <li><span class="k">Valor</span> <span id="r-valor">—</span></li>
-            
               <li><span class="k">Mensagem</span> <span id="r-msg">—</span></li>
-             
             </ul>
           </div>
         </section>
@@ -116,6 +116,27 @@
             </ol>
           </div>
         </section>
+
+        <section class="card">
+          <div class="card-body">
+            <h3 style="margin-top:0">Cupom de banca</h3>
+            <p style="margin:0 0 8px; color:var(--muted); line-height:1.6">
+              Se você recebeu um <strong>cupom de banca</strong>, digite o código no campo
+              <strong>“Cupom de banca”</strong> do formulário ao lado.
+            </p>
+            <p style="margin:0; color:var(--muted); line-height:1.6">
+              Cada cupom:
+            </p>
+            <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5">
+              <li>vale para <strong>apenas uma pessoa</strong>;</li>
+              <li>tem um <strong>valor fixo</strong> de banca;</li>
+              <li>pode ter <strong>data de validade</strong>.</li>
+            </ul>
+            <p style="margin:8px 0 0; color:var(--muted); line-height:1.6">
+              Quando o cupom é válido, sua banca é criada automaticamente com o valor do cupom.
+            </p>
+          </div>
+        </section>
       </aside>
     </div>
 
@@ -124,14 +145,8 @@
     </footer>
   </main>
 
- 
   <div class="toast" id="toast"></div>
 
-  
   <script src="assets/js/app.js"></script>
-
-  
-  
-  
 </body>
 </html>

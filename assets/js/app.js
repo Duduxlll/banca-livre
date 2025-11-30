@@ -10,6 +10,7 @@ const toast       = document.querySelector('#toast');
 const btnSubmit   = document.querySelector('#btnDepositar');
 
 const mensagemInput = document.querySelector('#mensagem');
+const cupomInput    = document.querySelector('#cupom');
 
 const rNome    = document.querySelector('#r-nome');
 const rTipo    = document.querySelector('#r-tipo');
@@ -54,6 +55,30 @@ async function saveOnServerConfirmado({ tokenOrTxid, nome, valorCentavos, tipo, 
   });
   if (!res.ok) {
     let msg = `Falha ao confirmar (${res.status})`;
+    try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function resgatarCupom({ codigo, nome, tipo, chave, message }){
+  const APP_KEY = window.APP_PUBLIC_KEY || getMeta('app-key') || '';
+  const res = await fetch(`${API}/api/cupons/resgatar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(APP_KEY ? { 'X-APP-KEY': APP_KEY } : {})
+    },
+    body: JSON.stringify({
+      codigo,
+      nome,
+      pixType: tipo,
+      pixKey: chave,
+      message: message || null
+    })
+  });
+  if (!res.ok) {
+    let msg = `Cupom inválido ou expirado (${res.status})`;
     try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
     throw new Error(msg);
   }
@@ -156,7 +181,11 @@ function isCPFValid(cpf){
   r = (s*10)%11; if(r===10||r===11) r=0; return r===parseInt(cpf.substring(10,11));
 }
 function isEmail(v){ return /.+@.+\..+/.test(v); }
-function showError(sel, ok){ const el = document.querySelector(sel); ok ? el.classList.remove('show') : el.classList.add('show'); }
+function showError(sel, ok){
+  const el = document.querySelector(sel);
+  if (!el) return;
+  ok ? el.classList.remove('show') : el.classList.add('show');
+}
 
 function ensurePixStyles(){
   if (!document.getElementById('pixCss')) {
@@ -255,9 +284,11 @@ async function criarCobrancaPIX({ nome, cpf, valorCentavos }){
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const tipoRaw   = tipoSelect.value;
-  const chaveVal  = (chaveInput?.value || '').trim();
+  const tipoRaw    = tipoSelect.value;
+  const chaveVal   = (chaveInput?.value || '').trim();
   const messageVal = (mensagemInput?.value || '').trim();
+  const cupomVal   = (cupomInput?.value || '').trim();
+  const hasCupom   = !!cupomVal;
 
   let chaveOk = true;
   if (tipoRaw === 'cpf')            chaveOk = isCPFValid(chaveVal);
@@ -265,13 +296,20 @@ form?.addEventListener('submit', async (e) => {
   else if (tipoRaw === 'telefone')  chaveOk = chaveVal.replace(/\D/g,'').length === 11;
   else                              chaveOk = chaveVal.length >= 10;
 
-  const nomeOk        = nomeInput.value.trim().length > 2;
-  const valorCentavos = toCentsMasked(valorInput.value);
-  const valorOk       = valorCentavos >= 1;
+  const nomeOk = nomeInput.value.trim().length > 2;
+
+  let valorCentavos = toCentsMasked(valorInput.value);
+  let valorOk = true;
+  if (!hasCupom) {
+    valorOk = valorCentavos >= 1;
+  } else {
+    valorCentavos = 0;
+  }
 
   showError('#nomeError', nomeOk);
   showError('#chaveError',chaveOk);
   showError('#valorError',valorOk);
+  showError('#cupomError', true);
   const cpfErr = document.querySelector('#cpfError'); cpfErr && cpfErr.classList.remove('show');
 
   if (!(nomeOk && chaveOk && valorOk)){
@@ -298,6 +336,25 @@ form?.addEventListener('submit', async (e) => {
 
   try{
     btnSubmit && (btnSubmit.disabled = true);
+
+    if (hasCupom) {
+      const result = await resgatarCupom({
+        codigo: cupomVal,
+        nome: nomeInput.value.trim(),
+        tipo: tipoNorm,
+        chave: chaveCanon,
+        message: messageVal
+      });
+
+      const valorCupom = Number(result.valorCentavos || result.valorCents || 0);
+      if (valorCupom > 0 && rValor) {
+        rValor.textContent = centsToBRL(valorCupom);
+      }
+
+      notify('Cupom resgatado com sucesso! Sua banca foi criada.', false, 4500);
+      showError('#cupomError', true);
+      return;
+    }
 
     const cob = await criarCobrancaPIX({ nome: nomeInput.value.trim(), cpf: cpfParaEfi, valorCentavos });
     const tokenOrTxid = cob.token || cob.txid;
@@ -361,7 +418,12 @@ form?.addEventListener('submit', async (e) => {
 
   }catch(e){
     console.error(e);
-    notify('Não foi possível iniciar o PIX. Tente novamente.', true);
+    if (hasCupom) {
+      notify(e.message || 'Cupom inválido, expirado ou já utilizado.', true);
+      showError('#cupomError', false);
+    } else {
+      notify('Não foi possível iniciar o PIX. Tente novamente.', true);
+    }
   } finally {
     btnSubmit && (btnSubmit.disabled = false);
   }

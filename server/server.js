@@ -162,6 +162,222 @@ function sseSendAll(event, payload = {}) {
   for (const res of sseClients) { try { res.write(msg); } catch {} }
 }
 
+function mapCupom(row){
+  if (!row) return null;
+  return {
+    id: row.id,
+    codigo: row.codigo,
+    valorCentavos: row.valor_cents,
+    ativo: row.ativo,
+    maxUsos: row.max_usos,
+    usadoEm: row.usado_em,
+    expiraEm: row.expira_em,
+    usadoPorNome: row.usado_por_nome,
+    usadoPorPixType: row.usado_por_pix_type,
+    usadoPorPixKey: row.usado_por_pix_key,
+    usadoPorMessage: row.usado_por_message,
+    createdAt: row.created_at
+  };
+}
+
+function normalizarCodigo(c){
+  return String(c || '').trim().toUpperCase();
+}
+
+router.get('/api/cupons', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM cupons ORDER BY created_at DESC'
+    );
+    res.json(rows.map(mapCupom));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/cupons', async (req, res, next) => {
+  try {
+    const codigoRaw = req.body.codigo;
+    const valorCentavos = Number(req.body.valorCentavos || req.body.valor_cents || 0);
+    const diasValidade = Number(req.body.diasValidade || 3);
+    const maxUsos = Number(req.body.maxUsos || 1);
+
+    const codigo = normalizarCodigo(codigoRaw);
+    if (!codigo || !valorCentavos || valorCentavos <= 0) {
+      return res.status(400).json({ error: 'Código e valor são obrigatórios.' });
+    }
+
+    const expiraEm = req.body.expiraEm
+      ? new Date(req.body.expiraEm)
+      : new Date(Date.now() + diasValidade * 24 * 60 * 60 * 1000);
+
+    const { rows } = await pool.query(
+      `INSERT INTO cupons (codigo, valor_cents, expira_em, max_usos, ativo)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING *`,
+      [codigo, valorCentavos, expiraEm, maxUsos]
+    );
+
+    res.status(201).json(mapCupom(rows[0]));
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Já existe um cupom com esse código.' });
+    }
+    next(err);
+  }
+});
+
+router.patch('/api/cupons/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (req.body.valorCentavos != null || req.body.valor_cents != null) {
+      fields.push(`valor_cents = $${idx++}`);
+      values.push(Number(req.body.valorCentavos || req.body.valor_cents));
+    }
+    if (req.body.ativo != null) {
+      fields.push(`ativo = $${idx++}`);
+      values.push(!!req.body.ativo);
+    }
+    if (req.body.expiraEm) {
+      fields.push(`expira_em = $${idx++}`);
+      values.push(new Date(req.body.expiraEm));
+    }
+
+    if (!fields.length) {
+      return res.status(400).json({ error: 'Nada para atualizar.' });
+    }
+
+    values.push(id);
+
+    const { rows } = await pool.query(
+      `UPDATE cupons
+       SET ${fields.join(', ')}
+       WHERE id = $${idx}
+       RETURNING *`,
+      values
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+
+    res.json(mapCupom(rows[0]));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/api/cupons/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rowCount } = await pool.query(
+      'DELETE FROM cupons WHERE id = $1',
+      [id]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/api/cupons/resgatar', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const codigo = normalizarCodigo(req.body.codigo);
+    const nome = String(req.body.nome || '').trim();
+    const pixType = String(req.body.pixType || '').trim() || null;
+    const pixKey = String(req.body.pixKey || '').trim() || null;
+    const message = req.body.message != null ? String(req.body.message) : null;
+
+    if (!codigo || !nome || !pixKey || !pixType) {
+      client.release();
+      return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
+    }
+
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      'SELECT * FROM cupons WHERE codigo = $1 FOR UPDATE',
+      [codigo]
+    );
+    if (!rows.length) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+
+    const cupom = rows[0];
+
+    if (!cupom.ativo) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom inativo.' });
+    }
+
+    const agora = new Date();
+    if (cupom.expira_em && agora > cupom.expira_em) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom expirado.' });
+    }
+
+    if (cupom.usado_em) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom já utilizado.' });
+    }
+
+    const valorCents = cupom.valor_cents;
+
+    await client.query(
+      `INSERT INTO bancas (nome, deposito_cents, banca_cents, pix_key, pix_type, message, created_at)
+       VALUES ($1, $2, 0, $3, $4, $5, now())`,
+      [nome, valorCents, pixKey, pixType, message]
+    );
+
+    await client.query(
+      `UPDATE cupons
+       SET usado_em = now(),
+           usado_por_nome = $2,
+           usado_por_pix_type = $3,
+           usado_por_pix_key = $4,
+           usado_por_message = $5
+       WHERE id = $1`,
+      [cupom.id, nome, pixType, pixKey, message]
+    );
+
+    await client.query('COMMIT');
+client.release();
+
+
+setTimeout(async () => {
+  try {
+    await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
+  } catch (err) {
+    console.error('Erro ao apagar cupom após 5 minutos:', err);
+  }
+}, 5 * 60 * 1000); 
+
+res.json({
+  ok: true,
+  valorCentavos: valorCents,
+  codigo: cupom.codigo
+});
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    client.release();
+    next(err);
+  }
+});
 
 
 app.use('/api', (req, res, next) => {

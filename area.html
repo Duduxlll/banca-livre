@@ -20,7 +20,7 @@
       <img src="assets/img/banner.jpg" alt="Banquinhas" class="hero-logo">
       <div>
         <h1 class="hero-title">Banquinhas</h1>
-        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos e Sorteio</p>
+        <p class="hero-sub">Gestão de Bancas, Pagamentos, Extratos, Cupons e Sorteio</p>
       </div>
     </div>
   </header>
@@ -37,6 +37,7 @@
         <button class="nav-btn active" data-tab="bancas">Bancas</button>
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
+        <button class="nav-btn" data-tab="cupons">Cupons</button>
         <button class="nav-btn" data-tab="sorteio">Sorteio</button>
 
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
@@ -47,6 +48,7 @@
 
     <section class="content">
       
+      <!-- TAB BANCAS -->
       <div class="tab tab-view show" id="tab-bancas">
 
         <div class="bar totbar">
@@ -88,6 +90,7 @@
         </div>
       </div>
 
+      <!-- TAB PAGAMENTOS -->
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -105,6 +108,7 @@
         </div>
       </div>
 
+      <!-- TAB EXTRATOS -->
       <div class="tab tab-view" id="tab-extratos">
         <div class="card extratos-card">
           <div class="bar extratos-bar">
@@ -186,6 +190,59 @@
         </div>
       </div>
 
+      <!-- TAB CUPONS -->
+      <div class="tab tab-view" id="tab-cupons">
+        <div class="card cupons-card">
+          <div class="bar cupons-bar">
+            <div class="cupons-filtros">
+              <div>
+                <label class="muted" for="busca-cupom">Buscar</label>
+                <input
+                  id="busca-cupom"
+                  class="input"
+                  type="text"
+                  placeholder="Buscar por código ou nome…">
+              </div>
+
+              <div>
+                <label class="muted" for="filtro-cupom-status">Status</label>
+                <select id="filtro-cupom-status" class="input">
+                  <option value="todos">Todos</option>
+                  <option value="ativos">Ativos</option>
+                  <option value="usados">Resgatados</option>
+                  <option value="expirados">Expirados</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="cupons-acoes">
+              <button type="button" class="btn btn--primary" id="btnCupomNovo">
+                Gerar cupom
+              </button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" id="tblCupons" aria-label="Cupons de depósito">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Valor (R$)</th>
+                  <th>Status</th>
+                  <th>Expira em</th>
+                  <th>Resgatado por</th>
+                  <th class="col-acoes">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- preenchido via area.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB SORTEIO -->
       <div class="tab tab-view" id="tab-sorteio">
         <div class="card sorteio-header-card">
           <div class="sorteio-header-admin">
