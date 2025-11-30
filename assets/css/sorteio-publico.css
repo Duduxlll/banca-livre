@@ -73,9 +73,11 @@
   overflow: hidden;
 }
 
+/* BANNER 1300 x 440 – responsivo */
 .sp-banner {
   position: relative;
-  height: 220px;
+  aspect-ratio: 1300 / 440;
+  max-height: 440px;
   overflow: hidden;
 }
 
@@ -84,7 +86,7 @@
   height: 100%;
   object-fit: cover;
   transform: scale(1.03);
-  filter: blur(0.8px) brightness(0.72);
+  filter: blur(0.6px) brightness(0.82);
 }
 
 .sp-banner-overlay {
@@ -92,9 +94,9 @@
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.15) 0%,
-    rgba(5, 2, 1, 0.45) 45%,
-    rgba(5, 2, 1, 0.85) 100%
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(5, 2, 1, 0.22) 45%,
+    rgba(5, 2, 1, 0.55) 100%
   );
 }
 
@@ -295,6 +297,8 @@
   border-color: rgba(255, 92, 122, 0.9);
 }
 
+/* RESPONSIVO */
+
 @media (max-width: 840px) {
   .sp-header-inner {
     flex-direction: column;
@@ -304,10 +308,6 @@
 
   .sp-header-badge {
     align-self: flex-end;
-  }
-
-  .sp-banner {
-    height: 190px;
   }
 
   .sp-card-body {
@@ -348,7 +348,7 @@
   }
 
   .sp-banner {
-    height: 160px;
+    max-height: 220px;
   }
 
   .sp-banner-img {
@@ -358,9 +358,9 @@
   .sp-banner-overlay {
     background: linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.12) 0%,
-      rgba(5, 2, 1, 0.4) 40%,
-      rgba(5, 2, 1, 0.8) 100%
+      rgba(0, 0, 0, 0.06) 0%,
+      rgba(5, 2, 1, 0.18) 40%,
+      rgba(5, 2, 1, 0.5) 100%
     );
   }
 
