@@ -76,9 +76,7 @@
   }
 
   async function excluirInscritoSorteio(id){
-    const ok = window.confirm('Remover este inscrito do sorteio?');
-    if (!ok) return;
-
+    if (!id) return;
     try {
       const res = await fetch(`${API}/api/sorteio/inscricoes/${id}`, {
         method: 'DELETE'
@@ -103,6 +101,100 @@
     }
   }
 
+  let confirmModalEl = null;
+  let confirmResolve = null;
+
+  function ensureSorteioConfirmModal(){
+    if (confirmModalEl) return confirmModalEl;
+
+    if (typeof injectOnce === 'function') {
+      injectOnce('sorteioConfirmCSS',
+        'dialog#sorteioConfirmModal::backdrop{' +
+          'background:rgba(8,12,26,0.7);' +
+          'backdrop-filter:blur(6px) saturate(0.9);' +
+        '}' +
+        '.sorteio-confirm-box{' +
+          'width:min(94vw,420px);' +
+          'background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04));' +
+          'border:1px solid rgba(255,255,255,.18);' +
+          'border-radius:16px;' +
+          'box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);' +
+          'padding:18px;' +
+          'color:#e7e9f3;' +
+        '}' +
+        '.sorteio-confirm-title{' +
+          'margin:0 0 6px;' +
+          'font-weight:800;' +
+          'font-size:1rem;' +
+        '}' +
+        '.sorteio-confirm-text{' +
+          'margin:0 0 12px;' +
+          'font-size:0.9rem;' +
+          'color:#cfd2e8;' +
+        '}' +
+        '.sorteio-confirm-actions{' +
+          'display:flex;' +
+          'gap:8px;' +
+          'justify-content:flex-end;' +
+          'margin-top:4px;' +
+        '}'
+      );
+    }
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'sorteioConfirmModal';
+    dlg.style.border = '0';
+    dlg.style.padding = '0';
+    dlg.style.background = 'transparent';
+
+    const box = document.createElement('div');
+    box.className = 'sorteio-confirm-box';
+    box.innerHTML =
+      '<h3 class="sorteio-confirm-title">Confirmar ação</h3>' +
+      '<p class="sorteio-confirm-text" data-confirm-msg></p>' +
+      '<div class="sorteio-confirm-actions">' +
+        '<button type="button" class="btn btn--ghost" data-action="cancel">Cancelar</button>' +
+        '<button type="button" class="btn btn--danger" data-action="confirm">Apagar tudo</button>' +
+      '</div>';
+
+    dlg.appendChild(box);
+    document.body.appendChild(dlg);
+
+    dlg.addEventListener('click', function(e){
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const act = btn.getAttribute('data-action');
+      dlg.close();
+      if (confirmResolve) {
+        confirmResolve(act === 'confirm');
+        confirmResolve = null;
+      }
+    });
+
+    dlg.addEventListener('cancel', function(e){
+      e.preventDefault();
+      dlg.close();
+      if (confirmResolve) {
+        confirmResolve(false);
+        confirmResolve = null;
+      }
+    });
+
+    confirmModalEl = dlg;
+    return dlg;
+  }
+
+  function showSorteioConfirm(message){
+    return new Promise(function(resolve){
+      const dlg = ensureSorteioConfirmModal();
+      const msgEl = dlg.querySelector('[data-confirm-msg]');
+      if (msgEl) msgEl.textContent = message || '';
+      confirmResolve = resolve;
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open', '');
+    });
+  }
+
   async function limparTodosSorteio(){
     if (!inscritos.length) {
       if (typeof notify === 'function') {
@@ -111,7 +203,9 @@
       return;
     }
 
-    const ok = window.confirm('Tem certeza que deseja apagar TODAS as inscrições do sorteio?');
+    const ok = await showSorteioConfirm(
+      'Tem certeza que deseja apagar TODAS as inscrições do sorteio? Essa ação não pode ser desfeita.'
+    );
     if (!ok) return;
 
     try {
