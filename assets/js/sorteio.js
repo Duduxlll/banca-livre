@@ -1,4 +1,4 @@
-(function () {
+(function () { 
   const API = window.location.origin;
 
   let inscritos = [];
@@ -33,6 +33,8 @@
       console.error('Erro ao carregar inscritos do sorteio', err);
       if (!silent && typeof notify === 'function') {
         notify('Erro ao carregar inscritos do sorteio.', 'error');
+      } else if (!silent) {
+        window.alert('Erro ao carregar inscritos do sorteio.');
       }
     }
   }
@@ -74,46 +76,64 @@
   }
 
   async function excluirInscritoSorteio(id){
-    if (!confirm('Remover este inscrito do sorteio?')) return;
+    const ok = window.confirm('Remover este inscrito do sorteio?');
+    if (!ok) return;
+
     try {
       const res = await fetch(`${API}/api/sorteio/inscricoes/${id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
-      if (!data.ok) throw new Error();
+      if (!data || data.ok !== true) throw new Error('Resposta inválida da API');
+
       inscritos = inscritos.filter(i => i.id !== id);
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
+
       if (typeof notify === 'function') {
         notify('Inscrito removido do sorteio.', 'ok');
       }
     } catch (err) {
-      alert('Erro ao excluir inscrito do sorteio');
+      console.error('Erro ao excluir inscrito do sorteio', err);
       if (typeof notify === 'function') {
-        notify('Erro ao excluir inscrito.', 'error');
+        notify('Erro ao excluir inscrito do sorteio.', 'error');
+      } else {
+        window.alert('Erro ao excluir inscrito do sorteio.');
       }
     }
   }
 
   async function limparTodosSorteio(){
-    if (!inscritos.length) return;
-    if (!confirm('Tem certeza que deseja apagar TODAS as inscrições do sorteio?')) return;
+    if (!inscritos.length) {
+      if (typeof notify === 'function') {
+        notify('Não há inscrições para limpar.', 'error');
+      }
+      return;
+    }
+
+    const ok = window.confirm('Tem certeza que deseja apagar TODAS as inscrições do sorteio?');
+    if (!ok) return;
+
     try {
       const res = await fetch(`${API}/api/sorteio/inscricoes`, {
         method: 'DELETE'
       });
       const data = await res.json();
-      if (!data.ok) throw new Error();
+      if (!data || data.ok !== true) throw new Error('Resposta inválida da API');
+
       inscritos = [];
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
+
       if (typeof notify === 'function') {
         notify('Todas as inscrições do sorteio foram removidas.', 'ok');
       }
     } catch (err) {
-      alert('Erro ao limpar inscrições do sorteio');
+      console.error('Erro ao limpar inscrições do sorteio', err);
       if (typeof notify === 'function') {
         notify('Erro ao limpar inscrições do sorteio.', 'error');
+      } else {
+        window.alert('Erro ao limpar inscrições do sorteio.');
       }
     }
   }
@@ -298,8 +318,8 @@
     box.style.boxShadow = '0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04)';
     box.style.padding = '18px';
     box.style.color = '#e7e9f3';
-    box.innerHTML = ''
-      + '<h3 style="margin:0 0 6px;font-weight:800">ID do vencedor</h3>'
+    box.innerHTML =
+        '<h3 style="margin:0 0 6px;font-weight:800">ID do vencedor</h3>'
       + '<p style="margin:0 0 4px;font-size:0.9rem;color:#cfd2e8">'
       + 'Use esse ID para confirmar com a pessoa na live.'
       + '</p>'
@@ -375,6 +395,8 @@
       if (!ultimoVencedor || !ultimoVencedor.mensagem) {
         if (typeof notify === 'function') {
           notify('Nenhum ID disponível para este vencedor.', 'error');
+        } else {
+          window.alert('Nenhum ID disponível para este vencedor.');
         }
         return;
       }
