@@ -10,7 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="assets/css/area.css">
-  
   <link rel="stylesheet" href="assets/css/sorteio.css">
 </head>
 <body>
@@ -38,7 +37,6 @@
         <button class="nav-btn active" data-tab="bancas">Bancas</button>
         <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
         <button class="nav-btn" data-tab="extratos">Extratos</button>
-        
         <button class="nav-btn" data-tab="sorteio">Sorteio</button>
 
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
@@ -49,8 +47,37 @@
 
     <section class="content">
       
-      
       <div class="tab tab-view show" id="tab-bancas">
+
+        <div class="card card-add-banca">
+          <form id="formAddBanca" class="add-banca-form">
+            <div class="add-banca-header">
+              <h3>Adicionar banca</h3>
+              <span class="add-banca-hint">Crie uma banca manual informando depósito e PIX da pessoa.</span>
+            </div>
+
+            <div class="add-banca-grid">
+              <div class="add-banca-field">
+                <label for="addNome">Nome</label>
+                <input id="addNome" type="text" placeholder="ex: dudufpss" required>
+              </div>
+
+              <div class="add-banca-field">
+                <label for="addDeposito">Depósito (R$)</label>
+                <input id="addDeposito" type="text" inputmode="decimal" placeholder="ex: 50,00">
+              </div>
+
+              <div class="add-banca-field">
+                <label for="addPix">PIX da pessoa</label>
+                <input id="addPix" type="text" placeholder="chave PIX (e-mail, CPF, tel…)">
+              </div>
+            </div>
+
+            <div class="add-banca-footer">
+              <button type="submit" class="btn btn--primary">Salvar banca</button>
+            </div>
+          </form>
+        </div>
 
         <div class="bar totbar">
           <input
@@ -68,7 +95,6 @@
               Soma das Bancas
             </button>
           </div>
-
         </div>
 
         <div class="card">
@@ -88,7 +114,6 @@
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -106,7 +131,6 @@
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-extratos">
 
         <div class="card">
@@ -190,7 +214,6 @@
 
       </div>
 
-      
       <div class="tab tab-view" id="tab-sorteio">
         <div class="card sorteio-header-card">
           <div class="sorteio-header-admin">
@@ -271,7 +294,6 @@
   
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
-  
   <script src="assets/js/sorteio.js" defer></script>
 
 </body>

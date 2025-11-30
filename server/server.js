@@ -623,9 +623,7 @@ app.get('/qr', async (req, res) => {
 });
 
 
-// ====================== SORTEIO ======================
 
-// listar inscritos
 app.get('/api/sorteio/inscricoes', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -654,7 +652,7 @@ app.post('/api/sorteio/inscrever', async (req, res) => {
 
     return res.status(201).json({ ok: true });
   } catch (err) {
-    // código 23505 = unique_violation no Postgres
+    
     if (err.code === '23505') {
       return res.status(409).json({
         ok: false,
@@ -670,7 +668,7 @@ app.post('/api/sorteio/inscrever', async (req, res) => {
 
 
 
-// excluir UM inscrito
+
 app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -684,7 +682,7 @@ app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
   }
 });
 
-// apagar TODOS (opcional)
+
 app.delete('/api/sorteio/inscricoes', async (req, res) => {
   try {
     await pool.query('TRUNCATE TABLE sorteio_inscricoes');
@@ -692,6 +690,55 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   } catch (err) {
     console.error('DELETE /api/sorteio/inscricoes', err);
     res.status(500).json({ error: 'Erro ao limpar inscrições' });
+  }
+});
+
+app.post('/api/bancas/manual', async (req, res) => {
+  const { nome, depositoCents, pixKey } = req.body || {};
+
+  const nomeTrim = (nome || '').trim();
+  const deposito = Number(depositoCents || 0) | 0;
+  const pix = (pixKey || '').trim();
+
+  if (!nomeTrim || deposito <= 0) {
+    return res.status(400).json({ error: 'Nome e depósito são obrigatórios.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const insertBanca = await client.query(
+      `INSERT INTO bancas (nome, deposito_cents, banca_cents, pix_key)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, nome, deposito_cents, banca_cents, pix_key, message, created_at`,
+      [nomeTrim, deposito, deposito, pix || null]
+    );
+    const row = insertBanca.rows[0];
+
+    await client.query(
+      `INSERT INTO extratos (tipo, nome, valor_cents)
+       VALUES ($1, $2, $3)`,
+      ['deposito', nomeTrim, deposito]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      id: row.id,
+      nome: row.nome,
+      depositoCents: row.deposito_cents,
+      bancaCents: row.banca_cents,
+      pixKey: row.pix_key,
+      message: row.message,
+      createdAt: row.created_at
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao criar banca manual:', err);
+    return res.status(500).json({ error: 'Erro ao criar banca manual.' });
+  } finally {
+    client.release();
   }
 });
 

@@ -26,12 +26,10 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
-
 function debounce(fn, wait = 300){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
 }
-
 
 function toASCIIUpper(s = '') {
   const noMarks = s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
@@ -48,10 +46,9 @@ function cleanPixKey(raw = '') {
   return k;
 }
 
-
 function TLV(id, value) {
   const v = String(value ?? '');
-  const len = String(v.length).padStart(2, '0'); 
+  const len = String(v.length).padStart(2, '0');
   return `${id}${len}${v}`;
 }
 
@@ -84,13 +81,13 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   );
 
   const payloadSemCRC =
-      TLV('00','01') +                                     
-      TLV('01','11') +                                     
+      TLV('00','01') +
+      TLV('01','11') +
       mai +
-      TLV('52','0000') +                                   
-      TLV('53','986') +                                    
+      TLV('52','0000') +
+      TLV('53','986') +
       TLV('54', (Number(valorCents||0)/100).toFixed(2)) +
-      TLV('58', 'BR') +           
+      TLV('58', 'BR') +
       TLV('59', nomeOK) +
       TLV('60', cidadeOK) +
       TLV('62', TLV('05', txidOK)) +
@@ -100,11 +97,10 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   return payloadSemCRC + crc;
 }
 
-
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
-const tabSorteioEl    = qs('#tab-sorteio'); // NOVO
+const tabSorteioEl    = qs('#tab-sorteio');
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -121,6 +117,11 @@ const filtroFrom  = qs('#filtro-from');
 const filtroTo    = qs('#filtro-to');
 const btnFiltrar  = qs('#btn-filtrar');
 const btnLimpar   = qs('#btn-limpar');
+
+const formAddBanca = qs('#formAddBanca');
+const inputAddNome = qs('#addNome');
+const inputAddDeposito = qs('#addDeposito');
+const inputAddPix = qs('#addPix');
 
 let TAB = localStorage.getItem('area_tab') || 'bancas';
 const STATE = {
@@ -315,32 +316,25 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-
     renderBancas();
     updateTotals();
-
   } else if (TAB === 'pagamentos') {
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-
     renderPagamentos();
-
   } else if (TAB === 'extratos') {
     tabExtratosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-
     renderExtratos();
-
   } else if (TAB === 'sorteio') {
     tabSorteioEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
-    // o conteúdo da aba é controlado pelo sorteio.js
   }
 }
 
@@ -474,7 +468,6 @@ async function refresh(){
   } else if (TAB==='extratos'){
     await loadExtratos();
   } else if (TAB==='sorteio') {
-    // Sorteio usa sorteio.js pra carregar a lista, aqui não precisa fazer nada
   }
   render();
 }
@@ -555,7 +548,6 @@ function setupAutoDeleteTimers(){
   });
 }
 
-
 let payPixModalEl = null;
 
 function ensurePayPixModal() {
@@ -619,7 +611,7 @@ function abrirPixModal(id){
     valorCents: Number(p.pagamentoCents || 0),
     nome: p.nome || 'RECEBEDOR',
     cidade: 'BRASILIA',
-    txid: '***' 
+    txid: '***'
   });
 
   const dlg = ensurePayPixModal();
@@ -632,13 +624,12 @@ function abrirPixModal(id){
   const url  = `${API}/qr?size=${size}&data=${encodeURIComponent(emv)}`;
   img.style.display = '';
   img.removeAttribute('src');
-  img.onerror = () => { img.style.display = 'none'; }; 
+  img.onerror = () => { img.style.display = 'none'; };
   img.src = url;
 
   if (typeof dlg.showModal === 'function') dlg.showModal();
   else dlg.setAttribute('open', '');
 }
-
 
 let msgModalEl = null;
 function injectOnce(id, css){
@@ -696,7 +687,6 @@ function abrirMensagem(texto){
   p.textContent = (texto && String(texto).trim()) ? String(texto) : '(sem mensagem)';
   dlg.showModal();
 }
-
 
 let statusMenuEl = null;
 let statusMenuId = null;
@@ -779,7 +769,7 @@ document.addEventListener('click', (e)=>{
 });
 
 document.addEventListener('click', (e)=>{
-  const btn = e.target.closest('button[data-action]');  
+  const btn = e.target.closest('button[data-action]');
   if(!btn) return;
   const {action, id} = btn.dataset;
   if(action==='to-pagamento') return toPagamento(id).catch(console.error);
@@ -922,11 +912,63 @@ function startStream(){
   };
 }
 
+async function handleAddBancaSubmit(ev){
+  ev.preventDefault();
+  if (!inputAddNome || !formAddBanca) return;
+
+  const nome = (inputAddNome.value || '').trim();
+  const depositoStr = inputAddDeposito?.value || '';
+  const pixKeyRaw = inputAddPix?.value || '';
+
+  const depositoCents = toCents(depositoStr);
+  const pixKey = cleanPixKey(pixKeyRaw);
+
+  if (!nome) {
+    if (typeof notify === 'function') notify('Informe o nome.', 'error');
+    inputAddNome.focus();
+    return;
+  }
+  if (!depositoCents) {
+    if (typeof notify === 'function') notify('Informe o depósito.', 'error');
+    if (inputAddDeposito) inputAddDeposito.focus();
+    return;
+  }
+
+  const submitBtn = formAddBanca.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    await apiFetch('/api/bancas/manual', {
+      method:'POST',
+      body: JSON.stringify({
+        nome,
+        depositoCents,
+        pixKey
+      })
+    });
+
+    formAddBanca.reset();
+    await Promise.all([loadBancas(), loadPagamentos(), loadExtratos()]);
+    render();
+    setupAutoDeleteTimers();
+    if (typeof notify === 'function') notify('Banca adicionada com sucesso.', 'ok');
+  } catch (err) {
+    console.error(err);
+    if (typeof notify === 'function') notify('Erro ao adicionar banca.', 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async ()=>{
   qsa('.nav-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.tab === TAB);
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
+
+  if (formAddBanca) {
+    formAddBanca.addEventListener('submit', handleAddBancaSubmit);
+  }
 
   applyExtratoFiltersUIRules();
   readExtratoFiltersFromDOM();

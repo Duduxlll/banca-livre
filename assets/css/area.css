@@ -555,7 +555,7 @@ body{
   box-shadow:0 10px 26px rgba(255,122,0,.22);
 }
 
-/* ===== Modal PIX (pagar) ===== */
+
 dialog.pix-modal {
   border: 0;
   padding: 0;
@@ -615,4 +615,93 @@ dialog.pix-modal::backdrop {
   gap: 8px;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+
+.card-add-banca {
+  margin-bottom: 14px;
+}
+
+.add-banca-form {
+  display: grid;
+  gap: 10px;
+}
+
+.add-banca-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.add-banca-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.add-banca-hint {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.add-banca-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.6fr;
+  gap: 10px;
+}
+
+.add-banca-field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.86rem;
+}
+
+.add-banca-field label {
+  opacity: 0.85;
+}
+
+.add-banca-field input {
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 180, 120, 0.32);
+  background: radial-gradient(circle at top, #241108, #140805);
+  padding: 6px 10px;
+  color: #f9f3ea;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+}
+
+.add-banca-field input::placeholder {
+  color: rgba(249, 243, 234, 0.5);
+}
+
+.add-banca-field input:focus {
+  border-color: #ffb84a;
+  box-shadow: 0 0 0 1px rgba(255, 180, 120, 0.5);
+  background: radial-gradient(circle at top, #2c160a, #160906);
+}
+
+.add-banca-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.add-banca-footer .btn {
+  padding-inline: 18px;
+  height: 34px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .add-banca-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .add-banca-grid {
+    grid-template-columns: 1fr;
+  }
 }
