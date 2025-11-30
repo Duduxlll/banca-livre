@@ -26,6 +26,7 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
+// formata valor em um input tipo dinheiro (R$)
 function formatMoneyInputEl(inp){
   if (!inp) return;
   let v = String(inp.value || '').replace(/\D/g,'');
@@ -38,15 +39,46 @@ function formatMoneyInputEl(inp){
   inp.value = fmtBRL(parseInt(v,10));
 }
 
+// normaliza chave pra salvar no banco (sem pontuação)
 function normalizePixKeyByType(type, raw){
   let v = String(raw || '').trim();
   if (!v) return '';
   if (type === 'cpf' || type === 'phone') {
-    v = v.replace(/\D/g,'');
+    v = v.replace(/\D/g,''); // só dígitos
   } else if (type === 'email') {
     v = v.toLowerCase();
   }
   return v;
+}
+
+// máscara bonita de CPF
+function formatCPF(raw){
+  const d = String(raw || '').replace(/\D/g,'').slice(0,11);
+  const p1 = d.slice(0,3);
+  const p2 = d.slice(3,6);
+  const p3 = d.slice(6,9);
+  const p4 = d.slice(9,11);
+  let out = '';
+  if (p1) out = p1;
+  if (p2) out += '.' + p2;
+  if (p3) out += '.' + p3;
+  if (p4) out += '-' + p4;
+  return out;
+}
+
+// máscara bonita de telefone brasileiro (DDD + número)
+function formatPhoneBR(raw){
+  let d = String(raw || '').replace(/\D/g,'').slice(-11); // pega últimos 11 dígitos
+  const has9 = d.length === 11;
+  const ddd  = d.slice(0,2);
+  const meio = has9 ? d.slice(2,7) : d.slice(2,6);
+  const fim  = has9 ? d.slice(7)   : d.slice(6);
+  let out = '';
+  if (ddd) out = `(${ddd}`;
+  if (ddd && (meio || fim)) out += ') ';
+  if (meio) out += meio;
+  if (fim) out += '-' + fim;
+  return out;
 }
 
 function debounce(fn, wait = 300){
@@ -87,8 +119,31 @@ function crc16_ccitt(payload) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '***' }) {
-  const chaveOK  = cleanPixKey(chave);
+// normaliza telefone pra payload PIX: +55DDDNÚMERO (E.164)
+function formatPixPhoneForPayload(raw){
+  let d = String(raw || '').replace(/\D/g,'');
+  if (!d) return '';
+  // garante que tenha DDI 55
+  if (!d.startsWith('55')) {
+    // se vier só com DDD + número, cola 55 na frente
+    if (d.length >= 10 && d.length <= 11) {
+      d = '55' + d;
+    }
+  }
+  return '+' + d;
+}
+
+function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '***', tipo = null }) {
+  let chaveOK;
+
+  if (tipo === 'phone') {
+    chaveOK = formatPixPhoneForPayload(chave);
+  } else if (tipo === 'cpf') {
+    chaveOK = String(chave || '').replace(/\D/g,'');
+  } else {
+    chaveOK = cleanPixKey(chave);
+  }
+
   const nomeOK   = toASCIIUpper((nome || 'RECEBEDOR')).slice(0, 25) || 'RECEBEDOR';
   const cidadeOK = toASCIIUpper(cidade || 'BRASILIA').slice(0, 15) || 'BRASILIA';
 
@@ -140,6 +195,9 @@ const filtroFrom  = qs('#filtro-from');
 const filtroTo    = qs('#filtro-to');
 const btnFiltrar  = qs('#btn-filtrar');
 const btnLimpar   = qs('#btn-limpar');
+
+// sobrou do layout antigo, não usamos mais o form direto na tela
+const formAddBanca = qs('#formAddBanca');
 
 let TAB = localStorage.getItem('area_tab') || 'bancas';
 const STATE = {
@@ -629,7 +687,8 @@ function abrirPixModal(id){
     valorCents: Number(p.pagamentoCents || 0),
     nome: p.nome || 'RECEBEDOR',
     cidade: 'BRASILIA',
-    txid: '***'
+    txid: '***',
+    tipo: p.pixType || null
   });
 
   const dlg = ensurePayPixModal();
@@ -841,8 +900,8 @@ function ensureAddBancaModal(){
   });
   dlg.addEventListener('cancel', (e)=>{ e.preventDefault(); dlg.close(); });
 
-  const form = dlg.querySelector('#addBancaForm');
-  const depInput = dlg.querySelector('#addBancaDeposito');
+  const form      = dlg.querySelector('#addBancaForm');
+  const depInput  = dlg.querySelector('#addBancaDeposito');
   const pixTypeEl = dlg.querySelector('#addPixType');
   const pixKeyEl  = dlg.querySelector('#addPixKey');
 
@@ -859,12 +918,29 @@ function ensureAddBancaModal(){
       else pixKeyEl.placeholder = 'chave PIX (e-mail, CPF, tel.)';
     };
     pixTypeEl.addEventListener('change', ()=>{
-      pixKeyEl.value = normalizePixKeyByType(pixTypeEl.value, pixKeyEl.value);
+      // ao trocar tipo, normaliza e reaplica máscara
+      const t = pixTypeEl.value;
+      const digits = pixKeyEl.value.replace(/\D/g,'');
+      if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
+      else if (t === 'phone') pixKeyEl.value = formatPhoneBR(digits);
       updatePlaceholder();
     });
-    pixKeyEl.addEventListener('blur', ()=>{
-      pixKeyEl.value = normalizePixKeyByType(pixTypeEl.value, pixKeyEl.value);
+
+    pixKeyEl.addEventListener('input', ()=>{
+      const t = pixTypeEl.value;
+      const digits = pixKeyEl.value.replace(/\D/g,'');
+      if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
+      else if (t === 'phone') pixKeyEl.value = formatPhoneBR(digits);
     });
+
+    pixKeyEl.addEventListener('blur', ()=>{
+      // ao sair do campo, apenas normaliza internamente depois no submit
+      const t = pixTypeEl.value;
+      const digits = pixKeyEl.value.replace(/\D/g,'');
+      if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
+      else if (t === 'phone') pixKeyEl.value = formatPhoneBR(digits);
+    });
+
     updatePlaceholder();
   }
 
@@ -877,15 +953,15 @@ function ensureAddBancaModal(){
 async function handleAddBancaSubmit(e){
   e.preventDefault();
   const dlg = ensureAddBancaModal();
-  const nomeEl = dlg.querySelector('#addBancaNome');
-  const depEl  = dlg.querySelector('#addBancaDeposito');
+  const nomeEl    = dlg.querySelector('#addBancaNome');
+  const depEl     = dlg.querySelector('#addBancaDeposito');
   const pixTypeEl = dlg.querySelector('#addPixType');
   const pixKeyEl  = dlg.querySelector('#addPixKey');
 
-  const nome = String(nomeEl.value || '').trim();
+  const nome     = String(nomeEl.value || '').trim();
   const depositoCents = toCents(depEl.value);
-  const pixType = pixTypeEl.value || '';
-  const pixKey  = normalizePixKeyByType(pixType, pixKeyEl.value);
+  const pixType  = pixTypeEl.value || '';
+  const pixKey   = normalizePixKeyByType(pixType, pixKeyEl.value);
 
   if (!nome || !depositoCents) {
     if (typeof notify === 'function') notify('Preencha nome e depósito.', 'error');
@@ -899,11 +975,11 @@ async function handleAddBancaSubmit(e){
   try{
     await apiFetch('/api/bancas/manual', {
       method:'POST',
-      body: JSON.stringify({ nome, depositoCents, pixKey })
+      body: JSON.stringify({ nome, depositoCents, pixKey, pixType })
     });
 
-    nomeEl.value = '';
-    depEl.value  = '';
+    nomeEl.value    = '';
+    depEl.value     = '';
     pixTypeEl.value = '';
     pixKeyEl.value  = '';
 
@@ -1148,17 +1224,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
 
+  // botão "Adicionar banca" (lado das somas)
   const btnAddBanca = qs('#btnAddBanca');
   if (btnAddBanca) {
     btnAddBanca.addEventListener('click', ()=>{
       const dlg = ensureAddBancaModal();
-      const nomeEl = dlg.querySelector('#addBancaNome');
-      const depEl  = dlg.querySelector('#addBancaDeposito');
+      const nomeEl    = dlg.querySelector('#addBancaNome');
+      const depEl     = dlg.querySelector('#addBancaDeposito');
       const pixTypeEl = dlg.querySelector('#addPixType');
       const pixKeyEl  = dlg.querySelector('#addPixKey');
 
-      if (nomeEl) nomeEl.value = '';
-      if (depEl)  depEl.value  = '';
+      if (nomeEl)    nomeEl.value = '';
+      if (depEl)     depEl.value  = '';
       if (pixTypeEl) pixTypeEl.value = '';
       if (pixKeyEl)  pixKeyEl.value  = '';
 

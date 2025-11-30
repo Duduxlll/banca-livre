@@ -693,14 +693,13 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-app.post('/api/bancas/manual', areaAuth, async (req, res) => {
-  const { nome, depositoCents, pixKey } = req.body || {};
+app.post('/api/bancas/manual', async (req, res) => {
+  const { nome, depositoCents, pixKey, pixType } = req.body || {};
 
-  const nomeTrim = String(nome || '').trim();
-  const deposito = Number.isFinite(Number(depositoCents))
-    ? Number(depositoCents)
-    : 0;
-  const pix = String(pixKey || '').trim() || null;
+  const nomeTrim = (nome || '').trim();
+  const deposito = Number(depositoCents || 0) | 0;
+  const pix = (pixKey || '').trim();
+  const pixTypeNorm = ['email','cpf','phone','random'].includes(pixType) ? pixType : null;
 
   if (!nomeTrim || deposito <= 0) {
     return res.status(400).json({ error: 'Nome e depósito são obrigatórios.' });
@@ -708,46 +707,43 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
 
   const client = await pool.connect();
   try {
-    await client.query('begin');
-
-    const idBanca = uid();
+    await client.query('BEGIN');
 
     const insertBanca = await client.query(
-      `insert into bancas
-         (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7, now())
-       returning id, nome,
-                 deposito_cents as "depositoCents",
-                 banca_cents    as "bancaCents",
-                 pix_type       as "pixType",
-                 pix_key        as "pixKey",
-                 message        as "message",
-                 created_at     as "createdAt"`,
-      [idBanca, nomeTrim, deposito, deposito, null, pix, null]
+      `INSERT INTO bancas (nome, deposito_cents, banca_cents, pix_type, pix_key)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at`,
+      [nomeTrim, deposito, deposito, pixTypeNorm, pix || null]
     );
-    const banca = insertBanca.rows[0];
+    const row = insertBanca.rows[0];
 
     await client.query(
-      `insert into extratos
-         (id, ref_id, nome, tipo, valor_cents, created_at)
-       values ($1,$2,$3,'deposito',$4, now())`,
-      [uid(), idBanca, nomeTrim, deposito]
+      `INSERT INTO extratos (tipo, nome, valor_cents)
+       VALUES ($1, $2, $3)`,
+      ['deposito', nomeTrim, deposito]
     );
 
-    await client.query('commit');
+    await client.query('COMMIT');
 
-    sseSendAll('extratos-changed', { reason: 'deposito-manual-area' });
-    sseSendAll('bancas-changed',   { reason: 'insert-manual-area' });
-
-    return res.status(201).json({ ok: true, ...banca });
+    return res.status(201).json({
+      id: row.id,
+      nome: row.nome,
+      depositoCents: row.deposito_cents,
+      bancaCents: row.banca_cents,
+      pixType: row.pix_type,
+      pixKey: row.pix_key,
+      message: row.message,
+      createdAt: row.created_at
+    });
   } catch (err) {
-    await client.query('rollback');
+    await client.query('ROLLBACK');
     console.error('Erro ao criar banca manual:', err);
     return res.status(500).json({ error: 'Erro ao criar banca manual.' });
   } finally {
     client.release();
   }
 });
+
 
 
 
