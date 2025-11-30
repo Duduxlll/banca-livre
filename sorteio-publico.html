@@ -9,9 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Pode reaproveitar seu style.css se quiser (cores globais, .wrap, etc) -->
   <link rel="stylesheet" href="assets/css/style.css">
-  <!-- CSS exclusivo do sorteio público -->
   <link rel="stylesheet" href="assets/css/sorteio-publico.css">
 </head>
 <body class="sp-body">
@@ -34,21 +32,18 @@
     <div class="sp-wrap">
       <section class="sp-card">
 
-        <!-- BANNER LÁ EM CIMA -->
         <div class="sp-banner">
-          <!-- Troca essa imagem pelo banner que você quiser -->
           <img src="assets/img/banner.jpg" alt="Sorteio Banquinhas" class="sp-banner-img">
           <div class="sp-banner-overlay"></div>
           <div class="sp-banner-text">
             <h2>Sorteio da Banca</h2>
             <p>
-              Preencha seu nome da Twitch para entrar na roleta do streamer.
-              Quanto mais organizado, mais fácil para ele conferir ao vivo.
+              Preencha seu nome da Twitch e o seu ID da live para entrar na roleta do streamer.
+              Guarde bem o ID, ele será usado para conferir o vencedor.
             </p>
           </div>
         </div>
 
-        <!-- CONTEÚDO DO PAINEL -->
         <div class="sp-card-body">
           <div class="sp-grid">
 
@@ -62,16 +57,25 @@
               <form id="sp-form" autocomplete="off" class="sp-form">
                 <label class="sp-field">
                   <span>Nome na Twitch <span class="sp-required">*</span></span>
-                  <input type="text" id="sp-nomeTwitch" maxlength="60"
-                         placeholder="ex: dudufpss" required>
+                  <input
+                    type="text"
+                    id="sp-nomeTwitch"
+                    maxlength="60"
+                    placeholder="ex: dudufpss"
+                    required>
                 </label>
 
                 <label class="sp-field">
-                  <span>Mensagem / Observação (opcional)</span>
-                  <textarea id="sp-mensagem" rows="3"
-                            placeholder="Ex: Sorteio da banca 50/50, quero jogar em tal jogo…"></textarea>
+                  <span>ID da live <span class="sp-required">*</span></span>
+                  <input
+                    type="text"
+                    id="sp-id"
+                    maxlength="60"
+                    placeholder="Digite seu ID único da live"
+                    required>
                   <small class="sp-help">
-                    Essa mensagem é só para o streamer se organizar. Não é obrigatória.
+                    Use o ID oficial que você tem na live (ex: ID da plataforma / do painel).
+                    Esse ID é único e usado para confirmar que você é o vencedor.
                   </small>
                 </label>
 
@@ -91,21 +95,23 @@
                   <strong>Preencha seu nome da Twitch</strong> exatamente igual ao que aparece na live.
                 </li>
                 <li>
-                  (Opcional) Escreva uma <strong>mensagem</strong> para o streamer se organizar
-                  com o sorteio, premiação, etc.
+                  Informe o <strong>seu ID da live</strong>. Ele deve ser único e apenas seu.
+                  Não compartilhe esse ID com outras pessoas.
                 </li>
                 <li>
                   Clique em <strong>Entrar no sorteio</strong>. Sua inscrição vai para o painel do streamer.
                 </li>
                 <li>
                   Na tela dele existe uma <strong>roleta gigante</strong> com todos os nomes.
-                  Ele gira ao vivo e o resultado sai na hora.
+                  Ele gira ao vivo e, quando alguém ganha, vê o <strong>ID do vencedor</strong>
+                  para conferir se está correto.
                 </li>
               </ol>
 
               <div class="sp-alert">
-                <strong>Atenção:</strong> enviar o formulário não garante prêmio.
-                O sorteio e as regras são definidos pelo streamer.
+                <strong>Atenção:</strong> cada ID só pode ser usado por
+                <strong>uma inscrição por vez</strong>. Se alguém tentar usar um ID que já está cadastrado,
+                o sistema bloqueia. O sorteio e as regras de premiação são definidos pelo streamer.
               </div>
             </div>
 
@@ -119,6 +125,8 @@
   <footer class="sp-footer">
     © <span id="sp-ano"></span> Banquinhas • Sorteios
   </footer>
+
+ <div class="toast" id="toast"></div>
 
   <script src="assets/js/sorteio-publico.js"></script>
 </body>

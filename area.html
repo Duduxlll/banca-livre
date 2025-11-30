@@ -212,8 +212,11 @@
               <div class="wheel-pointer"></div>
             </div>
             <button id="btnSorteioGirar" class="btn-girar">Girar roleta</button>
-            <div id="sorteioWinnerBox" class="winner-box">
-              Aguardando giro…
+            <div class="winner-box" id="sorteioWinnerBox">
+              <span id="sorteioWinnerLabel">Vencedor: —</span>
+              <button id="btnSorteioVerCodigo" class="btn-soft btn-soft-mini" style="margin-left:8px;display:none">
+                Ver ID
+              </button>
             </div>
           </div>
 
@@ -226,9 +229,8 @@
                 <thead>
                   <tr>
                     <th>Nome Twitch</th>
-                    <th>Mensagem</th>
                     <th>Data</th>
-                    <th></th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody id="tbodySorteio"></tbody>

@@ -639,31 +639,35 @@ app.get('/api/sorteio/inscricoes', async (req, res) => {
 });
 
 app.post('/api/sorteio/inscrever', async (req, res) => {
+  const { nome_twitch, mensagem } = req.body;
+
+  if (!nome_twitch || !mensagem) {
+    return res.status(400).json({ ok: false, error: 'nome_twitch e mensagem (ID) são obrigatórios.' });
+  }
+
   try {
-    const { nomeTwitch, mensagem } = req.body || {};
-
-    if (!nomeTwitch || !nomeTwitch.trim()) {
-      return res.status(400).json({ ok: false, error: 'Informe o nome da Twitch' });
-    }
-
-    const ip =
-      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-      req.socket.remoteAddress ||
-      null;
-
-    const { rows } = await pool.query(
-      `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem, ip)
-       VALUES ($1, $2, $3)
-       RETURNING id, nome_twitch, mensagem, criado_em`,
-      [nomeTwitch.trim(), (mensagem || '').trim() || null, ip]
+    await pool.query(
+      `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem)
+       VALUES ($1, $2)`,
+      [nome_twitch, mensagem]
     );
 
-    res.status(201).json({ ok: true, inscrito: rows[0] });
+    return res.status(201).json({ ok: true });
   } catch (err) {
-    console.error('POST /api/sorteio/inscrever', err);
-    res.status(500).json({ ok: false, error: 'Erro ao inscrever no sorteio' });
+    // código 23505 = unique_violation no Postgres
+    if (err.code === '23505') {
+      return res.status(409).json({
+        ok: false,
+        code: 'ID_DUPLICADO',
+        error: 'Esse ID já está cadastrado.'
+      });
+    }
+
+    console.error('Erro ao inserir inscrição do sorteio', err);
+    return res.status(500).json({ ok: false, error: 'Erro interno ao salvar inscrição.' });
   }
 });
+
 
 
 // excluir UM inscrito

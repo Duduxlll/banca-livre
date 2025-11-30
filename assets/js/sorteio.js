@@ -5,6 +5,7 @@
   let spinning = false;
   let startAngle = 0;
   let animId = null;
+  let ultimoVencedor = null;
 
   const canvas = document.getElementById('sorteioWheel');
   if (!canvas) return;
@@ -45,14 +46,11 @@
       tdNome.textContent = ins.nome_twitch;
       tr.appendChild(tdNome);
 
-      const tdMsg = document.createElement('td');
-      tdMsg.textContent = ins.mensagem || '—';
-      tr.appendChild(tdMsg);
-
       const tdData = document.createElement('td');
       const d = new Date(ins.criado_em);
-      tdData.innerHTML =
-        `<small>${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>`;
+      tdData.textContent =
+        `${d.toLocaleDateString('pt-BR')} ` +
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       tr.appendChild(tdData);
 
       const tdAcoes = document.createElement('td');
@@ -153,9 +151,9 @@
     const n = inscritos.length;
     const arc = (Math.PI * 2) / n;
     const pointerAngle = (3 * Math.PI) / 2;
+    const twoPi = Math.PI * 2;
 
     let diff = pointerAngle - angleFinal;
-    const twoPi = Math.PI * 2;
     diff = ((diff % twoPi) + twoPi) % twoPi;
 
     const idx = Math.floor(diff / arc);
@@ -171,12 +169,8 @@
       animId = null;
     }
 
-    const n = inscritos.length;
     const twoPi = Math.PI * 2;
-
-    const initialAngle =
-      ((startAngle % twoPi) + twoPi) % twoPi;
-
+    const initialAngle = ((startAngle % twoPi) + twoPi) % twoPi;
     const voltasExtras = 5 + Math.random() * 3;
     const offsetAleatorio = Math.random() * twoPi;
     const finalAngle = initialAngle + voltasExtras * twoPi + offsetAleatorio;
@@ -184,10 +178,13 @@
     const duration = 3500;
     const startTime = performance.now();
 
-    const winnerBox = document.getElementById('sorteioWinnerBox');
+    const winnerLabel = document.getElementById('sorteioWinnerLabel');
     const btnGirar = document.getElementById('btnSorteioGirar');
+    const btnVerCodigo = document.getElementById('btnSorteioVerCodigo');
 
-    if (winnerBox) winnerBox.textContent = 'Girando…';
+    if (winnerLabel) winnerLabel.textContent = 'Girando…';
+    if (btnVerCodigo) btnVerCodigo.style.display = 'none';
+
     if (btnGirar) {
       btnGirar.disabled = true;
       btnGirar.classList.add('is-spinning');
@@ -209,16 +206,27 @@
         animId = null;
         spinning = false;
 
-        const normalized =
-          ((startAngle % twoPi) + twoPi) % twoPi;
+        const normalized = ((startAngle % twoPi) + twoPi) % twoPi;
         startAngle = normalized;
 
         const winnerIndex = calcularIndiceVencedorPeloAngulo(normalized);
         const vencedor = inscritos[winnerIndex] || null;
+        ultimoVencedor = vencedor || null;
 
-        if (winnerBox) {
-          const nome = vencedor && vencedor.nome_twitch ? vencedor.nome_twitch : '';
-          winnerBox.innerHTML = `Vencedor: <strong>${nome}</strong>`;
+        if (winnerLabel) {
+          if (vencedor && vencedor.nome_twitch) {
+            winnerLabel.innerHTML = `Vencedor: <strong>${vencedor.nome_twitch}</strong>`;
+          } else {
+            winnerLabel.textContent = 'Vencedor: —';
+          }
+        }
+
+        if (btnVerCodigo) {
+          if (vencedor && vencedor.mensagem) {
+            btnVerCodigo.style.display = 'inline-block';
+          } else {
+            btnVerCodigo.style.display = 'none';
+          }
         }
 
         if (btnGirar) {
@@ -238,10 +246,23 @@
   const btnGirarEl = document.getElementById('btnSorteioGirar');
   const btnAtualizarEl = document.getElementById('btnSorteioAtualizar');
   const btnLimparEl = document.getElementById('btnSorteioLimpar');
+  const btnVerCodigoEl = document.getElementById('btnSorteioVerCodigo');
 
   if (btnGirarEl) btnGirarEl.addEventListener('click', girarRoletaSorteio);
   if (btnAtualizarEl) btnAtualizarEl.addEventListener('click', carregarInscritosSorteio);
   if (btnLimparEl) btnLimparEl.addEventListener('click', limparTodosSorteio);
+
+  if (btnVerCodigoEl) {
+    btnVerCodigoEl.addEventListener('click', () => {
+      if (!ultimoVencedor || !ultimoVencedor.mensagem) return;
+      const id = ultimoVencedor.mensagem;
+      if (typeof notify === 'function') {
+        notify(`ID do vencedor: ${id}`);
+      } else {
+        alert(`ID do vencedor: ${id}`);
+      }
+    });
+  }
 
   carregarInscritosSorteio();
 })();
