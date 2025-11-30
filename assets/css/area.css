@@ -463,27 +463,15 @@ body{
   border-top-right-radius:16px;
 }
 
-/* EXTRATOS: filtros + depósitos e pagamentos lado a lado */
-
-#tab-extratos .card{
-  display:grid;
-  grid-template-columns:1.1fr .9fr;
-  grid-template-rows:auto minmax(0,1fr);
-  grid-template-areas:
-    "bar bar"
-    "deps pags";
-  column-gap:20px;
-}
+/* EXTRATOS – filtros + colunas */
 
 #tab-extratos .card .bar{
-  grid-area:bar;
   display:grid !important;
   gap:12px !important;
   grid-template-columns:1fr !important;
   align-items:start;
   margin-bottom:8px !important;
 }
-
 #tab-extratos .card .bar>div:first-child{
   display:grid !important;
   gap:8px !important;
@@ -519,16 +507,15 @@ body{
 #tab-extratos #btn-filtrar.btn{min-width:160px}
 #tab-extratos #btn-limpar.btn{min-width:120px}
 
+/* aqui a mágica: depósitos e pagamentos lado a lado */
+
 #tab-extratos [data-card="deps"],
 #tab-extratos [data-card="pags"]{
-  margin-top:4px;
-}
-
-#tab-extratos [data-card="deps"]{
-  grid-area:deps;
-}
-#tab-extratos [data-card="pags"]{
-  grid-area:pags;
+  display:inline-block;
+  width:50%;
+  vertical-align:top;
+  margin-top:14px;
+  box-sizing:border-box;
 }
 
 #tab-extratos [data-card]>h3{
@@ -549,19 +536,11 @@ body{
   font-variant-numeric:tabular-nums;
 }
 
-/* Scroll individual das duas tabelas */
+/* scroll separado para cada lista */
 
-#tab-extratos{
-  min-height:0;
-}
-
-#tab-extratos [data-card="deps"] .table-wrap{
-  max-height:380px;
-  overflow-y:auto;
-  padding-right:6px;
-}
+#tab-extratos [data-card="deps"] .table-wrap,
 #tab-extratos [data-card="pags"] .table-wrap{
-  max-height:260px;
+  max-height:360px;
   overflow-y:auto;
   padding-right:6px;
 }
@@ -580,7 +559,7 @@ body{
   border-radius:999px;
 }
 
-/* Responsivo: empilha em telas menores */
+/* responsivo: em telas menores volta a ficar um embaixo do outro */
 
 @media(max-width:1100px){
   #tab-extratos .card .bar>div:first-child{
@@ -593,14 +572,10 @@ body{
 }
 
 @media(max-width:900px){
-  #tab-extratos .card{
-    grid-template-columns:1fr;
-    grid-template-rows:auto auto auto;
-    grid-template-areas:
-      "bar"
-      "deps"
-      "pags";
-    row-gap:10px;
+  #tab-extratos [data-card="deps"],
+  #tab-extratos [data-card="pags"]{
+    display:block;
+    width:100%;
   }
   #tab-extratos [data-card="deps"] .table-wrap,
   #tab-extratos [data-card="pags"] .table-wrap{
@@ -617,7 +592,7 @@ body{
   }
 }
 
-/* Alturas para bancos/pagamentos (telas principais) */
+/* alturas gerais das outras tabelas */
 
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
@@ -638,12 +613,10 @@ dialog.pix-modal{
   padding:0;
   background:transparent;
 }
-
 dialog.pix-modal::backdrop{
   background:rgba(0,0,0,.55);
   backdrop-filter:blur(4px);
 }
-
 .pix-card{
   width:min(94vw,520px);
   color:var(--text,#e7e9f3);
@@ -653,40 +626,33 @@ dialog.pix-modal::backdrop{
   box-shadow:0 28px 80px rgba(0,0,0,.55);
   padding:16px;
 }
-
 .pix-title{
   margin:0 0 8px;
   font-weight:800;
 }
-
 .pix-qr-wrap{
   display:flex;
   justify-content:center;
   margin:8px 0 12px;
 }
-
 .pix-qr{
   display:block;
   width:240px;
   height:240px;
 }
-
 .pix-code{
   display:grid;
   grid-template-columns:1fr auto;
   gap:8px;
   align-items:center;
 }
-
 .pix-emv{
   width:100%;
 }
-
 .pix-status{
   margin:10px 0 0;
   color:var(--muted,#b3b8cc);
 }
-
 .pix-actions{
   display:flex;
   gap:8px;
@@ -694,50 +660,42 @@ dialog.pix-modal::backdrop{
   margin-top:12px;
 }
 
-/* Janela de adicionar banca */
+/* janela adicionar banca */
 
 .card-add-banca{
   margin-bottom:14px;
 }
-
 .add-banca-form{
   display:grid;
   gap:10px;
 }
-
 .add-banca-header{
   display:flex;
   flex-direction:column;
   gap:4px;
   margin-bottom:4px;
 }
-
 .add-banca-header h3{
   margin:0;
   font-size:1rem;
 }
-
 .add-banca-hint{
   font-size:.8rem;
   opacity:.75;
 }
-
 .add-banca-grid{
   display:grid;
   grid-template-columns:2fr 1fr 1fr 1.6fr;
   gap:10px;
 }
-
 .add-banca-field{
   display:grid;
   gap:4px;
   font-size:.86rem;
 }
-
 .add-banca-field label{
   opacity:.85;
 }
-
 .add-banca-field input{
   height:34px;
   border-radius:999px;
@@ -749,35 +707,29 @@ dialog.pix-modal::backdrop{
   outline:none;
   transition:border-color .16s,box-shadow .16s,background .16s;
 }
-
 .add-banca-field input::placeholder{
   color:rgba(249,243,234,.5);
 }
-
 .add-banca-field input:focus{
   border-color:#ffb84a;
   box-shadow:0 0 0 1px rgba(255,180,120,.5);
   background:radial-gradient(circle at top,#2c160a,#160906);
 }
-
 .add-banca-footer{
   display:flex;
   justify-content:flex-end;
   margin-top:4px;
 }
-
 .add-banca-footer .btn{
   padding-inline:18px;
   height:34px;
   font-size:.9rem;
 }
-
 @media(max-width:900px){
   .add-banca-grid{
     grid-template-columns:1fr 1fr;
   }
 }
-
 @media(max-width:600px){
   .add-banca-grid{
     grid-template-columns:1fr;

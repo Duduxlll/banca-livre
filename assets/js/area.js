@@ -26,7 +26,7 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
-// formata valor em um input tipo dinheiro (R$)
+
 function formatMoneyInputEl(inp){
   if (!inp) return;
   let v = String(inp.value || '').replace(/\D/g,'');
@@ -39,19 +39,19 @@ function formatMoneyInputEl(inp){
   inp.value = fmtBRL(parseInt(v,10));
 }
 
-// normaliza chave pra salvar no banco (sem pontuação)
+
 function normalizePixKeyByType(type, raw){
   let v = String(raw || '').trim();
   if (!v) return '';
   if (type === 'cpf' || type === 'phone') {
-    v = v.replace(/\D/g,''); // só dígitos
+    v = v.replace(/\D/g,''); 
   } else if (type === 'email') {
     v = v.toLowerCase();
   }
   return v;
 }
 
-// máscara bonita de CPF
+
 function formatCPF(raw){
   const d = String(raw || '').replace(/\D/g,'').slice(0,11);
   const p1 = d.slice(0,3);
@@ -66,9 +66,9 @@ function formatCPF(raw){
   return out;
 }
 
-// máscara bonita de telefone brasileiro (DDD + número)
+
 function formatPhoneBR(raw){
-  let d = String(raw || '').replace(/\D/g,'').slice(-11); // pega últimos 11 dígitos
+  let d = String(raw || '').replace(/\D/g,'').slice(-11); 
   const has9 = d.length === 11;
   const ddd  = d.slice(0,2);
   const meio = has9 ? d.slice(2,7) : d.slice(2,6);
@@ -119,13 +119,13 @@ function crc16_ccitt(payload) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-// normaliza telefone pra payload PIX: +55DDDNÚMERO (E.164)
+
 function formatPixPhoneForPayload(raw){
   let d = String(raw || '').replace(/\D/g,'');
   if (!d) return '';
-  // garante que tenha DDI 55
+ 
   if (!d.startsWith('55')) {
-    // se vier só com DDD + número, cola 55 na frente
+    
     if (d.length >= 10 && d.length <= 11) {
       d = '55' + d;
     }
@@ -196,7 +196,7 @@ const filtroTo    = qs('#filtro-to');
 const btnFiltrar  = qs('#btn-filtrar');
 const btnLimpar   = qs('#btn-limpar');
 
-// sobrou do layout antigo, não usamos mais o form direto na tela
+
 const formAddBanca = qs('#formAddBanca');
 
 let TAB = localStorage.getItem('area_tab') || 'bancas';
@@ -918,7 +918,7 @@ function ensureAddBancaModal(){
       else pixKeyEl.placeholder = 'chave PIX (e-mail, CPF, tel.)';
     };
     pixTypeEl.addEventListener('change', ()=>{
-      // ao trocar tipo, normaliza e reaplica máscara
+      
       const t = pixTypeEl.value;
       const digits = pixKeyEl.value.replace(/\D/g,'');
       if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
@@ -934,7 +934,7 @@ function ensureAddBancaModal(){
     });
 
     pixKeyEl.addEventListener('blur', ()=>{
-      // ao sair do campo, apenas normaliza internamente depois no submit
+      
       const t = pixTypeEl.value;
       const digits = pixKeyEl.value.replace(/\D/g,'');
       if (t === 'cpf')      pixKeyEl.value = formatCPF(digits);
