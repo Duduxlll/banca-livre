@@ -696,9 +696,9 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
 app.post('/api/bancas/manual', async (req, res) => {
   const { nome, depositoCents, pixKey, pixType } = req.body || {};
 
-  const nomeTrim = (nome || '').trim();
-  const deposito = Number(depositoCents || 0) | 0;
-  const pix = (pixKey || '').trim();
+  const nomeTrim    = (nome || '').trim();
+  const deposito    = Number(depositoCents || 0) | 0;
+  const pix         = (pixKey || '').trim();
   const pixTypeNorm = ['email','cpf','phone','random'].includes(pixType) ? pixType : null;
 
   if (!nomeTrim || deposito <= 0) {
@@ -709,31 +709,36 @@ app.post('/api/bancas/manual', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // gera id da banca
+    const bancaId = uid();
+
+    // cria a banca já com banca_cents = deposito_cents
     const insertBanca = await client.query(
-      `INSERT INTO bancas (nome, deposito_cents, banca_cents, pix_type, pix_key)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, now())
        RETURNING id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at`,
-      [nomeTrim, deposito, deposito, pixTypeNorm, pix || null]
+      [bancaId, nomeTrim, deposito, deposito, pixTypeNorm, pix || null]
     );
     const row = insertBanca.rows[0];
 
+    // registra extrato certinho (com id e ref_id)
     await client.query(
-      `INSERT INTO extratos (tipo, nome, valor_cents)
-       VALUES ($1, $2, $3)`,
-      ['deposito', nomeTrim, deposito]
+      `INSERT INTO extratos (id, ref_id, nome, tipo, valor_cents, created_at)
+       VALUES ($1, $2, $3, 'deposito', $4, now())`,
+      [uid(), row.id, nomeTrim, deposito]
     );
 
     await client.query('COMMIT');
 
     return res.status(201).json({
-      id: row.id,
-      nome: row.nome,
+      id:            row.id,
+      nome:          row.nome,
       depositoCents: row.deposito_cents,
-      bancaCents: row.banca_cents,
-      pixType: row.pix_type,
-      pixKey: row.pix_key,
-      message: row.message,
-      createdAt: row.created_at
+      bancaCents:    row.banca_cents,
+      pixType:       row.pix_type,
+      pixKey:        row.pix_key,
+      message:       row.message,
+      createdAt:     row.created_at
     });
   } catch (err) {
     await client.query('ROLLBACK');
