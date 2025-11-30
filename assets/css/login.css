@@ -1,12 +1,12 @@
 :root{
-  /* paleta quente */
-  --bg:#120a04;                 /* fundo geral (quase preto quente) */
-  --card:#1a120a;               /* cartão escuro quente */
+  
+  --bg:#120a04;                 
+  --card:#1a120a;               
   --text:#e7e9f3;
   --muted:#c8cbd6;
-  --brand:#FF7A00;              /* laranja principal */
-  --brand2:#FFC13A;             /* laranja/amarelo para gradiente */
-  --line:rgba(255,180,120,.16); /* linhas/sutilezas no tom quente */
+  --brand:#FF7A00;              
+  --brand2:#FFC13A;             
+  --line:rgba(255,180,120,.16); 
 }
 
 *{box-sizing:border-box}
@@ -15,7 +15,7 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
-  /* trocados os halos azuis por laranjas */
+  
   background:
     radial-gradient(900px 600px at -10% -10%, rgba(255,140,0,.20), transparent 60%),
     radial-gradient(900px 600px at 110% 10%, rgba(255,193,58,.14), transparent 60%),
@@ -48,7 +48,7 @@ label{display:block; margin:12px 0 8px; font-weight:600}
   width:100%;
   padding:12px 14px;
   border-radius:12px;
-  /* antes #0e1327 (azulado) -> âmbar escuro */
+  
   background:#161006;
   border:1px solid var(--line);
   color:var(--text);
@@ -65,7 +65,7 @@ label{display:block; margin:12px 0 8px; font-weight:600}
   padding:14px;
   border-radius:12px;
   border:0;
-  /* gradiente laranja */
+  
   background:linear-gradient(90deg, var(--brand), var(--brand2));
   color:#1b0e03;
   font-weight:800;

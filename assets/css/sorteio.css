@@ -1,4 +1,4 @@
-/* Layout geral da aba de sorteio */
+
 .sorteio-header-card {
   margin-bottom: 16px;
 }
@@ -43,7 +43,7 @@
   color: #ffb8c8;
 }
 
-/* grid roleta + lista */
+
 .sorteio-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -56,7 +56,7 @@
   border-radius: 18px;
 }
 
-/* Roleta */
+
 .wheel-wrapper {
   position: relative;
   display: flex;
@@ -70,10 +70,10 @@
   display: block;
 }
 
-/* Ponteiro estilo AppSorteos, em cima da roda */
+
 .wheel-pointer {
   position: absolute;
-  top: -10px;              /* encosta na borda superior do círculo */
+  top: -10px;              
   left: 50%;
   width: 40px;
   height: 30px;
@@ -82,7 +82,7 @@
   animation: pointerBounce 1.1s ease-in-out infinite;
 }
 
-/* círculo preto */
+
 .wheel-pointer::before {
   content: "";
   position: absolute;
@@ -96,7 +96,7 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
 }
 
-/* “bico” que aponta pra roda */
+
 .wheel-pointer::after {
   content: "";
   position: absolute;
@@ -109,7 +109,7 @@
   border-radius: 0 0 999px 999px;
 }
 
-/* animação suave pra dar vida ao ponteiro */
+
 @keyframes pointerBounce {
   0%, 100% {
     transform: translateX(-50%) translateY(0);
@@ -137,7 +137,7 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
-/* estado enquanto está girando / desabilitado */
+
 .btn-girar.is-spinning,
 .btn-girar:disabled {
   opacity: 0.6;
@@ -159,7 +159,7 @@
   color: #ffd76b;
 }
 
-/* Lista de inscritos */
+
 .sorteio-list {
   max-height: 420px;
   overflow: auto;
@@ -217,9 +217,80 @@
   border-radius: 6px;
 }
 
-/* responsivo */
+
 @media (max-width: 900px) {
   .sorteio-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+
+
+.sorteio-actions .btn-soft.is-loading{
+  position:relative;
+  opacity:0.7;
+  pointer-events:none;
+}
+
+.sorteio-actions .btn-soft.is-loading::after{
+  content:"";
+  position:absolute;
+  right:10px;
+  top:50%;
+  width:12px;
+  height:12px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,0.8);
+  border-top-color:transparent;
+  transform:translateY(-50%);
+  animation:spn .6s linear infinite;
+}
+
+@keyframes spn{
+  to{ transform:translateY(-50%) rotate(360deg); }
+}
+
+
+.winner-box.flash{
+  animation:winnerFlash 0.9s ease-out;
+}
+
+@keyframes winnerFlash{
+  0%{
+    box-shadow:0 0 0 0 rgba(255,215,107,0.9);
+  }
+  100%{
+    box-shadow:0 0 0 18px rgba(255,215,107,0);
+  }
+}
+
+
+.id-modal-code{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:rgba(0,0,0,0.45);
+  display:grid;
+  gap:8px;
+}
+
+.id-modal-label{
+  font-size:0.75rem;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  opacity:0.75;
+}
+
+.id-modal-value{
+  font-size:0.95rem;
+  word-break:break-all;
+}
+
+.id-modal-value--code{
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:0.9rem;
+  padding:4px 8px;
+  border-radius:8px;
+  background:rgba(255,180,120,0.12);
+  border:1px solid rgba(255,180,120,0.4);
 }

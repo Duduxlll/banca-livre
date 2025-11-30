@@ -17,19 +17,27 @@
     '#b39fff', '#7ecbff', '#80e8c2', '#c6ff8f'
   ];
 
-  async function carregarInscritosSorteio() {
+  async function carregarInscritosSorteio(silent){
     try {
       const res = await fetch(`${API}/api/sorteio/inscricoes`);
       inscritos = await res.json();
       if (!Array.isArray(inscritos)) inscritos = [];
+
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
+
+      if (!silent && typeof notify === 'function') {
+        notify('Lista de inscritos do sorteio atualizada.', 'ok');
+      }
     } catch (err) {
       console.error('Erro ao carregar inscritos do sorteio', err);
+      if (!silent && typeof notify === 'function') {
+        notify('Erro ao carregar inscritos do sorteio.', 'error');
+      }
     }
   }
 
-  function atualizarTabelaSorteio() {
+  function atualizarTabelaSorteio(){
     const tbody = document.getElementById('tbodySorteio');
     const totalEl = document.getElementById('sorteioTotalInscritos');
     if (!tbody || !totalEl) return;
@@ -65,7 +73,7 @@
     }
   }
 
-  async function excluirInscritoSorteio(id) {
+  async function excluirInscritoSorteio(id){
     if (!confirm('Remover este inscrito do sorteio?')) return;
     try {
       const res = await fetch(`${API}/api/sorteio/inscricoes/${id}`, {
@@ -76,12 +84,18 @@
       inscritos = inscritos.filter(i => i.id !== id);
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
+      if (typeof notify === 'function') {
+        notify('Inscrito removido do sorteio.', 'ok');
+      }
     } catch (err) {
       alert('Erro ao excluir inscrito do sorteio');
+      if (typeof notify === 'function') {
+        notify('Erro ao excluir inscrito.', 'error');
+      }
     }
   }
 
-  async function limparTodosSorteio() {
+  async function limparTodosSorteio(){
     if (!inscritos.length) return;
     if (!confirm('Tem certeza que deseja apagar TODAS as inscrições do sorteio?')) return;
     try {
@@ -93,12 +107,18 @@
       inscritos = [];
       atualizarTabelaSorteio();
       desenharRoletaSorteio();
+      if (typeof notify === 'function') {
+        notify('Todas as inscrições do sorteio foram removidas.', 'ok');
+      }
     } catch (err) {
       alert('Erro ao limpar inscrições do sorteio');
+      if (typeof notify === 'function') {
+        notify('Erro ao limpar inscrições do sorteio.', 'error');
+      }
     }
   }
 
-  function desenharRoletaSorteio() {
+  function desenharRoletaSorteio(){
     const w = canvas.width;
     const h = canvas.height;
     const cx = w / 2;
@@ -146,7 +166,7 @@
     ctx.fillText('SORTEIO', cx, cy + 6);
   }
 
-  function calcularIndiceVencedorPeloAngulo(angleFinal) {
+  function calcularIndiceVencedorPeloAngulo(angleFinal){
     if (!inscritos.length) return -1;
     const n = inscritos.length;
     const arc = (Math.PI * 2) / n;
@@ -160,7 +180,7 @@
     return idx % n;
   }
 
-  function girarRoletaSorteio() {
+  function girarRoletaSorteio(){
     if (spinning || !inscritos.length) return;
     spinning = true;
 
@@ -181,6 +201,7 @@
     const winnerLabel = document.getElementById('sorteioWinnerLabel');
     const btnGirar = document.getElementById('btnSorteioGirar');
     const btnVerCodigo = document.getElementById('btnSorteioVerCodigo');
+    const winnerBox = document.getElementById('sorteioWinnerBox');
 
     if (winnerLabel) winnerLabel.textContent = 'Girando…';
     if (btnVerCodigo) btnVerCodigo.style.display = 'none';
@@ -190,11 +211,11 @@
       btnGirar.classList.add('is-spinning');
     }
 
-    function easeOutCubic(t) {
+    function easeOutCubic(t){
       return 1 - Math.pow(1 - t, 3);
     }
 
-    function step(now) {
+    function step(now){
       const t = Math.min(1, (now - startTime) / duration);
       const eased = easeOutCubic(t);
       startAngle = initialAngle + (finalAngle - initialAngle) * eased;
@@ -215,7 +236,7 @@
 
         if (winnerLabel) {
           if (vencedor && vencedor.nome_twitch) {
-            winnerLabel.innerHTML = `Vencedor: <strong>${vencedor.nome_twitch}</strong>`;
+            winnerLabel.innerHTML = 'Vencedor: <strong>' + vencedor.nome_twitch + '</strong>';
           } else {
             winnerLabel.textContent = 'Vencedor: —';
           }
@@ -234,8 +255,14 @@
           btnGirar.classList.remove('is-spinning');
         }
 
+        if (winnerBox) {
+          winnerBox.classList.remove('flash');
+          void winnerBox.offsetWidth;
+          winnerBox.classList.add('flash');
+        }
+
         if (vencedor && typeof notify === 'function') {
-          notify(`Vencedor: ${vencedor.nome_twitch}`);
+          notify('Vencedor: ' + vencedor.nome_twitch, 'ok');
         }
       }
     }
@@ -243,26 +270,117 @@
     animId = requestAnimationFrame(step);
   }
 
-  const btnGirarEl = document.getElementById('btnSorteioGirar');
+  let idModalEl = null;
+
+  function ensureIdModal(){
+    if (idModalEl) return idModalEl;
+
+    if (typeof injectOnce === 'function') {
+      injectOnce('idModalBackdropCSS',
+        'dialog#idModal::backdrop{' +
+        'background:rgba(8,12,26,0.65);' +
+        'backdrop-filter:blur(6px) saturate(0.9);' +
+        '}'
+      );
+    }
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'idModal';
+    dlg.style.border = '0';
+    dlg.style.padding = '0';
+    dlg.style.background = 'transparent';
+
+    const box = document.createElement('div');
+    box.style.width = 'min(94vw,420px)';
+    box.style.background = 'linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04))';
+    box.style.border = '1px solid rgba(255,255,255,.18)';
+    box.style.borderRadius = '16px';
+    box.style.boxShadow = '0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04)';
+    box.style.padding = '18px';
+    box.style.color = '#e7e9f3';
+    box.innerHTML = ''
+      + '<h3 style="margin:0 0 6px;font-weight:800">ID do vencedor</h3>'
+      + '<p style="margin:0 0 4px;font-size:0.9rem;color:#cfd2e8">'
+      + 'Use esse ID para confirmar com a pessoa na live.'
+      + '</p>'
+      + '<div class="id-modal-code">'
+      + '  <div>'
+      + '    <div class="id-modal-label">Nome Twitch</div>'
+      + '    <div class="id-modal-value" data-id-nome>—</div>'
+      + '  </div>'
+      + '  <div>'
+      + '    <div class="id-modal-label">ID</div>'
+      + '    <div class="id-modal-value id-modal-value--code" data-id-valor>—</div>'
+      + '  </div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">'
+      + '  <button type="button" class="btn btn--ghost" data-action="close-id">Fechar</button>'
+      + '  <button type="button" class="btn btn--primary" data-action="copy-id">Copiar ID</button>'
+      + '</div>';
+
+    dlg.appendChild(box);
+    document.body.appendChild(dlg);
+
+    dlg.addEventListener('click', function(e){
+      const closeBtn = e.target.closest('[data-action="close-id"]');
+      const copyBtn  = e.target.closest('[data-action="copy-id"]');
+      if (closeBtn) dlg.close();
+      if (copyBtn) {
+        const valEl = dlg.querySelector('[data-id-valor]');
+        const text = (valEl && valEl.textContent || '').trim();
+        if (text) {
+          navigator.clipboard.writeText(text).then(function(){
+            if (typeof notify === 'function') {
+              notify('ID copiado para a área de transferência.', 'ok');
+            }
+          }).catch(function(){});
+        }
+      }
+    });
+
+    idModalEl = dlg;
+    return dlg;
+  }
+
+  function abrirIdModal(vencedor){
+    if (!vencedor) return;
+    const dlg = ensureIdModal();
+    const nomeEl  = dlg.querySelector('[data-id-nome]');
+    const valorEl = dlg.querySelector('[data-id-valor]');
+    if (nomeEl)  nomeEl.textContent = vencedor.nome_twitch || '—';
+    if (valorEl) valorEl.textContent = vencedor.mensagem || '—';
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else dlg.setAttribute('open', '');
+  }
+
+  const btnGirarEl     = document.getElementById('btnSorteioGirar');
   const btnAtualizarEl = document.getElementById('btnSorteioAtualizar');
-  const btnLimparEl = document.getElementById('btnSorteioLimpar');
+  const btnLimparEl    = document.getElementById('btnSorteioLimpar');
   const btnVerCodigoEl = document.getElementById('btnSorteioVerCodigo');
 
   if (btnGirarEl) btnGirarEl.addEventListener('click', girarRoletaSorteio);
-  if (btnAtualizarEl) btnAtualizarEl.addEventListener('click', carregarInscritosSorteio);
-  if (btnLimparEl) btnLimparEl.addEventListener('click', limparTodosSorteio);
 
-  if (btnVerCodigoEl) {
-    btnVerCodigoEl.addEventListener('click', () => {
-      if (!ultimoVencedor || !ultimoVencedor.mensagem) return;
-      const id = ultimoVencedor.mensagem;
-      if (typeof notify === 'function') {
-        notify(`ID do vencedor: ${id}`);
-      } else {
-        alert(`ID do vencedor: ${id}`);
-      }
+  if (btnAtualizarEl) {
+    btnAtualizarEl.addEventListener('click', async function(){
+      btnAtualizarEl.classList.add('is-loading');
+      await carregarInscritosSorteio(false);
+      btnAtualizarEl.classList.remove('is-loading');
     });
   }
 
-  carregarInscritosSorteio();
+  if (btnLimparEl) btnLimparEl.addEventListener('click', limparTodosSorteio);
+
+  if (btnVerCodigoEl) {
+    btnVerCodigoEl.addEventListener('click', function(){
+      if (!ultimoVencedor || !ultimoVencedor.mensagem) {
+        if (typeof notify === 'function') {
+          notify('Nenhum ID disponível para este vencedor.', 'error');
+        }
+        return;
+      }
+      abrirIdModal(ultimoVencedor);
+    });
+  }
+
+  carregarInscritosSorteio(true);
 })();

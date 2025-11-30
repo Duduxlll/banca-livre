@@ -186,12 +186,12 @@ footer{margin-top:36px; color:var(--muted); text-align:center; font-size:.9rem}
     padding: 16px 14px;
   }
 
-  /* Menos espaço em cima/baixo da página */
+  
   main{
     padding: 18px 0 48px;
   }
 
-  /* Card mais “justo” */
+  
   .card{
     border-radius: 14px;
   }
@@ -204,13 +204,13 @@ footer{margin-top:36px; color:var(--muted); text-align:center; font-size:.9rem}
     padding: 16px;
   }
 
-  /* Banner mais baixo e focado na parte de cima */
+  
   .banner{
-    min-height: 150px;              /* antes era 220px */
-    background-position: center top; /* foca mais no texto do banner */
+    min-height: 150px;              
+    background-position: center top; 
   }
 
-  /* Espaço menor entre as colunas quando vira 1 coluna só */
+  
   .grid{
     gap: 16px;
   }

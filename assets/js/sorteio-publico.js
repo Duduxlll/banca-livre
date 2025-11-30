@@ -75,7 +75,7 @@
 
       if (!res.ok) {
         if (res.status === 409 || (data && data.code === 'ID_DUPLICADO')) {
-          setStatus('Esse ID já está cadastrado no sorteio. Use o seu ID correto ou aguarde o streamer limpar a lista.', 'error');
+          setStatus('Esse ID já está cadastrado no sorteio. Use seu id certo.', 'error');
         } else {
           setStatus((data && data.error) || 'Erro ao enviar sua inscrição. Tente novamente.', 'error');
         }
@@ -87,7 +87,7 @@
         return;
       }
 
-      setStatus('Inscrição enviada! Guarde o seu ID, ele será usado para conferir o vencedor na live.', 'ok');
+      setStatus('Inscrição enviada! Aguarde o sorteio.', 'ok');
       nomeInput.value = '';
     } catch (err){
       console.error(err);
