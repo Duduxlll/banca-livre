@@ -62,7 +62,7 @@
 }
 
 .sp-main {
-  padding: 32px 0 40px;
+  padding: 24px 0 36px;
 }
 
 .sp-card {
@@ -73,7 +73,6 @@
   overflow: hidden;
 }
 
-/* BANNER 1300 x 440 – responsivo */
 .sp-banner {
   position: relative;
   aspect-ratio: 1300 / 440;
@@ -86,7 +85,7 @@
   height: 100%;
   object-fit: cover;
   transform: scale(1.03);
-  filter: blur(0.6px) brightness(0.82);
+  filter: brightness(0.9);
 }
 
 .sp-banner-overlay {
@@ -94,9 +93,9 @@
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.08) 0%,
-    rgba(5, 2, 1, 0.22) 45%,
-    rgba(5, 2, 1, 0.55) 100%
+    rgba(0, 0, 0, 0.02) 0%,
+    rgba(5, 2, 1, 0.12) 40%,
+    rgba(5, 2, 1, 0.28) 100%
   );
 }
 
@@ -297,8 +296,6 @@
   border-color: rgba(255, 92, 122, 0.9);
 }
 
-/* RESPONSIVO */
-
 @media (max-width: 840px) {
   .sp-header-inner {
     flex-direction: column;
@@ -328,6 +325,10 @@
 }
 
 @media (max-width: 480px) {
+  .sp-wrap {
+    padding: 0 10px;
+  }
+
   .sp-header-inner {
     padding: 10px 0;
     align-items: flex-start;
@@ -347,8 +348,16 @@
     width: 100%;
   }
 
+  .sp-main {
+    padding-top: 18px;
+  }
+
+  .sp-card {
+    border-radius: 14px;
+  }
+
   .sp-banner {
-    max-height: 220px;
+    max-height: 200px;
   }
 
   .sp-banner-img {
@@ -358,9 +367,9 @@
   .sp-banner-overlay {
     background: linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.06) 0%,
-      rgba(5, 2, 1, 0.18) 40%,
-      rgba(5, 2, 1, 0.5) 100%
+      rgba(0, 0, 0, 0.0) 0%,
+      rgba(5, 2, 1, 0.08) 35%,
+      rgba(5, 2, 1, 0.22) 100%
     );
   }
 
