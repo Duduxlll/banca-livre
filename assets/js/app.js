@@ -255,17 +255,17 @@ async function criarCobrancaPIX({ nome, cpf, valorCentavos }){
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const tipo = tipoSelect.value;
-  const chaveVal = (chaveInput?.value || '').trim();
+  const tipoRaw   = tipoSelect.value;
+  const chaveVal  = (chaveInput?.value || '').trim();
   const messageVal = (mensagemInput?.value || '').trim();
 
   let chaveOk = true;
-  if (tipo === 'cpf')        chaveOk = isCPFValid(chaveVal);
-  else if (tipo === 'email') chaveOk = isEmail(chaveVal);
-  else if (tipo === 'telefone') chaveOk = chaveVal.replace(/\D/g,'').length === 11;
-  else                        chaveOk = chaveVal.length >= 10;
+  if (tipoRaw === 'cpf')            chaveOk = isCPFValid(chaveVal);
+  else if (tipoRaw === 'email')     chaveOk = isEmail(chaveVal);
+  else if (tipoRaw === 'telefone')  chaveOk = chaveVal.replace(/\D/g,'').length === 11;
+  else                              chaveOk = chaveVal.length >= 10;
 
-  const nomeOk  = nomeInput.value.trim().length > 2;
+  const nomeOk        = nomeInput.value.trim().length > 2;
   const valorCentavos = toCentsMasked(valorInput.value);
   const valorOk       = valorCentavos >= 1;
 
@@ -279,7 +279,22 @@ form?.addEventListener('submit', async (e) => {
     return;
   }
 
-  const cpfParaEfi = (tipo === 'cpf') ? chaveVal : '';
+  const cpfParaEfi = (tipoRaw === 'cpf') ? chaveVal : '';
+
+  let tipoNorm = tipoRaw;
+  let chaveCanon = chaveVal;
+
+  if (tipoRaw === 'cpf') {
+    tipoNorm = 'cpf';
+    chaveCanon = chaveVal.replace(/\D/g,'');
+  } else if (tipoRaw === 'telefone') {
+    tipoNorm = 'phone';
+    chaveCanon = chaveVal.replace(/\D/g,'').slice(-11);
+  } else if (tipoRaw === 'email') {
+    tipoNorm = 'email';
+  } else if (tipoRaw === 'aleatoria') {
+    tipoNorm = 'random';
+  }
 
   try{
     btnSubmit && (btnSubmit.disabled = true);
@@ -316,16 +331,16 @@ form?.addEventListener('submit', async (e) => {
               tokenOrTxid,
               nome: nomeInput.value.trim(),
               valorCentavos,
-              tipo,
-              chave: chaveVal,
+              tipo: tipoNorm,
+              chave: chaveCanon,
               message: messageVal
             });
           }catch(_err){
             saveLocal({
               nome: nomeInput.value.trim(),
               valorCentavos,
-              tipo,
-              chave: chaveVal,
+              tipo: tipoNorm,
+              chave: chaveCanon,
               message: messageVal
             });
             notify('Servidor não confirmou o registro — salvo localmente.', true, 4200);
