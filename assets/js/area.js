@@ -349,42 +349,60 @@ async function loadPagamentos() {
   return STATE.pagamentos;
 }
 
-function buildExtratosQuery(){
+function buildExtratosQuery(tipoOverride = null){
   const f = STATE.filtrosExtratos || {};
   const params = new URLSearchParams();
-  if (f.tipo && f.tipo !== 'all') params.set('tipo', f.tipo);
-  if (f.range && f.range !== 'custom') {
-    params.set('range', f.range);
-  } else if (f.range === 'custom') {
+
+  const tipo = tipoOverride || f.tipo || 'all';
+  if (tipo && tipo !== 'all') {
+    params.set('tipo', tipo);
+  }
+
+  const range = f.range || 'last30';
+  if (range === 'custom') {
     if (f.from) params.set('from', f.from);
     if (f.to)   params.set('to',   f.to);
   } else {
-    params.set('range', 'last30');
+    params.set('range', range);
   }
+
   params.set('limit', '500');
   return params.toString();
 }
 
+
 async function loadExtratos(){
   if (!tabExtratosEl) return STATE.extratos;
-  const qsBase = buildExtratosQuery();
+
   const f = STATE.filtrosExtratos || {};
+
   if (!f.tipo || f.tipo === 'all') {
+    const qsDeps = buildExtratosQuery('deposito');
+    const qsPags = buildExtratosQuery('pagamento');
+
     const [deps, pags] = await Promise.all([
-      apiFetch(`/api/extratos?${qsBase}&tipo=deposito`),
-      apiFetch(`/api/extratos?${qsBase}&tipo=pagamento`)
+      apiFetch(`/api/extratos?${qsDeps}`),
+      apiFetch(`/api/extratos?${qsPags}`)
     ]);
+
     STATE.extratos.depositos  = deps;
     STATE.extratos.pagamentos = pags;
+
   } else if (f.tipo === 'deposito') {
-    STATE.extratos.depositos  = await apiFetch(`/api/extratos?${qsBase}&tipo=deposito`);
+    const qsDeps = buildExtratosQuery('deposito');
+    STATE.extratos.depositos  = await apiFetch(`/api/extratos?${qsDeps}`);
     STATE.extratos.pagamentos = [];
+
   } else if (f.tipo === 'pagamento') {
+    const qsPags = buildExtratosQuery('pagamento');
     STATE.extratos.depositos  = [];
-    STATE.extratos.pagamentos = await apiFetch(`/api/extratos?${qsBase}&tipo=pagamento`);
+    STATE.extratos.pagamentos = await apiFetch(`/api/extratos?${qsPags}`);
   }
+
   return STATE.extratos;
 }
+
+
 
 async function render(){
   if (TAB === 'bancas') {
