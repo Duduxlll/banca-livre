@@ -26,6 +26,29 @@ const fmtBRL  = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:
 const toCents = (s)=> { const d = (s||'').toString().replace(/\D/g,''); return d ? parseInt(d,10) : 0; };
 const esc     = (s='') => s.replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
+function formatMoneyInputEl(inp){
+  if (!inp) return;
+  let v = String(inp.value || '').replace(/\D/g,'');
+  if (!v) {
+    inp.value = '';
+    return;
+  }
+  v = v.replace(/^0+/, '');
+  if (v.length < 3) v = v.padStart(3,'0');
+  inp.value = fmtBRL(parseInt(v,10));
+}
+
+function normalizePixKeyByType(type, raw){
+  let v = String(raw || '').trim();
+  if (!v) return '';
+  if (type === 'cpf' || type === 'phone') {
+    v = v.replace(/\D/g,'');
+  } else if (type === 'email') {
+    v = v.toLowerCase();
+  }
+  return v;
+}
+
 function debounce(fn, wait = 300){
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
@@ -117,11 +140,6 @@ const filtroFrom  = qs('#filtro-from');
 const filtroTo    = qs('#filtro-to');
 const btnFiltrar  = qs('#btn-filtrar');
 const btnLimpar   = qs('#btn-limpar');
-
-const formAddBanca = qs('#formAddBanca');
-const inputAddNome = qs('#addNome');
-const inputAddDeposito = qs('#addDeposito');
-const inputAddPix = qs('#addPix');
 
 let TAB = localStorage.getItem('area_tab') || 'bancas';
 const STATE = {
@@ -688,6 +706,222 @@ function abrirMensagem(texto){
   dlg.showModal();
 }
 
+let addBancaModalEl = null;
+
+function ensureAddBancaModal(){
+  if (addBancaModalEl) return addBancaModalEl;
+
+  injectOnce('addBancaModalCSS', `
+    #addBancaModal::backdrop{
+      background: rgba(8,12,26,.65);
+      backdrop-filter: blur(6px) saturate(.9);
+    }
+    #addBancaModal{
+      border:0;
+      padding:0;
+      background:transparent;
+    }
+    .add-banca-card{
+      width:min(96vw,640px);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.15);
+      box-shadow:0 30px 90px rgba(0,0,0,.7);
+      padding:18px 18px 16px;
+      color:#e7e9f3;
+    }
+    .add-banca-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .add-banca-title{
+      margin:0;
+      font-size:1.1rem;
+      font-weight:800;
+    }
+    .add-banca-sub{
+      margin:2px 0 0;
+      font-size:0.8rem;
+      opacity:0.8;
+    }
+    .add-banca-close{
+      border:0;
+      background:transparent;
+      color:#f5f5f5;
+      font-size:20px;
+      line-height:1;
+      cursor:pointer;
+    }
+    .add-banca-form{
+      display:grid;
+      gap:10px;
+    }
+    .add-banca-row{
+      display:grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+      gap:10px;
+    }
+    .add-banca-field{
+      display:grid;
+      gap:4px;
+      font-size:0.85rem;
+    }
+    .add-banca-pix-row{
+      display:grid;
+      grid-template-columns:minmax(120px, .8fr) minmax(0, 1.4fr);
+      gap:8px;
+    }
+    .add-banca-actions{
+      margin-top:4px;
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+    }
+    @media (max-width: 600px){
+      .add-banca-row{ grid-template-columns: minmax(0,1fr); }
+      .add-banca-pix-row{ grid-template-columns:minmax(0,1fr); }
+    }
+  `);
+
+  const dlg = document.createElement('dialog');
+  dlg.id = 'addBancaModal';
+  dlg.innerHTML = `
+    <div class="add-banca-card">
+      <div class="add-banca-header">
+        <div>
+          <h3 class="add-banca-title">Adicionar banca</h3>
+          <p class="add-banca-sub">Crie uma banca manual informando depósito e PIX da pessoa.</p>
+        </div>
+        <button type="button" class="add-banca-close" data-add-banca-close>&times;</button>
+      </div>
+
+      <form id="addBancaForm" class="add-banca-form">
+        <div class="add-banca-row">
+          <div class="add-banca-field">
+            <label class="muted" for="addBancaNome">Nome</label>
+            <input id="addBancaNome" class="input" autocomplete="off" placeholder="ex: dudufpss">
+          </div>
+          <div class="add-banca-field">
+            <label class="muted" for="addBancaDeposito">Depósito (R$)</label>
+            <input id="addBancaDeposito" class="input" autocomplete="off" placeholder="ex: 50,00">
+          </div>
+        </div>
+
+        <div class="add-banca-field">
+          <label class="muted" for="addPixType">PIX da pessoa</label>
+          <div class="add-banca-pix-row">
+            <select id="addPixType" class="input">
+              <option value="">Tipo de chave</option>
+              <option value="email">E-mail</option>
+              <option value="cpf">CPF</option>
+              <option value="phone">Telefone</option>
+              <option value="random">Chave aleatória</option>
+            </select>
+            <input id="addPixKey" class="input" autocomplete="off" placeholder="chave PIX (e-mail, CPF, tel.)">
+          </div>
+        </div>
+
+        <div class="add-banca-actions">
+          <button type="button" class="btn btn--ghost" data-add-banca-close>Cancelar</button>
+          <button type="submit" class="btn btn--primary">Salvar banca</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(dlg);
+
+  dlg.addEventListener('click', (e)=>{
+    if (e.target === dlg || e.target.closest('[data-add-banca-close]')) {
+      dlg.close();
+    }
+  });
+  dlg.addEventListener('cancel', (e)=>{ e.preventDefault(); dlg.close(); });
+
+  const form = dlg.querySelector('#addBancaForm');
+  const depInput = dlg.querySelector('#addBancaDeposito');
+  const pixTypeEl = dlg.querySelector('#addPixType');
+  const pixKeyEl  = dlg.querySelector('#addPixKey');
+
+  if (depInput) {
+    depInput.addEventListener('input', ()=> formatMoneyInputEl(depInput));
+  }
+
+  if (pixTypeEl && pixKeyEl) {
+    const updatePlaceholder = ()=>{
+      const t = pixTypeEl.value;
+      if (t === 'email') pixKeyEl.placeholder = 'e-mail da pessoa';
+      else if (t === 'cpf') pixKeyEl.placeholder = 'CPF (somente números)';
+      else if (t === 'phone') pixKeyEl.placeholder = 'Telefone com DDD (somente números)';
+      else pixKeyEl.placeholder = 'chave PIX (e-mail, CPF, tel.)';
+    };
+    pixTypeEl.addEventListener('change', ()=>{
+      pixKeyEl.value = normalizePixKeyByType(pixTypeEl.value, pixKeyEl.value);
+      updatePlaceholder();
+    });
+    pixKeyEl.addEventListener('blur', ()=>{
+      pixKeyEl.value = normalizePixKeyByType(pixTypeEl.value, pixKeyEl.value);
+    });
+    updatePlaceholder();
+  }
+
+  form.addEventListener('submit', handleAddBancaSubmit);
+
+  addBancaModalEl = dlg;
+  return dlg;
+}
+
+async function handleAddBancaSubmit(e){
+  e.preventDefault();
+  const dlg = ensureAddBancaModal();
+  const nomeEl = dlg.querySelector('#addBancaNome');
+  const depEl  = dlg.querySelector('#addBancaDeposito');
+  const pixTypeEl = dlg.querySelector('#addPixType');
+  const pixKeyEl  = dlg.querySelector('#addPixKey');
+
+  const nome = String(nomeEl.value || '').trim();
+  const depositoCents = toCents(depEl.value);
+  const pixType = pixTypeEl.value || '';
+  const pixKey  = normalizePixKeyByType(pixType, pixKeyEl.value);
+
+  if (!nome || !depositoCents) {
+    if (typeof notify === 'function') notify('Preencha nome e depósito.', 'error');
+    else alert('Preencha nome e depósito.');
+    return;
+  }
+
+  const submitBtn = dlg.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try{
+    await apiFetch('/api/bancas/manual', {
+      method:'POST',
+      body: JSON.stringify({ nome, depositoCents, pixKey })
+    });
+
+    nomeEl.value = '';
+    depEl.value  = '';
+    pixTypeEl.value = '';
+    pixKeyEl.value  = '';
+
+    dlg.close();
+
+    await loadBancas();
+    render();
+    setupAutoDeleteTimers();
+    if (typeof notify === 'function') notify('Banca adicionada com sucesso.', 'ok');
+  }catch(err){
+    console.error(err);
+    if (typeof notify === 'function') notify('Erro ao criar banca manual.', 'error');
+    else alert('Erro ao criar banca manual.');
+  }finally{
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
 let statusMenuEl = null;
 let statusMenuId = null;
 
@@ -817,11 +1051,7 @@ async function saveBancaInline(inp){
 document.addEventListener('input', (e)=>{
   const inp = e.target.closest('input[data-role="banca"]');
   if(!inp) return;
-  let v = inp.value.replace(/\D/g,'');
-  if(!v){ inp.value=''; return; }
-  v = v.replace(/^0+/, '');
-  if(v.length<3) v = v.padStart(3,'0');
-  inp.value = fmtBRL(parseInt(v,10));
+  formatMoneyInputEl(inp);
 });
 
 document.addEventListener('keydown', (e)=>{
@@ -912,62 +1142,31 @@ function startStream(){
   };
 }
 
-async function handleAddBancaSubmit(ev){
-  ev.preventDefault();
-  if (!inputAddNome || !formAddBanca) return;
-
-  const nome = (inputAddNome.value || '').trim();
-  const depositoStr = inputAddDeposito?.value || '';
-  const pixKeyRaw = inputAddPix?.value || '';
-
-  const depositoCents = toCents(depositoStr);
-  const pixKey = cleanPixKey(pixKeyRaw);
-
-  if (!nome) {
-    if (typeof notify === 'function') notify('Informe o nome.', 'error');
-    inputAddNome.focus();
-    return;
-  }
-  if (!depositoCents) {
-    if (typeof notify === 'function') notify('Informe o depósito.', 'error');
-    if (inputAddDeposito) inputAddDeposito.focus();
-    return;
-  }
-
-  const submitBtn = formAddBanca.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.disabled = true;
-
-  try {
-    await apiFetch('/api/bancas/manual', {
-      method:'POST',
-      body: JSON.stringify({
-        nome,
-        depositoCents,
-        pixKey
-      })
-    });
-
-    formAddBanca.reset();
-    await Promise.all([loadBancas(), loadPagamentos(), loadExtratos()]);
-    render();
-    setupAutoDeleteTimers();
-    if (typeof notify === 'function') notify('Banca adicionada com sucesso.', 'ok');
-  } catch (err) {
-    console.error(err);
-    if (typeof notify === 'function') notify('Erro ao adicionar banca.', 'error');
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-  }
-}
-
 document.addEventListener('DOMContentLoaded', async ()=>{
   qsa('.nav-btn').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.tab === TAB);
     btn.addEventListener('click', ()=> setTab(btn.dataset.tab));
   });
 
-  if (formAddBanca) {
-    formAddBanca.addEventListener('submit', handleAddBancaSubmit);
+  const btnAddBanca = qs('#btnAddBanca');
+  if (btnAddBanca) {
+    btnAddBanca.addEventListener('click', ()=>{
+      const dlg = ensureAddBancaModal();
+      const nomeEl = dlg.querySelector('#addBancaNome');
+      const depEl  = dlg.querySelector('#addBancaDeposito');
+      const pixTypeEl = dlg.querySelector('#addPixType');
+      const pixKeyEl  = dlg.querySelector('#addPixKey');
+
+      if (nomeEl) nomeEl.value = '';
+      if (depEl)  depEl.value  = '';
+      if (pixTypeEl) pixTypeEl.value = '';
+      if (pixKeyEl)  pixKeyEl.value  = '';
+
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else dlg.setAttribute('open','');
+
+      nomeEl?.focus();
+    });
   }
 
   applyExtratoFiltersUIRules();
