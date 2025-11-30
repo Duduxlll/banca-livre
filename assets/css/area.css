@@ -463,8 +463,6 @@ body{
   border-top-right-radius:16px;
 }
 
-/* ========== EXTRATOS – NOVO DESIGN ========== */
-
 #tab-extratos .card:not([data-card]){
   padding:18px 18px 20px;
   display:grid;
@@ -473,7 +471,6 @@ body{
   gap:16px;
 }
 
-/* barra de filtros ocupa a linha inteira */
 #tab-extratos .card:not([data-card]) .bar{
   grid-column:1 / -1;
   margin-bottom:2px;
@@ -483,7 +480,6 @@ body{
   align-items:end !important;
 }
 
-/* campo de busca + botões embaixo */
 #tab-extratos .card:not([data-card]) .bar > div:last-child{
   grid-column:1 / -1;
   display:flex !important;
@@ -513,7 +509,6 @@ body{
 #tab-extratos #btn-filtrar.btn{min-width:160px}
 #tab-extratos #btn-limpar.btn{min-width:120px}
 
-/* dois cards lado a lado */
 #tab-extratos [data-card="deps"],
 #tab-extratos [data-card="pags"]{
   background:radial-gradient(circle at top,rgba(255,255,255,.08),rgba(0,0,0,.4));
@@ -530,7 +525,6 @@ body{
 #tab-extratos [data-card="deps"]{grid-column:1 / 2;}
 #tab-extratos [data-card="pags"]{grid-column:2 / 3;}
 
-/* título dos cards */
 #tab-extratos [data-card]>h3{
   margin:0;
   padding:10px 16px 10px;
@@ -550,7 +544,6 @@ body{
   background:linear-gradient(90deg,rgba(255,255,255,.18),rgba(255,255,255,0));
 }
 
-/* scroll só dentro da tabela */
 #tab-extratos [data-card] .table-wrap{
   flex:1 1 auto;
   max-height:360px;
@@ -559,7 +552,6 @@ body{
   border-radius:0 0 16px 16px;
 }
 
-/* colunas valor / data alinhadas */
 #tblExtratosDepositos td:nth-child(2),
 #tblExtratosPagamentos td:nth-child(2){
   text-align:right;
@@ -572,7 +564,6 @@ body{
   font-variant-numeric:tabular-nums;
 }
 
-/* scrollbar bonitinho dentro dos extratos */
 #tab-extratos [data-card] .table-wrap::-webkit-scrollbar{
   width:6px;
 }
@@ -584,7 +575,6 @@ body{
   border-radius:999px;
 }
 
-/* responsivo: empilha os dois cards */
 @media(max-width:980px){
   #tab-extratos .card:not([data-card]){
     grid-template-columns:1fr;
@@ -596,7 +586,6 @@ body{
   }
 }
 
-/* filtros mais compactos em telas menores */
 @media(max-width:780px){
   #tab-extratos .card:not([data-card]) .bar{
     grid-template-columns:1fr 1fr;
@@ -605,8 +594,6 @@ body{
     min-width:0;
   }
 }
-
-/* ========== LIMITES DAS OUTRAS TABELAS ========== */
 
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
@@ -619,8 +606,6 @@ body{
 #tab-pagamentos [data-action="to-banca"].btn:hover{
   box-shadow:0 10px 26px rgba(255,122,0,.22);
 }
-
-/* PIX modal */
 
 dialog.pix-modal{
   border:0;
@@ -673,8 +658,6 @@ dialog.pix-modal::backdrop{
   justify-content:flex-end;
   margin-top:12px;
 }
-
-/* janela adicionar banca */
 
 .card-add-banca{
   margin-bottom:14px;
