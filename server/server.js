@@ -37,13 +37,24 @@ const {
 const PROD = process.env.NODE_ENV === 'production';
 
 ['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
-  if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (login)`); process.exit(1); }
+  if(!process.env[k]) {
+    console.error(`❌ Falta ${k} no .env (login)`);
+    process.exit(1);
+  }
 });
 
 ['EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_CERT_PATH','EFI_KEY_PATH','EFI_PIX_KEY','EFI_BASE_URL','EFI_OAUTH_URL']
-  .forEach(k => { if(!process.env[k]) { console.error(`❌ Falta ${k} no .env (Efi)`); process.exit(1); } });
+  .forEach(k => {
+    if(!process.env[k]) {
+      console.error(`❌ Falta ${k} no .env (Efi)`);
+      process.exit(1);
+    }
+  });
 
-if (!DATABASE_URL) { console.error('❌ Falta DATABASE_URL no .env'); process.exit(1); }
+if (!DATABASE_URL) {
+  console.error('❌ Falta DATABASE_URL no .env');
+  process.exit(1);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -80,8 +91,12 @@ function brlStrToCents(strOriginal) {
   return Math.round(n * 100);
 }
 
-function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-function tok(){ return 'tok_' + crypto.randomBytes(18).toString('hex'); }
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+function tok(){
+  return 'tok_' + crypto.randomBytes(18).toString('hex');
+}
 
 const tokenStore = new Map();
 const TOKEN_TTL_MS = 15 * 60 * 1000;
@@ -113,23 +128,37 @@ app.use((req, res, next) => {
   next();
 });
 
-
-
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
-
 app.use(express.static(ROOT, { extensions: ['html'] }));
 
-const loginLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
-function signSession(payload) { return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' }); }
-function verifySession(token) { try { return jwt.verify(token, JWT_SECRET); } catch { return null; } }
-function randomHex(n=32){ return crypto.randomBytes(n).toString('hex'); }
+function signSession(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '2h' });
+}
+function verifySession(token) {
+  try { return jwt.verify(token, JWT_SECRET); }
+  catch { return null; }
+}
+function randomHex(n=32){
+  return crypto.randomBytes(n).toString('hex');
+}
 
 function setAuthCookies(res, token) {
-  const common = { sameSite: 'strict', secure: PROD, maxAge: 2 * 60 * 60 * 1000, path: '/' };
+  const common = {
+    sameSite: 'strict',
+    secure: PROD,
+    maxAge: 2 * 60 * 60 * 1000,
+    path: '/'
+  };
   res.cookie('session', token, { ...common, httpOnly: true });
   res.cookie('csrf',    randomHex(16), { ...common, httpOnly: false });
 }
@@ -159,8 +188,12 @@ const sseClients = new Set();
 function sseSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const msg = `event: ${event}\ndata: ${data}\n\n`;
-  for (const res of sseClients) { try { res.write(msg); } catch {} }
+  for (const res of sseClients) {
+    try { res.write(msg); } catch {}
+  }
 }
+
+
 
 function mapCupom(row){
   if (!row) return null;
@@ -184,200 +217,6 @@ function normalizarCodigo(c){
   return String(c || '').trim().toUpperCase();
 }
 
-router.get('/api/cupons', async (req, res, next) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT * FROM cupons ORDER BY created_at DESC'
-    );
-    res.json(rows.map(mapCupom));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/api/cupons', async (req, res, next) => {
-  try {
-    const codigoRaw = req.body.codigo;
-    const valorCentavos = Number(req.body.valorCentavos || req.body.valor_cents || 0);
-    const diasValidade = Number(req.body.diasValidade || 3);
-    const maxUsos = Number(req.body.maxUsos || 1);
-
-    const codigo = normalizarCodigo(codigoRaw);
-    if (!codigo || !valorCentavos || valorCentavos <= 0) {
-      return res.status(400).json({ error: 'Código e valor são obrigatórios.' });
-    }
-
-    const expiraEm = req.body.expiraEm
-      ? new Date(req.body.expiraEm)
-      : new Date(Date.now() + diasValidade * 24 * 60 * 60 * 1000);
-
-    const { rows } = await pool.query(
-      `INSERT INTO cupons (codigo, valor_cents, expira_em, max_usos, ativo)
-       VALUES ($1, $2, $3, $4, true)
-       RETURNING *`,
-      [codigo, valorCentavos, expiraEm, maxUsos]
-    );
-
-    res.status(201).json(mapCupom(rows[0]));
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'Já existe um cupom com esse código.' });
-    }
-    next(err);
-  }
-});
-
-router.patch('/api/cupons/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const fields = [];
-    const values = [];
-    let idx = 1;
-
-    if (req.body.valorCentavos != null || req.body.valor_cents != null) {
-      fields.push(`valor_cents = $${idx++}`);
-      values.push(Number(req.body.valorCentavos || req.body.valor_cents));
-    }
-    if (req.body.ativo != null) {
-      fields.push(`ativo = $${idx++}`);
-      values.push(!!req.body.ativo);
-    }
-    if (req.body.expiraEm) {
-      fields.push(`expira_em = $${idx++}`);
-      values.push(new Date(req.body.expiraEm));
-    }
-
-    if (!fields.length) {
-      return res.status(400).json({ error: 'Nada para atualizar.' });
-    }
-
-    values.push(id);
-
-    const { rows } = await pool.query(
-      `UPDATE cupons
-       SET ${fields.join(', ')}
-       WHERE id = $${idx}
-       RETURNING *`,
-      values
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-
-    res.json(mapCupom(rows[0]));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.delete('/api/cupons/:id', async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rowCount } = await pool.query(
-      'DELETE FROM cupons WHERE id = $1',
-      [id]
-    );
-    if (!rowCount) {
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/api/cupons/resgatar', async (req, res, next) => {
-  const client = await pool.connect();
-  try {
-    const codigo = normalizarCodigo(req.body.codigo);
-    const nome = String(req.body.nome || '').trim();
-    const pixType = String(req.body.pixType || '').trim() || null;
-    const pixKey = String(req.body.pixKey || '').trim() || null;
-    const message = req.body.message != null ? String(req.body.message) : null;
-
-    if (!codigo || !nome || !pixKey || !pixType) {
-      client.release();
-      return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
-    }
-
-    await client.query('BEGIN');
-
-    const { rows } = await client.query(
-      'SELECT * FROM cupons WHERE codigo = $1 FOR UPDATE',
-      [codigo]
-    );
-    if (!rows.length) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-
-    const cupom = rows[0];
-
-    if (!cupom.ativo) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom inativo.' });
-    }
-
-    const agora = new Date();
-    if (cupom.expira_em && agora > cupom.expira_em) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom expirado.' });
-    }
-
-    if (cupom.usado_em) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom já utilizado.' });
-    }
-
-    const valorCents = cupom.valor_cents;
-
-    await client.query(
-      `INSERT INTO bancas (nome, deposito_cents, banca_cents, pix_key, pix_type, message, created_at)
-       VALUES ($1, $2, 0, $3, $4, $5, now())`,
-      [nome, valorCents, pixKey, pixType, message]
-    );
-
-    await client.query(
-      `UPDATE cupons
-       SET usado_em = now(),
-           usado_por_nome = $2,
-           usado_por_pix_type = $3,
-           usado_por_pix_key = $4,
-           usado_por_message = $5
-       WHERE id = $1`,
-      [cupom.id, nome, pixType, pixKey, message]
-    );
-
-    await client.query('COMMIT');
-client.release();
-
-
-setTimeout(async () => {
-  try {
-    await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
-  } catch (err) {
-    console.error('Erro ao apagar cupom após 5 minutos:', err);
-  }
-}, 5 * 60 * 1000); 
-
-res.json({
-  ok: true,
-  valorCentavos: valorCents,
-  codigo: cupom.codigo
-});
-
-  } catch (err) {
-    try { await client.query('ROLLBACK'); } catch {}
-    client.release();
-    next(err);
-  }
-});
 
 
 app.use('/api', (req, res, next) => {
@@ -387,7 +226,8 @@ app.use('/api', (req, res, next) => {
     '/api/auth/me',
     '/api/pix/cob',
     '/api/pix/status',
-    '/api/public/bancas'
+    '/api/public/bancas',
+    '/api/sorteio/inscrever'
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -417,23 +257,38 @@ app.get('/api/stream', requireAuth, (req, res) => {
   res.flushHeaders?.();
   sseClients.add(res);
 
-  const ping = setInterval(() => { try { res.write(`event: ping\ndata: {}\n\n`); } catch {} }, 25000);
+  const ping = setInterval(() => {
+    try { res.write(`event: ping\ndata: {}\n\n`); } catch {}
+  }, 25000);
 
-  req.on('close', () => { clearInterval(ping); sseClients.delete(res); try { res.end(); } catch {} });
+  req.on('close', () => {
+    clearInterval(ping);
+    sseClients.delete(res);
+    try { res.end(); } catch {}
+  });
 });
+
+
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'missing_fields' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'missing_fields' });
+  }
   const userOk = username === ADMIN_USER;
   const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-  if (!userOk || !passOk) return res.status(401).json({ error: 'invalid_credentials' });
+  if (!userOk || !passOk) {
+    return res.status(401).json({ error: 'invalid_credentials' });
+  }
   const token = signSession({ sub: ADMIN_USER, role: 'admin' });
   setAuthCookies(res, token);
   return res.json({ ok: true });
 });
 
-app.post('/api/auth/logout', (req, res) => { clearAuthCookies(res); return res.json({ ok:true }); });
+app.post('/api/auth/logout', (req, res) => {
+  clearAuthCookies(res);
+  return res.json({ ok:true });
+});
 
 app.get('/api/auth/me', (req, res) => {
   const token = req.cookies?.session;
@@ -442,20 +297,37 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
+
+
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
+
+
 app.get('/health', async (req, res) => {
-  try { fs.accessSync(EFI_CERT_PATH); fs.accessSync(EFI_KEY_PATH); await q('select 1'); return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true }); }
-  catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
+  try {
+    fs.accessSync(EFI_CERT_PATH);
+    fs.accessSync(EFI_KEY_PATH);
+    await q('select 1');
+    return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
+  } catch (e) {
+    return res.status(500).json({ ok:false, error: e.message });
+  }
 });
+
 app.get('/api/pix/ping', async (req, res) => {
-  try { const token = await getAccessToken(); return res.json({ ok:true, token:true }); }
-  catch (e) { return res.status(500).json({ ok:false, error: e.response?.data || e.message }); }
+  try {
+    const token = await getAccessToken();
+    return res.json({ ok:true, token:true });
+  } catch (e) {
+    return res.status(500).json({ ok:false, error: e.response?.data || e.message });
+  }
 });
+
+
 
 app.post('/api/pix/cob', async (req, res) => {
   try {
@@ -466,16 +338,30 @@ app.post('/api/pix/cob', async (req, res) => {
     const access = await getAccessToken();
     const valor = (valorCentavos / 100).toFixed(2);
 
-    const payload = { calendario: { expiracao: 3600 }, valor: { original: valor }, chave: EFI_PIX_KEY, infoAdicionais: [{ nome: 'Nome', valor: nome }] };
+    const payload = {
+      calendario: { expiracao: 3600 },
+      valor: { original: valor },
+      chave: EFI_PIX_KEY,
+      infoAdicionais: [{ nome: 'Nome', valor: nome }]
+    };
     if (cpf) {
       const cpfNum = String(cpf).replace(/\D/g, '');
-      if (cpfNum.length !== 11) return res.status(400).json({ error: 'cpf_invalido' });
+      if (cpfNum.length !== 11) {
+        return res.status(400).json({ error: 'cpf_invalido' });
+      }
       payload.devedor = { cpf: cpfNum, nome };
     }
 
-    const { data: cob } = await axios.post(`${EFI_BASE_URL}/v2/cob`, payload, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
+    const { data: cob } = await axios.post(`${EFI_BASE_URL}/v2/cob`, payload, {
+      httpsAgent,
+      headers: { Authorization: `Bearer ${access}` }
+    });
     const { txid, loc } = cob;
-    const { data: qr } = await axios.get(`${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
+
+    const { data: qr } = await axios.get(`${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`, {
+      httpsAgent,
+      headers: { Authorization: `Bearer ${access}` }
+    });
 
     const tokenOpaque = tok();
     tokenStore.set(tokenOpaque, { txid, createdAt: Date.now() });
@@ -494,7 +380,10 @@ app.get('/api/pix/status/:token', async (req, res) => {
     const rec = tokenStore.get(req.params.token);
     if (!rec) return res.status(404).json({ error: 'token_not_found' });
     const access = await getAccessToken();
-    const { data } = await axios.get(`${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
+    const { data } = await axios.get(
+      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
+      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
+    );
     res.json({ status: data.status });
   } catch (err) {
     console.error('Erro status:', err.response?.data || err.message);
@@ -517,12 +406,21 @@ app.post('/api/pix/confirmar', async (req, res) => {
     if (!rec) return res.status(404).json({ error:'token_not_found' });
 
     const access = await getAccessToken();
-    const { data } = await axios.get(`${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`, { httpsAgent, headers: { Authorization: `Bearer ${access}` } });
+    const { data } = await axios.get(
+      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
+      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
+    );
 
-    if (data.status !== 'CONCLUIDA') return res.status(409).json({ error:'pix_nao_concluido' });
+    if (data.status !== 'CONCLUIDA') {
+      return res.status(409).json({ error:'pix_nao_concluido' });
+    }
     const valorEfiCents = brlStrToCents(data?.valor?.original);
-    if (valorEfiCents == null) return res.status(500).json({ error:'valor_invalido_efi' });
-    if (valorEfiCents !== valorCentavos) return res.status(409).json({ error:'valor_divergente' });
+    if (valorEfiCents == null) {
+      return res.status(500).json({ error:'valor_invalido_efi' });
+    }
+    if (valorEfiCents !== valorCentavos) {
+      return res.status(409).json({ error:'valor_divergente' });
+    }
 
     const id = uid();
     const { rows } = await q(
@@ -554,6 +452,8 @@ app.post('/api/pix/confirmar', async (req, res) => {
     return res.status(500).json({ error:'falha_confirmar' });
   }
 });
+
+
 
 app.post('/api/public/bancas', async (req, res) => {
   try{
@@ -589,6 +489,8 @@ app.post('/api/public/bancas', async (req, res) => {
     return res.status(500).json({ error:'falha_public' });
   }
 });
+
+
 
 const areaAuth = [requireAuth];
 
@@ -659,7 +561,10 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
        from bancas where id = $1 for update`,
       [req.params.id]
     );
-    if (!sel.rows.length) { await client.query('rollback'); return res.status(404).json({ error:'not_found' }); }
+    if (!sel.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error:'not_found' });
+    }
     const b = sel.rows[0];
 
     const bancaFinal = (typeof bancaCents === 'number' && bancaCents >= 0)
@@ -683,7 +588,9 @@ app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
     await client.query('rollback');
     console.error('to-pagamento:', e.message);
     res.status(500).json({ error:'falha_mover' });
-  }finally{ client.release(); }
+  }finally{
+    client.release();
+  }
 });
 
 app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
@@ -696,7 +603,10 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
          from pagamentos where id = $1 for update`,
       [req.params.id]
     );
-    if (!sel.rows.length) { await client.query('rollback'); return res.status(404).json({ error: 'not_found' }); }
+    if (!sel.rows.length) {
+      await client.query('rollback');
+      return res.status(404).json({ error: 'not_found' });
+    }
     const p = sel.rows[0];
 
     await client.query(
@@ -716,7 +626,9 @@ app.post('/api/pagamentos/:id/to-banca', areaAuth, async (req, res) => {
     await client.query('rollback');
     console.error('to-banca:', e.message);
     return res.status(500).json({ error: 'falha_mover' });
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 });
 
 app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
@@ -744,7 +656,9 @@ app.get('/api/pagamentos', areaAuth, async (req, res) => {
 
 app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
   const { status } = req.body || {};
-  if (!['pago','nao_pago'].includes(status)) return res.status(400).json({ error: 'status_invalido' });
+  if (!['pago','nao_pago'].includes(status)) {
+    return res.status(400).json({ error: 'status_invalido' });
+  }
 
   const beforeQ = await q(
     `select id, nome, pagamento_cents, status, paid_at from pagamentos where id = $1`,
@@ -818,6 +732,9 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
     client.release();
   }
 });
+
+
+
 app.get('/qr', async (req, res) => {
   try {
     const data = String(req.query.data || '');
@@ -826,7 +743,7 @@ app.get('/qr', async (req, res) => {
 
     const png = await QRCode.toBuffer(data, {
       type: 'png',
-      errorCorrectionLevel: 'M', 
+      errorCorrectionLevel: 'M',
       margin: 1,
       width: size
     });
@@ -868,7 +785,6 @@ app.post('/api/sorteio/inscrever', async (req, res) => {
 
     return res.status(201).json({ ok: true });
   } catch (err) {
-    
     if (err.code === '23505') {
       return res.status(409).json({
         ok: false,
@@ -881,9 +797,6 @@ app.post('/api/sorteio/inscrever', async (req, res) => {
     return res.status(500).json({ ok: false, error: 'Erro interno ao salvar inscrição.' });
   }
 });
-
-
-
 
 app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
   try {
@@ -898,7 +811,6 @@ app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
   }
 });
 
-
 app.delete('/api/sorteio/inscricoes', async (req, res) => {
   try {
     await pool.query('TRUNCATE TABLE sorteio_inscricoes');
@@ -909,7 +821,9 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-app.post('/api/bancas/manual', async (req, res) => {
+
+
+app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   const { nome, depositoCents, pixKey, pixType } = req.body || {};
 
   const nomeTrim    = (nome || '').trim();
@@ -925,10 +839,8 @@ app.post('/api/bancas/manual', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // gera id da banca
     const bancaId = uid();
 
-    // cria a banca já com banca_cents = deposito_cents
     const insertBanca = await client.query(
       `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, NULL, now())
@@ -937,7 +849,6 @@ app.post('/api/bancas/manual', async (req, res) => {
     );
     const row = insertBanca.rows[0];
 
-    // registra extrato certinho (com id e ref_id)
     await client.query(
       `INSERT INTO extratos (id, ref_id, nome, tipo, valor_cents, created_at)
        VALUES ($1, $2, $3, 'deposito', $4, now())`,
@@ -945,6 +856,9 @@ app.post('/api/bancas/manual', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    sseSendAll('bancas-changed', { reason: 'manual' });
+    sseSendAll('extratos-changed', { reason: 'deposito-manual' });
 
     return res.status(201).json({
       id:            row.id,
@@ -967,8 +881,6 @@ app.post('/api/bancas/manual', async (req, res) => {
 
 
 
-
-
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
 
@@ -976,21 +888,50 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   const params = [];
   let i = 1;
 
-  if (tipo && ['deposito','pagamento'].includes(tipo)) { conds.push(`tipo = $${i++}`); params.push(tipo); }
-  if (nome) { conds.push(`lower(nome) LIKE $${i++}`); params.push(`%${String(nome).toLowerCase()}%`); }
-
-  const now = new Date();
-  const startOfDay = (d)=>{ const x = new Date(d); x.setHours(0,0,0,0); return x; };
-  const addDays = (d,n)=>{ const x = new Date(d); x.setDate(x.getDate()+n); return x; };
-
-  if (range) {
-    if (range === 'today') { from = startOfDay(now).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
-    if (range === 'last7') { from = addDays(startOfDay(now), -6).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
-    if (range === 'last30'){ from = addDays(startOfDay(now), -29).toISOString(); to = addDays(startOfDay(now), 1).toISOString(); }
+  if (tipo && ['deposito','pagamento'].includes(tipo)) {
+    conds.push(`tipo = $${i++}`);
+    params.push(tipo);
+  }
+  if (nome) {
+    conds.push(`lower(nome) LIKE $${i++}`);
+    params.push(`%${String(nome).toLowerCase()}%`);
   }
 
-  if (from) { conds.push(`created_at >= $${i++}`); params.push(new Date(from)); }
-  if (to)   { conds.push(`created_at <  $${i++}`); params.push(new Date(to)); }
+  const now = new Date();
+  const startOfDay = (d)=>{
+    const x = new Date(d);
+    x.setHours(0,0,0,0);
+    return x;
+  };
+  const addDays = (d,n)=>{
+    const x = new Date(d);
+    x.setDate(x.getDate()+n);
+    return x;
+  };
+
+  if (range) {
+    if (range === 'today') {
+      from = startOfDay(now).toISOString();
+      to   = addDays(startOfDay(now), 1).toISOString();
+    }
+    if (range === 'last7') {
+      from = addDays(startOfDay(now), -6).toISOString();
+      to   = addDays(startOfDay(now), 1).toISOString();
+    }
+    if (range === 'last30'){
+      from = addDays(startOfDay(now), -29).toISOString();
+      to   = addDays(startOfDay(now), 1).toISOString();
+    }
+  }
+
+  if (from) {
+    conds.push(`created_at >= $${i++}`);
+    params.push(new Date(from));
+  }
+  if (to)   {
+    conds.push(`created_at <  $${i++}`);
+    params.push(new Date(to));
+  }
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   const sql = `
@@ -1010,6 +951,220 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
+
+app.get('/api/cupons', requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM cupons ORDER BY created_at DESC'
+    );
+    res.json(rows.map(mapCupom));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+app.post('/api/cupons', requireAuth, async (req, res, next) => {
+  try {
+    const codigoRaw    = req.body.codigo;
+    const valorCentavos = Number(req.body.valorCentavos || req.body.valor_cents || 0);
+    const diasValidade  = Number(req.body.diasValidade || 3);
+    const maxUsos       = Number(req.body.maxUsos || 1);
+
+    const codigo = normalizarCodigo(codigoRaw);
+    if (!codigo || !valorCentavos || valorCentavos <= 0) {
+      return res.status(400).json({ error: 'Código e valor são obrigatórios.' });
+    }
+
+    const expiraEm = req.body.expiraEm
+      ? new Date(req.body.expiraEm)
+      : new Date(Date.now() + diasValidade * 24 * 60 * 60 * 1000);
+
+    const { rows } = await pool.query(
+      `INSERT INTO cupons (codigo, valor_cents, expira_em, max_usos, ativo)
+       VALUES ($1, $2, $3, $4, true)
+       RETURNING *`,
+      [codigo, valorCentavos, expiraEm, maxUsos]
+    );
+
+    res.status(201).json(mapCupom(rows[0]));
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Já existe um cupom com esse código.' });
+    }
+    next(err);
+  }
+});
+
+
+app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (req.body.valorCentavos != null || req.body.valor_cents != null) {
+      fields.push(`valor_cents = $${idx++}`);
+      values.push(Number(req.body.valorCentavos || req.body.valor_cents));
+    }
+    if (req.body.ativo != null) {
+      fields.push(`ativo = $${idx++}`);
+      values.push(!!req.body.ativo);
+    }
+    if (req.body.expiraEm) {
+      fields.push(`expira_em = $${idx++}`);
+      values.push(new Date(req.body.expiraEm));
+    }
+
+    if (!fields.length) {
+      return res.status(400).json({ error: 'Nada para atualizar.' });
+    }
+
+    values.push(id);
+
+    const { rows } = await pool.query(
+      `UPDATE cupons
+       SET ${fields.join(', ')}
+       WHERE id = $${idx}
+       RETURNING *`,
+      values
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+
+    res.json(mapCupom(rows[0]));
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rowCount } = await pool.query(
+      'DELETE FROM cupons WHERE id = $1',
+      [id]
+    );
+    if (!rowCount) {
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+app.post('/api/cupons/resgatar', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const codigo   = normalizarCodigo(req.body.codigo);
+    const nome     = String(req.body.nome || '').trim();
+    const pixType  = String(req.body.pixType || '').trim() || null;
+    const pixKey   = String(req.body.pixKey || '').trim() || null;
+    const message  = req.body.message != null ? String(req.body.message) : null;
+
+    if (!codigo || !nome || !pixKey || !pixType) {
+      client.release();
+      return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
+    }
+
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      'SELECT * FROM cupons WHERE codigo = $1 FOR UPDATE',
+      [codigo]
+    );
+    if (!rows.length) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(404).json({ error: 'Cupom não encontrado.' });
+    }
+
+    const cupom = rows[0];
+
+    if (!cupom.ativo) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom inativo.' });
+    }
+
+    const agora = new Date();
+    if (cupom.expira_em && agora > cupom.expira_em) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom expirado.' });
+    }
+
+    if (cupom.usado_em) {
+      await client.query('ROLLBACK');
+      client.release();
+      return res.status(400).json({ error: 'Cupom já utilizado.' });
+    }
+
+    const valorCents = cupom.valor_cents;
+
+    const bancaId = uid();
+
+    await client.query(
+      `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_key, pix_type, message, created_at)
+       VALUES ($1, $2, $3, 0, $4, $5, $6, now())`,
+      [bancaId, nome, valorCents, pixKey, pixType, message]
+    );
+
+    await client.query(
+      `INSERT INTO extratos (id, ref_id, nome, tipo, valor_cents, created_at)
+       VALUES ($1, $2, $3, 'deposito', $4, now())`,
+      [uid(), bancaId, nome, valorCents]
+    );
+
+    await client.query(
+      `UPDATE cupons
+       SET usado_em = now(),
+           ativo = false,
+           usado_por_nome = $2,
+           usado_por_pix_type = $3,
+           usado_por_pix_key = $4,
+           usado_por_message = $5
+       WHERE id = $1`,
+      [cupom.id, nome, pixType, pixKey, message]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    
+    setTimeout(async () => {
+      try {
+        await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
+      } catch (err) {
+        console.error('Erro ao apagar cupom após 5 minutos:', err);
+      }
+    }, 5 * 60 * 1000);
+
+    sseSendAll('bancas-changed', { reason: 'cupom-resgatado' });
+    sseSendAll('extratos-changed', { reason: 'cupom-resgatado' });
+
+    res.json({
+      ok: true,
+      valorCentavos: valorCents,
+      codigo: cupom.codigo
+    });
+
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch {}
+    client.release();
+    next(err);
+  }
+});
+
+
+
 async function ensureMessageColumns(){
   try{
     await q(`alter table if exists bancas add column if not exists message text`);
@@ -1019,13 +1174,41 @@ async function ensureMessageColumns(){
   }
 }
 
+async function ensureCuponsTable(){
+  try {
+    await q(`
+      CREATE TABLE IF NOT EXISTS cupons (
+        id BIGSERIAL PRIMARY KEY,
+        codigo TEXT NOT NULL UNIQUE,
+        valor_cents INTEGER NOT NULL,
+        ativo BOOLEAN NOT NULL DEFAULT TRUE,
+        max_usos INTEGER NOT NULL DEFAULT 1,
+        usado_em TIMESTAMPTZ,
+        expira_em TIMESTAMPTZ,
+        usado_por_nome TEXT,
+        usado_por_pix_type TEXT,
+        usado_por_pix_key TEXT,
+        usado_por_message TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+  } catch (e) {
+    console.error('ensureCuponsTable:', e.message);
+  }
+}
+
+
+
 app.listen(PORT, async () => {
   try{
     await q('select 1');
     await ensureMessageColumns();
+    await ensureCuponsTable();
     console.log('🗄️  Postgres conectado');
   }
-  catch(e){ console.error('❌ Postgres falhou:', e.message); }
+  catch(e){
+    console.error('❌ Postgres falhou:', e.message);
+  }
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
