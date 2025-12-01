@@ -111,7 +111,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-
+// bloquear acesso a .git
 app.use((req, res, next) => {
   if (req.url.includes('/.git')) {
     return res.status(403).send('Forbidden');
@@ -119,7 +119,7 @@ app.use((req, res, next) => {
   next();
 });
 
-
+// Permissions-Policy
 app.use((req, res, next) => {
   res.setHeader(
     "Permissions-Policy",
@@ -193,7 +193,7 @@ function sseSendAll(event, payload = {}) {
   }
 }
 
-
+// ================== CUPONS (helpers) ==================
 
 function mapCupom(row){
   if (!row) return null;
@@ -217,7 +217,16 @@ function normalizarCodigo(c){
   return String(c || '').trim().toUpperCase();
 }
 
+function gerarCodigoCupom(){
+  const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tmp = '';
+  for (let i = 0; i < 8; i++) {
+    tmp += alpha[Math.floor(Math.random() * alpha.length)];
+  }
+  return tmp.slice(0,4) + '-' + tmp.slice(4);
+}
 
+// ================== PROTEÇÃO GLOBAL /api ==================
 
 app.use('/api', (req, res, next) => {
   const openRoutes = [
@@ -227,7 +236,8 @@ app.use('/api', (req, res, next) => {
     '/api/pix/cob',
     '/api/pix/status',
     '/api/public/bancas',
-    '/api/sorteio/inscrever'
+    '/api/sorteio/inscrever',
+    '/api/cupons/resgatar'
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -245,7 +255,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-
+// ================== SSE ==================
 
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -268,7 +278,7 @@ app.get('/api/stream', requireAuth, (req, res) => {
   });
 });
 
-
+// ================== AUTH ==================
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
@@ -297,7 +307,7 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
-
+// ================== ÁREA PROTEGIDA (HTML) ==================
 
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
@@ -305,7 +315,7 @@ app.get('/area.html', (req, res) => {
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
-
+// ================== HEALTH & PIX TEST ==================
 
 app.get('/health', async (req, res) => {
   try {
@@ -327,7 +337,7 @@ app.get('/api/pix/ping', async (req, res) => {
   }
 });
 
-
+// ================== PIX COBRANÇA (EFI) ==================
 
 app.post('/api/pix/cob', async (req, res) => {
   try {
@@ -453,7 +463,7 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-
+// ================== PUBLIC BANCA (APP KEY) ==================
 
 app.post('/api/public/bancas', async (req, res) => {
   try{
@@ -490,7 +500,7 @@ app.post('/api/public/bancas', async (req, res) => {
   }
 });
 
-
+// ================== ÁREA (bancas/pagamentos) ==================
 
 const areaAuth = [requireAuth];
 
@@ -733,7 +743,7 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
   }
 });
 
-
+// ================== QR CODE GENERIC ==================
 
 app.get('/qr', async (req, res) => {
   try {
@@ -755,7 +765,7 @@ app.get('/qr', async (req, res) => {
   }
 });
 
-
+// ================== SORTEIO ==================
 
 app.get('/api/sorteio/inscricoes', async (req, res) => {
   try {
@@ -821,7 +831,7 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-
+// ================== BANCAS MANUAL (ÁREA) ==================
 
 app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   const { nome, depositoCents, pixKey, pixType } = req.body || {};
@@ -879,7 +889,7 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   }
 });
 
-
+// ================== EXTRATOS ==================
 
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
@@ -951,7 +961,9 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
+// ================== CUPONS (rotas) ==================
 
+// GET /api/cupons – lista de cupons (ÁREA, precisa login)
 app.get('/api/cupons', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -963,17 +975,29 @@ app.get('/api/cupons', requireAuth, async (req, res, next) => {
   }
 });
 
-
+// POST /api/cupons – criar cupom (ÁREA)
 app.post('/api/cupons', requireAuth, async (req, res, next) => {
   try {
-    const codigoRaw    = req.body.codigo;
-    const valorCentavos = Number(req.body.valorCentavos || req.body.valor_cents || 0);
+    const codigoRaw = req.body.codigo;
+
+    // aceita vários nomes de campo pro valor
+    const valorBruto =
+      req.body.valorCentavos ??
+      req.body.valorCents ??
+      req.body.valor_cents ??
+      0;
+
+    const valorCentavos = Number(valorBruto) | 0;
     const diasValidade  = Number(req.body.diasValidade || 3);
     const maxUsos       = Number(req.body.maxUsos || 1);
 
-    const codigo = normalizarCodigo(codigoRaw);
-    if (!codigo || !valorCentavos || valorCentavos <= 0) {
+    if (!valorCentavos || valorCentavos <= 0) {
       return res.status(400).json({ error: 'Código e valor são obrigatórios.' });
+    }
+
+    let codigo = normalizarCodigo(codigoRaw);
+    if (!codigo) {
+      codigo = gerarCodigoCupom();
     }
 
     const expiraEm = req.body.expiraEm
@@ -987,7 +1011,10 @@ app.post('/api/cupons', requireAuth, async (req, res, next) => {
       [codigo, valorCentavos, expiraEm, maxUsos]
     );
 
-    res.status(201).json(mapCupom(rows[0]));
+    const cupom = rows[0];
+    sseSendAll('cupons-changed', { reason: 'create', id: cupom.id });
+
+    res.status(201).json(mapCupom(cupom));
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Já existe um cupom com esse código.' });
@@ -996,7 +1023,7 @@ app.post('/api/cupons', requireAuth, async (req, res, next) => {
   }
 });
 
-
+// PATCH /api/cupons/:id – editar cupom (valor, ativo, expiraEm)
 app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1005,9 +1032,15 @@ app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
     const values = [];
     let idx = 1;
 
-    if (req.body.valorCentavos != null || req.body.valor_cents != null) {
+    if (req.body.valorCentavos != null ||
+        req.body.valorCents    != null ||
+        req.body.valor_cents   != null) {
+      const v =
+        req.body.valorCentavos ??
+        req.body.valorCents ??
+        req.body.valor_cents;
       fields.push(`valor_cents = $${idx++}`);
-      values.push(Number(req.body.valorCentavos || req.body.valor_cents));
+      values.push(Number(v));
     }
     if (req.body.ativo != null) {
       fields.push(`ativo = $${idx++}`);
@@ -1036,13 +1069,16 @@ app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
       return res.status(404).json({ error: 'Cupom não encontrado.' });
     }
 
-    res.json(mapCupom(rows[0]));
+    const cupom = rows[0];
+    sseSendAll('cupons-changed', { reason: 'update', id: cupom.id });
+
+    res.json(mapCupom(cupom));
   } catch (err) {
     next(err);
   }
 });
 
-
+// DELETE /api/cupons/:id – remover cupom (ÁREA)
 app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1053,13 +1089,14 @@ app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
     if (!rowCount) {
       return res.status(404).json({ error: 'Cupom não encontrado.' });
     }
+    sseSendAll('cupons-changed', { reason: 'delete', id });
     res.status(204).end();
   } catch (err) {
     next(err);
   }
 });
 
-
+// POST /api/cupons/resgatar – usar cupom (PÚBLICO, usado pelo index.html)
 app.post('/api/cupons/resgatar', async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -1138,17 +1175,19 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
     await client.query('COMMIT');
     client.release();
 
-    
+    // auto-delete 5 minutos após resgate
     setTimeout(async () => {
       try {
         await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
+        sseSendAll('cupons-changed', { reason: 'auto-delete', id: cupom.id });
       } catch (err) {
         console.error('Erro ao apagar cupom após 5 minutos:', err);
       }
     }, 5 * 60 * 1000);
 
-    sseSendAll('bancas-changed', { reason: 'cupom-resgatado' });
-    sseSendAll('extratos-changed', { reason: 'cupom-resgatado' });
+    sseSendAll('bancas-changed',  { reason: 'cupom-resgatado', bancaId });
+    sseSendAll('extratos-changed',{ reason: 'cupom-resgatado' });
+    sseSendAll('cupons-changed',  { reason: 'resgatado', id: cupom.id });
 
     res.json({
       ok: true,
@@ -1163,7 +1202,7 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
   }
 });
 
-
+// ================== MIGRAÇÕES SIMPLES ==================
 
 async function ensureMessageColumns(){
   try{
@@ -1197,7 +1236,7 @@ async function ensureCuponsTable(){
   }
 }
 
-
+// ================== START SERVER ==================
 
 app.listen(PORT, async () => {
   try{
