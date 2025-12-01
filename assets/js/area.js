@@ -403,11 +403,50 @@ async function loadExtratos(){
 async function loadCupons(){
   if (!tabCuponsEl && !tbodyCupons) return STATE.cupons;
   const list = await apiFetch('/api/cupons');
-  STATE.cupons = (list || []).sort((a,b)=>{
+  const nowMs = Date.now();
+
+  STATE.cupons = (list || []).map(raw => {
+    const c = { ...raw };
+
+    const created = c.createdAt || c.created_at || null;
+    if (!c.createdAt && created) c.createdAt = created;
+
+    const expRaw = c.expiraEm || c.expira_em || null;
+    const usadoEm = c.usadoEm || c.usado_em || null;
+
+    let status = 'ativo';
+    const expMs = expRaw ? new Date(expRaw).getTime() : null;
+
+    if (usadoEm) {
+      status = 'resgatado';
+    } else if (expMs && expMs < nowMs) {
+      status = 'expirado';
+    } else if (c.ativo === false) {
+      status = 'inativo';
+    }
+
+    c.status = status;
+
+    if (typeof c.valorCentavos !== 'number') {
+      if (typeof c.valorCents === 'number') c.valorCentavos = c.valorCents;
+      else if (typeof c.valor_cents === 'number') c.valorCentavos = c.valor_cents;
+    }
+
+    if (!c.resgatadoPor) {
+      c.resgatadoPor =
+        c.usadoPorNome ||
+        c.usado_por_nome ||
+        c.resgatado_por ||
+        '';
+    }
+
+    return c;
+  }).sort((a,b)=>{
     const da = new Date(a.createdAt || a.criadoEm || 0).getTime();
     const db = new Date(b.createdAt || b.criadoEm || 0).getTime();
     return db - da;
   });
+
   return STATE.cupons;
 }
 
@@ -1259,7 +1298,7 @@ async function handleCupomSubmit(e){
       method:'POST',
       body: JSON.stringify({
         valorCentavos: valorCents,
-        validadeDias: dias,
+        diasValidade: dias,
         codigo: codigo || undefined
       })
     });
