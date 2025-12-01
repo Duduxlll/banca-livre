@@ -208,6 +208,21 @@ const STATE = {
   editingBancaId: null
 };
 
+let cuponsAutoTimer = null;
+
+function startCuponsAutoRefresh(){
+  if (cuponsAutoTimer) return;
+  cuponsAutoTimer = setInterval(async () => {
+    try{
+      await loadCupons();
+      if (TAB === 'cupons') renderCupons();
+    }catch(err){
+      console.error('Erro ao atualizar cupons automaticamente', err);
+    }
+  }, 4000);
+}
+
+
 function getTotalDepEl(){
   return qs('#totalDepositos') || qs('#openTotalDepositos');
 }
@@ -1642,4 +1657,5 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
 
   startStream();
+  startCuponsAutoRefresh();
 });
