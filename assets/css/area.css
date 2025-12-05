@@ -735,16 +735,28 @@ dialog.pix-modal::backdrop{
   font-size:.9rem;
 }
 
-.col-acoes{
+
+.table thead th.col-acoes{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end; 
+  gap:8px;
   white-space:nowrap;
 }
 
-.col-acoes .btn--small{
-  margin-left:8px;
-  padding:4px 10px;
+
+#btnDelAllBancas.btn--small{
+  padding:4px 12px;
   font-size:.78rem;
   border-radius:999px;
+  box-shadow:0 10px 26px rgba(255,92,122,.26);
 }
+
+#btnDelAllBancas.btn--small:hover{
+  filter:brightness(1.05);
+  box-shadow:0 8px 22px rgba(255,92,122,.22);
+}
+
 
 @media(max-width:900px){
   .add-banca-grid{
