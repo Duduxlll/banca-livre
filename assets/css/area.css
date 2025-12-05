@@ -741,8 +741,10 @@ dialog.pix-modal::backdrop{
 
 
 #btnDelAllBancas{
-  margin-left: 8px;
+  float:right;
+  margin-left:24px;
 }
+
 
 
 @media(max-width:900px){
