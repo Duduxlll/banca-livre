@@ -1,4 +1,4 @@
-:root{
+voltei o meu css dnv pq ficou bugado dnv, quero saber so onde eu mexo pro botao de excluir todos vai mais pra direita :root{
   --bg:#110904;
   --card:#1A1209;
   --card-2:#140C06;
@@ -734,17 +734,13 @@ dialog.pix-modal::backdrop{
   height:34px;
   font-size:.9rem;
 }
-.table thead th.col-acoes{
-  text-align: right;   
-  padding-right: 20px; 
-}
-
 
 #btnDelAllBancas{
-  float:right;
-  margin-left:24px;
-}
-
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+} 
 
 
 @media(max-width:900px){
