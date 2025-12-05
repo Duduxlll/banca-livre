@@ -743,7 +743,10 @@ dialog.pix-modal::backdrop{
   font-size:.9rem;
 }
 
-
+.table thead th.col-acoes{
+  position: relative;     
+  padding-right: 120px;    
+}
 
 #btnDelAllBancas{
   position: absolute;
