@@ -744,6 +744,42 @@ async function deleteBanca(id){
   render();
 }
 
+async function deleteAllBancas(){
+  if (!STATE.bancas.length) {
+    if (typeof notify === 'function') notify('Não há bancas para excluir.', 'error');
+    else alert('Não há bancas para excluir.');
+    return;
+  }
+
+  const total = STATE.bancas.length;
+  const ok = confirm(`Tem certeza que deseja excluir todas as ${total} bancas? Essa ação não pode ser desfeita.`);
+  if (!ok) return;
+
+  try {
+    const ids = STATE.bancas.map(b => b.id);
+
+    
+    await Promise.all(
+      ids.map(id =>
+        apiFetch(`/api/bancas/${encodeURIComponent(id)}`, {
+          method:'DELETE'
+        })
+      )
+    );
+
+    await loadBancas();
+    render();
+
+    if (typeof notify === 'function') {
+      notify('Todas as bancas foram excluídas.', 'ok');
+    }
+  } catch (err) {
+    console.error(err);
+    if (typeof notify === 'function') notify('Erro ao excluir todas as bancas.', 'error');
+    else alert('Erro ao excluir todas as bancas.');
+  }
+}
+
 async function deletePagamento(id){
   await apiFetch(`/api/pagamentos/${encodeURIComponent(id)}`, { method:'DELETE' });
   await loadPagamentos();
@@ -1611,6 +1647,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
       nomeEl?.focus();
     });
+  }
+
+   const btnDelAllBancas = qs('#btnDelAllBancas');
+  if (btnDelAllBancas) {
+    btnDelAllBancas.addEventListener('click', deleteAllBancas);
   }
 
   const btnCupomNovo = qs('#btnCupomNovo');

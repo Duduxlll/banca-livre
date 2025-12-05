@@ -48,7 +48,7 @@
 
     <section class="content">
       
-      <!-- TAB BANCAS -->
+     
       <div class="tab tab-view show" id="tab-bancas">
 
         <div class="bar totbar">
@@ -76,21 +76,30 @@
         <div class="card">
           <div class="table-wrap">
             <table class="table" id="tblBancas" aria-label="Tabela de Bancas">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Depósito (R$)</th>
-                  <th>Banca (R$)</th>
-                  <th class="col-acoes">Ações</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
+  <thead>
+    <tr>
+      <th>Nome</th>
+      <th>Depósito (R$)</th>
+      <th>Banca (R$)</th>
+      <th class="col-acoes">
+        Ações
+        <button
+          type="button"
+          id="btnDelAllBancas"
+          class="btn btn--danger btn--small">
+          Excluir todos
+        </button>
+      </th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
           </div>
         </div>
       </div>
 
-      <!-- TAB PAGAMENTOS -->
+      
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -108,7 +117,7 @@
         </div>
       </div>
 
-      <!-- TAB EXTRATOS -->
+      
       <div class="tab tab-view" id="tab-extratos">
         <div class="card extratos-card">
           <div class="bar extratos-bar">
@@ -190,7 +199,7 @@
         </div>
       </div>
 
-      <!-- TAB CUPONS -->
+      
       <div class="tab tab-view" id="tab-cupons">
         <div class="card cupons-card">
           <div class="bar cupons-bar">
@@ -235,14 +244,14 @@
                 </tr>
               </thead>
               <tbody>
-                <!-- preenchido via area.js -->
+               
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- TAB SORTEIO -->
+      
       <div class="tab tab-view" id="tab-sorteio">
         <div class="card sorteio-header-card">
           <div class="sorteio-header-admin">
