@@ -613,8 +613,10 @@ body{
 
 
 #tab-bancas .table-wrap,
-#tab-pagamentos .table-wrap{
-  max-height:520px;
+#tab-pagamentos .table-wrap,
+#tab-cupons .table-wrap{
+  max-height:520px;   
+  min-height:320px;   
   overflow:auto;
 }
 
