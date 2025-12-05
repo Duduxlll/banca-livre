@@ -253,7 +253,24 @@ body{
   padding:14px;
   border-bottom:1px solid rgba(255,255,255,.06);
 }
-.col-acoes{width:1%;white-space:nowrap}
+
+
+.col-acoes{
+  width:1%;
+  white-space:nowrap;
+}
+
+
+.th-acoes{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.th-acoes span{
+  font-weight:700;
+}
+
 .table input.input-money{min-width:140px}
 
 .btn{
@@ -271,6 +288,12 @@ body{
   transition:transform .06s ease,filter .2s ease,box-shadow .2s ease;
 }
 .btn:active{transform:translateY(1px)}
+
+
+.btn--small{
+  padding:6px 10px;
+  font-size:.8rem;
+}
 
 .btn--primary{
   background:linear-gradient(90deg,var(--brand),var(--brand-2));
@@ -459,13 +482,9 @@ body{
 
 
 .card .table-wrap{
-  
   overflow:auto;
-
-  
   max-height:460px;
   min-height:320px;
-
   border-top-left-radius:16px;
   border-top-right-radius:16px;
 }
@@ -474,6 +493,8 @@ body{
   font-size:.8rem;
   color:var(--muted);
 }
+
+
 
 #tab-extratos .extratos-card{
   padding:18px 18px 20px;
@@ -615,8 +636,8 @@ body{
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap,
 #tab-cupons .table-wrap{
-  max-height:520px;   
-  min-height:320px;   
+  max-height:520px;
+  min-height:320px;
   overflow:auto;
 }
 
@@ -626,6 +647,8 @@ body{
 #tab-pagamentos [data-action="to-banca"].btn:hover{
   box-shadow:0 10px 26px rgba(255,122,0,.22);
 }
+
+/* --- MODAL PIX --- */
 
 dialog.pix-modal{
   border:0;
@@ -678,6 +701,8 @@ dialog.pix-modal::backdrop{
   justify-content:flex-end;
   margin-top:12px;
 }
+
+
 
 .card-add-banca{
   margin-bottom:14px;
@@ -745,9 +770,9 @@ dialog.pix-modal::backdrop{
 
 
 #btnDelAllBancas{
-  margin-left: 12px;   
+  margin:0;
+  white-space:nowrap;
 }
-
 
 @media(max-width:900px){
   .add-banca-grid{
