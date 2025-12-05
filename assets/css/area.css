@@ -253,9 +253,7 @@ body{
   padding:14px;
   border-bottom:1px solid rgba(255,255,255,.06);
 }
-.col-acoes{
-  white-space:nowrap;
-}
+.col-acoes{width:1%;white-space:nowrap}
 .table input.input-money{min-width:140px}
 
 .btn{
@@ -459,6 +457,7 @@ body{
   }
 }
 
+
 .card .table-wrap{
   overflow:auto;
   border-top-left-radius:16px;
@@ -606,6 +605,7 @@ body{
   }
 }
 
+/* aqui garanti também o overflow nas abas de Bancas e Pagamentos */
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
   max-height:520px;
@@ -734,28 +734,6 @@ dialog.pix-modal::backdrop{
   height:34px;
   font-size:.9rem;
 }
-
-.table thead th.col-acoes{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  white-space:nowrap;
-  padding-right:18px;
-}
-
-#btnDelAllBancas.btn--small{
-  padding:4px 12px;
-  font-size:.78rem;
-  border-radius:999px;
-  box-shadow:0 10px 26px rgba(255,92,122,.26);
-}
-
-#btnDelAllBancas.btn--small:hover{
-  filter:brightness(1.05);
-  box-shadow:0 8px 22px rgba(255,92,122,.22);
-}
-
 @media(max-width:900px){
   .add-banca-grid{
     grid-template-columns:1fr 1fr;
