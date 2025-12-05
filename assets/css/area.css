@@ -228,7 +228,7 @@ body{
 }
 .table thead th{
   text-align:left;
-  padding:8px;
+  padding:14px;
   color:#ffe3c8;
   font-weight:700;
   background:rgba(255,255,255,.02);
@@ -253,6 +253,14 @@ body{
   padding:14px;
   border-bottom:1px solid rgba(255,255,255,.06);
 }
+
+.table thead th,
+.table tbody td{
+  padding-left: 18px;   
+  padding-right: 18px;  
+}
+
+
 .col-acoes{width:1%;white-space:nowrap}
 .table input.input-money{min-width:140px}
 
