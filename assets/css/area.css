@@ -457,20 +457,17 @@ body{
   }
 }
 
+/* AQUI ESTAVA O PROBLEMA: agora overflow:auto para mostrar o scroll */
 .card .table-wrap{
-  overflow:hidden;
+  overflow:auto;
   border-top-left-radius:16px;
   border-top-right-radius:16px;
 }
-
-
 
 .muted{
   font-size:.8rem;
   color:var(--muted);
 }
-
-
 
 #tab-extratos .extratos-card{
   padding:18px 18px 20px;
@@ -587,8 +584,6 @@ body{
   border-radius:999px;
 }
 
-
-
 @media(max-width:980px){
   .extratos-cols{
     grid-template-columns:1fr;
@@ -610,11 +605,11 @@ body{
   }
 }
 
-
-
+/* aqui garanti também o overflow nas abas de Bancas e Pagamentos */
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
   max-height:520px;
+  overflow:auto;
 }
 
 #tab-pagamentos [data-action="to-banca"].btn{
