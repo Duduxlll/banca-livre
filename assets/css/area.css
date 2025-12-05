@@ -231,16 +231,15 @@ body{
   padding:14px;
   color:#ffe3c8;
   font-weight:700;
-  background:rgba(255,255,255,.02);
   border-bottom:1px solid var(--line);
   transition:box-shadow .24s ease,background-color .24s ease;
   position:sticky;
   top:0;
   z-index:5;
-  background:rgba(32,18,8,.82);
-  backdrop-filter:blur(6px);
-  background-clip:padding-box;
+  background:#201208;        
+  box-shadow:0 4px 10px rgba(0,0,0,.6);
 }
+
 .table thead th:first-child{
   border-top-left-radius:16px;
 }
