@@ -605,7 +605,7 @@ body{
   }
 }
 
-/* aqui garanti também o overflow nas abas de Bancas e Pagamentos */
+
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
   max-height:520px;
@@ -734,6 +734,17 @@ dialog.pix-modal::backdrop{
   height:34px;
   font-size:.9rem;
 }
+.table thead th.col-acoes{
+  text-align: right;   
+  padding-right: 20px; 
+}
+
+
+#btnDelAllBancas{
+  margin-left: 8px;
+}
+
+
 @media(max-width:900px){
   .add-banca-grid{
     grid-template-columns:1fr 1fr;
