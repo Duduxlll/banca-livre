@@ -256,6 +256,11 @@ body{
 .col-acoes{width:1%;white-space:nowrap}
 .table input.input-money{min-width:140px}
 
+.table thead th.col-acoes{
+  position: relative;     
+  padding-right: 120px;    
+}
+
 .btn{
   display:inline-flex;
   align-items:center;
