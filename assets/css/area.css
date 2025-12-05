@@ -247,13 +247,28 @@ body{
 .table thead th:last-child{
   border-top-right-radius:16px;
 }
+
+/* AÇÕES + EXCLUIR TODOS NO CABEÇALHO */
+.table thead th.col-acoes{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding-right:18px;
+}
+
 .table tbody tr{position:relative}
 .table tbody td{
   position:relative;
   padding:14px;
   border-bottom:1px solid rgba(255,255,255,.06);
 }
-.col-acoes{width:1%;white-space:nowrap}
+
+/* coluna de ações pode crescer normal */
+.col-acoes{
+  white-space:nowrap;
+}
+
 .table input.input-money{min-width:140px}
 
 .btn{
@@ -457,7 +472,6 @@ body{
   }
 }
 
-
 .card .table-wrap{
   overflow:auto;
   border-top-left-radius:16px;
@@ -605,7 +619,6 @@ body{
   }
 }
 
-/* aqui garanti também o overflow nas abas de Bancas e Pagamentos */
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
   max-height:520px;
