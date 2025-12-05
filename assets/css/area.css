@@ -735,12 +735,6 @@ dialog.pix-modal::backdrop{
   font-size:.9rem;
 }
 
-#btnDelAllBancas{
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-} 
 
 @media(max-width:900px){
   .add-banca-grid{
