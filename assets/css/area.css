@@ -457,7 +457,6 @@ body{
   }
 }
 
-/* AQUI ESTAVA O PROBLEMA: agora overflow:auto para mostrar o scroll */
 .card .table-wrap{
   overflow:auto;
   border-top-left-radius:16px;
@@ -605,7 +604,6 @@ body{
   }
 }
 
-/* aqui garanti também o overflow nas abas de Bancas e Pagamentos */
 #tab-bancas .table-wrap,
 #tab-pagamentos .table-wrap{
   max-height:520px;
@@ -735,15 +733,13 @@ dialog.pix-modal::backdrop{
   font-size:.9rem;
 }
 
-
 .table thead th.col-acoes{
   display:flex;
   align-items:center;
-  justify-content:flex-end; 
+  justify-content:flex-end;
   gap:8px;
   white-space:nowrap;
 }
-
 
 #btnDelAllBancas.btn--small{
   padding:4px 12px;
@@ -756,7 +752,6 @@ dialog.pix-modal::backdrop{
   filter:brightness(1.05);
   box-shadow:0 8px 22px rgba(255,92,122,.22);
 }
-
 
 @media(max-width:900px){
   .add-banca-grid{
