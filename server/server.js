@@ -111,7 +111,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
-// bloquear acesso a .git
+
 app.use((req, res, next) => {
   if (req.url.includes('/.git')) {
     return res.status(403).send('Forbidden');
@@ -119,7 +119,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Permissions-Policy
+
 app.use((req, res, next) => {
   res.setHeader(
     "Permissions-Policy",
@@ -193,7 +193,7 @@ function sseSendAll(event, payload = {}) {
   }
 }
 
-// ================== CUPONS (helpers) ==================
+
 
 function mapCupom(row){
   if (!row) return null;
@@ -226,7 +226,7 @@ function gerarCodigoCupom(){
   return tmp.slice(0,4) + '-' + tmp.slice(4);
 }
 
-// ================== PROTEÇÃO GLOBAL /api ==================
+
 
 app.use('/api', (req, res, next) => {
   const openRoutes = [
@@ -255,7 +255,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// ================== SSE ==================
+
 
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -278,7 +278,7 @@ app.get('/api/stream', requireAuth, (req, res) => {
   });
 });
 
-// ================== AUTH ==================
+
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
@@ -307,7 +307,7 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
-// ================== ÁREA PROTEGIDA (HTML) ==================
+
 
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
@@ -315,7 +315,7 @@ app.get('/area.html', (req, res) => {
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
-// ================== HEALTH & PIX TEST ==================
+
 
 app.get('/health', async (req, res) => {
   try {
@@ -337,7 +337,7 @@ app.get('/api/pix/ping', async (req, res) => {
   }
 });
 
-// ================== PIX COBRANÇA (EFI) ==================
+
 
 app.post('/api/pix/cob', async (req, res) => {
   try {
@@ -463,7 +463,7 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-// ================== PUBLIC BANCA (APP KEY) ==================
+
 
 app.post('/api/public/bancas', async (req, res) => {
   try{
@@ -500,7 +500,7 @@ app.post('/api/public/bancas', async (req, res) => {
   }
 });
 
-// ================== ÁREA (bancas/pagamentos) ==================
+
 
 const areaAuth = [requireAuth];
 
@@ -743,7 +743,7 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
   }
 });
 
-// ================== QR CODE GENERIC ==================
+
 
 app.get('/qr', async (req, res) => {
   try {
@@ -765,7 +765,7 @@ app.get('/qr', async (req, res) => {
   }
 });
 
-// ================== SORTEIO ==================
+
 
 app.get('/api/sorteio/inscricoes', async (req, res) => {
   try {
@@ -831,7 +831,7 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-// ================== BANCAS MANUAL (ÁREA) ==================
+
 
 app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   const { nome, depositoCents, pixKey, pixType } = req.body || {};
@@ -889,7 +889,7 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   }
 });
 
-// ================== EXTRATOS ==================
+
 
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
@@ -961,9 +961,7 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
-// ================== CUPONS (rotas) ==================
 
-// GET /api/cupons – lista de cupons (ÁREA, precisa login)
 app.get('/api/cupons', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -975,12 +973,12 @@ app.get('/api/cupons', requireAuth, async (req, res, next) => {
   }
 });
 
-// POST /api/cupons – criar cupom (ÁREA)
+
 app.post('/api/cupons', requireAuth, async (req, res, next) => {
   try {
     const codigoRaw = req.body.codigo;
 
-    // aceita vários nomes de campo pro valor
+    
     const valorBruto =
       req.body.valorCentavos ??
       req.body.valorCents ??
@@ -1023,7 +1021,7 @@ app.post('/api/cupons', requireAuth, async (req, res, next) => {
   }
 });
 
-// PATCH /api/cupons/:id – editar cupom (valor, ativo, expiraEm)
+
 app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1078,7 +1076,7 @@ app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-// DELETE /api/cupons/:id – remover cupom (ÁREA)
+
 app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1096,7 +1094,7 @@ app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
   }
 });
 
-// POST /api/cupons/resgatar – usar cupom (PÚBLICO, usado pelo index.html)
+
 app.post('/api/cupons/resgatar', async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -1175,7 +1173,7 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
     await client.query('COMMIT');
     client.release();
 
-    // auto-delete 5 minutos após resgate
+   
     setTimeout(async () => {
       try {
         await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
@@ -1202,7 +1200,7 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
   }
 });
 
-// ================== MIGRAÇÕES SIMPLES ==================
+
 
 async function ensureMessageColumns(){
   try{
@@ -1236,7 +1234,7 @@ async function ensureCuponsTable(){
   }
 }
 
-// ================== START SERVER ==================
+
 
 app.listen(PORT, async () => {
   try{
