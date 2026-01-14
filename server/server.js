@@ -228,16 +228,20 @@ function parseMoneyToCents(v){
   return Math.round(n * 100);
 }
 
-// =========================
-// PALPITE (estado em memória + DB)
-// =========================
+
 const PALPITE = {
   roundId: null,
   isOpen: false,
   buyValueCents: 0,
   winnersCount: 3,
-  createdAt: null
+  createdAt: null,
+
+  
+  actualResultCents: null,
+  winners: [],
+  winnersAt: null
 };
+
 
 const palpiteSseClients = new Set(); // overlay (público com key)
 function palpiteSendAll(event, payload = {}) {
@@ -319,9 +323,15 @@ async function palpiteStatePayload(){
     winnersCount: PALPITE.winnersCount,
     createdAt: PALPITE.createdAt,
     total: entries.length,
-    entries
+    entries,
+
+    
+    actualResultCents: PALPITE.actualResultCents,
+    winners: PALPITE.winners,
+    winnersAt: PALPITE.winnersAt
   };
 }
+
 
 // estado compacto pro admin (igual seu palpiteadmin.js esperava)
 async function palpiteAdminCompactState(){
@@ -650,7 +660,6 @@ app.post('/api/palpite/stop', requireAuth, async (req, res) => {
   }
 });
 
-// rota "oficial" (mantida)
 app.post('/api/palpite/open', requireAuth, async (req, res) => {
   try{
     const buyCents =
@@ -687,6 +696,9 @@ app.post('/api/palpite/open', requireAuth, async (req, res) => {
     );
 
     PALPITE.roundId = roundId;
+    PALPITE.actualResultCents = null;
+    PALPITE.winners = [];
+    PALPITE.winnersAt = null;
     PALPITE.isOpen = true;
     PALPITE.buyValueCents = buyCents|0;
     PALPITE.winnersCount = winners|0;
@@ -738,6 +750,10 @@ app.post('/api/palpite/clear', requireAuth, async (req, res) => {
 
     await q(`delete from palpite_entries where round_id = $1`, [PALPITE.roundId]);
 
+    PALPITE.actualResultCents = null;
+PALPITE.winners = [];
+PALPITE.winnersAt = null;
+
     const state = await palpiteStatePayload();
     palpiteSendAll('palpite-clear', state);
 
@@ -753,46 +769,63 @@ app.post('/api/palpite/clear', requireAuth, async (req, res) => {
   }
 });
 
-// ✅ winners (admin) + evento pro overlay (opcional)
 app.post('/api/palpite/winners', requireAuth, async (req, res) => {
-  try{
-    if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
+  try {
+    if (!PALPITE.roundId) return res.status(409).json({ error: 'no_round' });
 
-    const actualResult = Number(String(req.body?.actualResult ?? req.body?.actual ?? '').replace(',', '.'));
-    let winnersCount = parseInt(req.body?.winnersCount ?? req.body?.winners ?? PALPITE.winnersCount ?? 3, 10);
+    let winnersCount =
+      parseInt(req.body?.winnersCount ?? req.body?.winners ?? PALPITE.winnersCount ?? 3, 10);
 
-    if (!Number.isFinite(actualResult)) return res.status(400).json({ error:'actual_invalid' });
     if (!Number.isFinite(winnersCount) || winnersCount < 1) winnersCount = 1;
     if (winnersCount > 10) winnersCount = 10;
 
-    const actualCents = Math.round(actualResult * 100);
+    const actualCents =
+      (typeof req.body?.actualResultCents === 'number' ? (req.body.actualResultCents | 0) : null) ??
+      parseMoneyToCents(req.body?.actualResult ?? req.body?.actual ?? req.body?.result ?? req.body?.value);
 
-    const entries = await palpiteGetEntries(2000);
-    const ranked = entries
-      .map(e => ({
-        name: e.user,
-        value: (e.guessCents || 0) / 100,
-        guessCents: e.guessCents || 0,
-        delta: Math.abs((e.guessCents || 0) - actualCents) / 100
-      }))
-      .sort((a,b) => a.delta - b.delta);
+    if (actualCents == null || actualCents < 0) {
+      return res.status(400).json({ error: 'dados_invalidos' });
+    }
 
-    const winners = ranked.slice(0, winnersCount);
+    // pega os mais próximos (menor diferença)
+    const { rows } = await q(
+      `select user_name as "name",
+              guess_cents as "guessCents",
+              abs(guess_cents - $2)::int as "deltaCents"
+         from palpite_entries
+        where round_id = $1
+        order by abs(guess_cents - $2) asc, updated_at asc, created_at asc
+        limit $3`,
+      [PALPITE.roundId, actualCents | 0, winnersCount]
+    );
 
-    const payload = { winners, actualResult, winnersCount };
+    const winners = rows.map(r => ({
+      name: r.name,
+      value: Number(r.guessCents || 0) / 100,
+      delta: Number(r.deltaCents || 0) / 100
+    }));
 
-    // admin
-    palpiteAdminSendAll('winners', payload);
+    PALPITE.actualResultCents = actualCents | 0;
+    PALPITE.winners = winners;
+    PALPITE.winnersAt = new Date().toISOString();
 
-    // overlay (se quiser mostrar lá também)
-    palpiteSendAll('palpite-winners', payload);
+    // manda evento (se você quiser mostrar em overlay depois)
+    palpiteSendAll('palpite-winners', {
+      actualResult: actualCents / 100,
+      winnersCount,
+      winners
+    });
 
-    res.json({ ok:true, ...payload });
-  }catch(e){
+    // atualiza admin via /api/stream
+    sseSendAll('palpite-changed', { reason: 'winners', winnersCount });
+
+    return res.json({ ok: true, actualResult: actualCents / 100, winnersCount, winners });
+  } catch (e) {
     console.error('palpite/winners:', e.message);
-    res.status(500).json({ error:'falha_winners' });
+    return res.status(500).json({ error: 'falha_winners' });
   }
 });
+
 
 
 // =========================

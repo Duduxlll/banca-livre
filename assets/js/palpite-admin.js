@@ -68,32 +68,33 @@
   }
 
   function renderWinners(data) {
-    if (!el.winnersBox) return;
+  if (!el.winnersBox) return;
 
-    const winners = data?.winners || [];
-    const actual  = data?.actual;
+  const winners = data?.winners || [];
+  const actual  = data?.actualResult;
 
-    if (!winners.length) {
-      el.winnersBox.textContent = "—";
-      return;
-    }
-
-    el.winnersBox.innerHTML = `
-      <div class="pw-head">
-        <span>Resultado real: <b>R$ ${Number(actual).toFixed(2)}</b></span>
-      </div>
-      <div class="pw-list">
-        ${winners.map((w, i) => `
-          <div class="pw-item">
-            <span class="pw-rank">#${i + 1}</span>
-            <span class="pw-name">${escapeHtml(w.name)}</span>
-            <span class="pw-val">R$ ${Number(w.value).toFixed(2)}</span>
-            <span class="pw-diff">± ${Number(w.diff).toFixed(2)}</span>
-          </div>
-        `).join("")}
-      </div>
-    `;
+  if (!winners.length) {
+    el.winnersBox.textContent = "—";
+    return;
   }
+
+  el.winnersBox.innerHTML = `
+    <div class="pw-head">
+      <span>Resultado real: <b>R$ ${Number(actual).toFixed(2)}</b></span>
+    </div>
+    <div class="pw-list">
+      ${winners.map((w, i) => `
+        <div class="pw-item">
+          <span class="pw-rank">#${i + 1}</span>
+          <span class="pw-name">${escapeHtml(w.name)}</span>
+          <span class="pw-val">R$ ${Number(w.value).toFixed(2)}</span>
+          <span class="pw-diff">± ${Number(w.delta).toFixed(2)}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 
   function renderState(st) {
     if (el.buyValue && st.buyValue != null) el.buyValue.value = st.buyValue;
@@ -128,21 +129,22 @@
   }
 
   async function calcWinners() {
-    const actual = Number(String(el.finalResult?.value || "").trim().replace(",", "."));
-    const winnersCount = Number(el.winnersCount?.value || 1) || 1;
+  const actual = Number(String(el.finalResult?.value || "").trim().replace(",", "."));
+  let winnersCount = Number(el.winnersCount?.value || 3) || 3;
 
-    if (!Number.isFinite(actual)) {
-      alert("Digite quanto pagou (resultado real).");
-      return;
-    }
-
-    const out = await apiFetch("/api/palpite/admin/winners", {
-      method: "POST",
-      body: JSON.stringify({ actualResult: actual, winnersCount })
-    });
-
-    renderWinners({ winners: out.winners || [], actual });
+  if (!Number.isFinite(actual)) {
+    alert("Digite quanto pagou (resultado real).");
+    return;
   }
+
+  const out = await apiFetch("/api/palpite/winners", {
+    method: "POST",
+    body: JSON.stringify({ actualResult: actual, winnersCount })
+  });
+
+  renderWinners(out);
+}
+
 
   // SSE (admin) – não precisa key, só estar logado
   let es = null;
