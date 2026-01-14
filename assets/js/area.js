@@ -168,11 +168,14 @@ function buildPixBRCode({ chave, valorCents, nome, cidade = 'BRASILIA', txid = '
   return payloadSemCRC + crc;
 }
 
+
+
 const tabBancasEl     = qs('#tab-bancas');
 const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
 const tabCuponsEl     = qs('#tab-cupons');
 const tabSorteioEl    = qs('#tab-sorteio');
+const tabPalpiteEl    = qs('#tab-palpite'); // ✅ NOVO
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -221,7 +224,6 @@ function startCuponsAutoRefresh(){
     }
   }, 4000);
 }
-
 
 function getTotalDepEl(){
   return qs('#totalDepositos') || qs('#openTotalDepositos');
@@ -465,6 +467,8 @@ async function loadCupons(){
   return STATE.cupons;
 }
 
+
+
 async function render(){
   if (TAB === 'bancas') {
     tabBancasEl?.classList.add('show');
@@ -472,35 +476,57 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show'); // ✅
     renderBancas();
     updateTotals();
+
   } else if (TAB === 'pagamentos') {
     tabPagamentosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show'); // ✅
     renderPagamentos();
+
   } else if (TAB === 'extratos') {
     tabExtratosEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show'); // ✅
     renderExtratos();
+
   } else if (TAB === 'cupons') {
     tabCuponsEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show'); 
     renderCupons();
+
   } else if (TAB === 'sorteio') {
     tabSorteioEl?.classList.add('show');
     tabBancasEl?.classList.remove('show');
     tabPagamentosEl?.classList.remove('show');
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
+    tabPalpiteEl?.classList.remove('show'); 
+
+  } else if (TAB === 'palpite') {
+    tabPalpiteEl?.classList.add('show'); 
+    tabBancasEl?.classList.remove('show');
+    tabPagamentosEl?.classList.remove('show');
+    tabExtratosEl?.classList.remove('show');
+    tabCuponsEl?.classList.remove('show');
+    tabSorteioEl?.classList.remove('show');
+
+    
+    if (window.PalpiteAdmin && typeof window.PalpiteAdmin.onTabShown === 'function') {
+      try { window.PalpiteAdmin.onTabShown(); } catch(e){ console.error(e); }
+    }
   }
 }
 
@@ -707,6 +733,12 @@ async function refresh(){
   } else if (TAB==='cupons'){
     await loadCupons();
   } else if (TAB==='sorteio') {
+    
+  } else if (TAB==='palpite') {
+    
+    if (window.PalpiteAdmin && typeof window.PalpiteAdmin.refresh === 'function') {
+      try { await window.PalpiteAdmin.refresh(); } catch(e){ console.error(e); }
+    }
   }
   render();
 }
@@ -758,7 +790,6 @@ async function deleteAllBancas(){
   try {
     const ids = STATE.bancas.map(b => b.id);
 
-    
     await Promise.all(
       ids.map(id =>
         apiFetch(`/api/bancas/${encodeURIComponent(id)}`, {
@@ -1537,6 +1568,7 @@ function filtrarTabela(tbody, q){
     tr.style.display = tr.textContent.toLowerCase().includes(query) ? '' : 'none';
   });
 }
+
 buscaInput?.addEventListener('input', ()=>{
   const q = buscaInput.value || '';
   if (TAB==='bancas') filtrarTabela(tbodyBancas, q);
@@ -1649,7 +1681,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     });
   }
 
-   const btnDelAllBancas = qs('#btnDelAllBancas');
+  const btnDelAllBancas = qs('#btnDelAllBancas');
   if (btnDelAllBancas) {
     btnDelAllBancas.addEventListener('click', deleteAllBancas);
   }
@@ -1695,6 +1727,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     totalBanEl.style.cursor = 'pointer';
     totalBanEl.classList.add('totais-pill');
     totalBanEl.addEventListener('click', ()=> showTotaisPopup('bancas', totalBanEl));
+  }
+
+  // ✅ Se o módulo do Palpite existir, inicializa
+  if (window.PalpiteAdmin && typeof window.PalpiteAdmin.init === 'function') {
+    try { window.PalpiteAdmin.init(); } catch(e){ console.error(e); }
   }
 
   startStream();
