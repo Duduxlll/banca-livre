@@ -11,11 +11,12 @@
 
   <link rel="stylesheet" href="assets/css/area.css">
   <link rel="stylesheet" href="assets/css/sorteio.css">
+
   <!-- NOVO (Palpite Exato) -->
   <link rel="stylesheet" href="assets/css/palpite.css">
 </head>
 <body>
-  
+
   <header class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-wrap">
@@ -28,7 +29,7 @@
   </header>
 
   <main class="layout">
-    
+
     <aside class="sidebar">
       <div class="brand">
         <img src="assets/img/banner.jpg" alt="Bancas" class="brand-img">
@@ -45,7 +46,7 @@
         <button class="nav-btn" data-tab="palpite">Palpite Exato</button>
 
         <button class="nav-btn" data-tab="extratos">Extratos</button>
-        
+
         <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
           Sair
         </button>
@@ -53,10 +54,8 @@
     </aside>
 
     <section class="content">
-      
-     
-      <div class="tab tab-view show" id="tab-bancas">
 
+      <div class="tab tab-view show" id="tab-bancas">
         <div class="bar totbar">
           <input
             id="busca"
@@ -82,35 +81,32 @@
         <div class="card">
           <div class="table-wrap">
             <table class="table" id="tblBancas" aria-label="Tabela de Bancas">
-<thead>
-  <tr>
-    <th>Nome</th>
-    <th>Depósito (R$)</th>
-    <th>Banca (R$)</th>
-    
-    <th class="col-acoes">
-      <div class="th-acoes">
-        <span>Ações</span>
-        <button
-          type="button"
-          id="btnDelAllBancas"
-          class="btn btn--danger btn--small">
-          Excluir todos
-        </button>
-      </div>
-    </th>
-  </tr>
-</thead>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Depósito (R$)</th>
+                  <th>Banca (R$)</th>
 
-
-  <tbody></tbody>
-</table>
+                  <th class="col-acoes">
+                    <div class="th-acoes">
+                      <span>Ações</span>
+                      <button
+                        type="button"
+                        id="btnDelAllBancas"
+                        class="btn btn--danger btn--small">
+                        Excluir todos
+                      </button>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
 
           </div>
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-pagamentos">
         <div class="card">
           <div class="table-wrap">
@@ -119,7 +115,7 @@
                 <tr>
                   <th>Nome</th>
                   <th>Pagamento (R$)</th>
-                  <th >Ações</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -128,7 +124,6 @@
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-extratos">
         <div class="card extratos-card">
           <div class="bar extratos-bar">
@@ -210,7 +205,6 @@
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-cupons">
         <div class="card cupons-card">
           <div class="bar cupons-bar">
@@ -254,15 +248,12 @@
                   <th class="col-acoes">Ações</th>
                 </tr>
               </thead>
-              <tbody>
-               
-              </tbody>
+              <tbody></tbody>
             </table>
           </div>
         </div>
       </div>
 
-      
       <div class="tab tab-view" id="tab-sorteio">
         <div class="card sorteio-header-card">
           <div class="sorteio-header-admin">
@@ -312,7 +303,7 @@
         </div>
 
         <p class="sorteio-tip">
-          Formulário público: 
+          Formulário público:
           <code>https://banca-livre.onrender.com/sorteio-publico.html</code>
         </p>
       </div>
@@ -323,13 +314,21 @@
           <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
             <div>
               <h2 style="margin:0">💰 Palpite Exato</h2>
-              <p class="muted" style="margin:6px 0 0">Chat: <code>!231</code> (somente valor)</p>
+              <p class="muted" style="margin:6px 0 0">
+                Chat: <code>!231</code> (somente valor, acima da compra)
+              </p>
+
+              <!-- (Opcional) link de overlay pra você copiar fácil -->
+              <p class="muted" style="margin:6px 0 0">
+                Overlay (OBS): <code>/palpite-overlay.html?key=SUA_KEY</code>
+              </p>
             </div>
 
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn--primary" id="palpiteOpen">🟢 Abrir Palpites</button>
-              <button class="btn btn--ghost"   id="palpiteClose">🔴 Fechar Palpites</button>
-              <button class="btn btn--danger"  id="palpiteClear">Limpar</button>
+              <!-- IDs que o JS usa -->
+              <button class="btn btn--primary" id="btnPalpiteOpen">🟢 Abrir Palpites</button>
+              <button class="btn btn--ghost"   id="btnPalpiteClose">🔴 Fechar Palpites</button>
+              <button class="btn btn--danger"  id="btnPalpiteClear">Limpar</button>
             </div>
           </div>
         </div>
@@ -338,12 +337,13 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div>
               <label class="muted">Valor da Compra (Bonus Buy)</label>
+              <!-- ID que o JS usa -->
               <input type="number" step="0.01" class="input" id="palpiteBuyValue" placeholder="Ex: 200">
             </div>
 
-            <!-- Bet removido -->
             <div>
               <label class="muted">Ganhadores</label>
+              <!-- ID que o JS usa -->
               <select class="input" id="palpiteWinnersCount">
                 <option value="1">Top 1</option>
                 <option value="2">Top 2</option>
@@ -355,6 +355,7 @@
 
         <div class="card" style="margin-bottom:12px">
           <label class="muted">Log de Palpites</label>
+          <!-- ID que o JS usa -->
           <div class="palpite-log" id="palpiteLogBox"></div>
 
           <div style="text-align:right; color:#aaa; font-size:0.8rem; margin-top:6px;">
@@ -366,15 +367,17 @@
           <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
             <div>
               <label class="muted">Quanto Pagou (Resultado Real)</label>
+              <!-- ID que o JS usa -->
               <input type="number" step="0.01" class="input" id="palpiteFinalResult" placeholder="Ex: 240.50">
             </div>
-            <button class="btn btn--primary" id="palpiteCalc">🏆 Verificar Vencedores</button>
+            <!-- ID que o JS usa -->
+            <button class="btn btn--primary" id="btnPalpiteWinners">🏆 Verificar Vencedores</button>
           </div>
 
           <div class="palpite-winners" id="palpiteWinnersBox" style="margin-top:10px">—</div>
         </div>
       </div>
-      
+
     </section>
   </main>
 
@@ -389,7 +392,7 @@
       box-shadow:0 28px 80px rgba(0,0,0,.55);
       padding:16px;
       color:#e7e9f3;">
-      
+
       <h3 style="margin:0 0 8px; font-weight:800">Mensagem</h3>
       <p id="msgText" style="white-space:pre-wrap; margin:0 0 12px; color:#cfd2e8"></p>
 
@@ -398,13 +401,13 @@
       </div>
     </div>
   </dialog>
-  
+
   <script src="assets/js/session.js" defer></script>
   <script src="assets/js/area.js" defer></script>
   <script src="assets/js/sorteio.js" defer></script>
 
-  
-  <script src="assets/js/palpite-admin.js" defer></script>
+  <!-- NOVO (Palpite Exato) -->
+  <script src="assets/js/palpiteadmin.js" defer></script>
 
 </body>
 </html>

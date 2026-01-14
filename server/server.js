@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import 'dotenv/config'; 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -195,6 +195,113 @@ function sseSendAll(event, payload = {}) {
 
 
 
+function requireAppKey(req, res, next){
+  if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
+  const key = req.get('X-APP-KEY') || req.query?.key;
+  if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
+  next();
+}
+
+function parseMoneyToCents(v){
+  if (v == null) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.round(v * 100);
+
+  const s = String(v).trim();
+  if (!s) return null;
+
+  
+  const cleaned = s.replace(/[^\d,.\-]/g, '');
+  if (!cleaned) return null;
+
+  let numStr = cleaned;
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    numStr = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes(',')) {
+    numStr = cleaned.replace(',', '.');
+  }
+
+  const n = Number.parseFloat(numStr);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100);
+}
+
+const PALPITE = {
+  roundId: null,
+  isOpen: false,
+  buyValueCents: 0,
+  winnersCount: 3,
+  createdAt: null
+};
+
+const palpiteSseClients = new Set();
+function palpiteSendAll(event, payload = {}) {
+  const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const msg = `event: ${event}\ndata: ${data}\n\n`;
+  for (const res of palpiteSseClients) {
+    try { res.write(msg); } catch {}
+  }
+}
+
+async function palpiteLoadFromDB(){
+  try{
+    const { rows } = await q(
+      `select id,
+              is_open      as "isOpen",
+              buy_value_cents as "buyValueCents",
+              winners_count as "winnersCount",
+              created_at   as "createdAt"
+         from palpite_rounds
+        order by created_at desc
+        limit 1`
+    );
+    if (rows.length){
+      const r = rows[0];
+      PALPITE.roundId = r.id;
+      PALPITE.isOpen = !!r.isOpen;
+      PALPITE.buyValueCents = Number(r.buyValueCents || 0) | 0;
+      PALPITE.winnersCount = Number(r.winnersCount || 3) | 0;
+      PALPITE.createdAt = r.createdAt || null;
+    }
+  }catch(e){
+    console.error('palpiteLoadFromDB:', e.message);
+  }
+}
+
+async function palpiteGetEntries(limit = 300){
+  if (!PALPITE.roundId) return [];
+  const lim = Math.min(Math.max(parseInt(limit,10)||300, 1), 1000);
+  const { rows } = await q(
+    `select user_name  as "user",
+            guess_cents as "guessCents",
+            raw_text    as "rawText",
+            created_at  as "createdAt",
+            updated_at  as "updatedAt"
+       from palpite_entries
+      where round_id = $1
+      order by updated_at desc, created_at desc
+      limit ${lim}`,
+    [PALPITE.roundId]
+  );
+  return rows;
+}
+
+async function palpiteStatePayload(){
+  const entries = await palpiteGetEntries(500);
+  return {
+    roundId: PALPITE.roundId,
+    isOpen: PALPITE.isOpen,
+    buyValueCents: PALPITE.buyValueCents,
+    winnersCount: PALPITE.winnersCount,
+    createdAt: PALPITE.createdAt,
+    total: entries.length,
+    entries
+  };
+}
+
+
+
+
+
 function mapCupom(row){
   if (!row) return null;
   return {
@@ -237,7 +344,13 @@ app.use('/api', (req, res, next) => {
     '/api/pix/status',
     '/api/public/bancas',
     '/api/sorteio/inscrever',
-    '/api/cupons/resgatar'
+    '/api/cupons/resgatar',
+
+    
+    '/api/palpite/stream',
+    '/api/palpite/guess',
+    '/api/palpite/state-public'
+    
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -277,6 +390,365 @@ app.get('/api/stream', requireAuth, (req, res) => {
     try { res.end(); } catch {}
   });
 });
+
+
+app.get('/api/palpite/stream', requireAppKey, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+
+  res.flushHeaders?.();
+  palpiteSseClients.add(res);
+
+  
+  try{
+    const state = await palpiteStatePayload();
+    res.write(`event: palpite-init\ndata: ${JSON.stringify(state)}\n\n`);
+  }catch{}
+
+  const ping = setInterval(() => {
+    try { res.write(`event: ping\ndata: {}\n\n`); } catch {}
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    palpiteSseClients.delete(res);
+    try { res.end(); } catch {}
+  });
+});
+
+
+app.get('/api/palpite/state-public', requireAppKey, async (req, res) => {
+  const state = await palpiteStatePayload();
+  res.json(state);
+});
+
+
+app.post('/api/palpite/guess', requireAppKey, async (req, res) => {
+  try{
+    if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
+    if (!PALPITE.isOpen)  return res.status(409).json({ error:'palpite_closed' });
+
+    const user =
+      String(req.body?.user || req.body?.username || req.body?.nome || '').trim();
+
+    const raw =
+      req.body?.rawText ?? req.body?.raw ?? req.body?.text ?? req.body?.value ?? '';
+
+    const cents = parseMoneyToCents(req.body?.value ?? req.body?.guess ?? raw);
+    if (!user || cents == null || cents < 0) {
+      return res.status(400).json({ error:'dados_invalidos' });
+    }
+
+    const { rows } = await q(
+      `insert into palpite_entries (round_id, user_name, guess_cents, raw_text, created_at, updated_at)
+       values ($1, $2, $3, $4, now(), now())
+       on conflict (round_id, user_name)
+       do update set guess_cents = excluded.guess_cents,
+                     raw_text   = excluded.raw_text,
+                     updated_at = now()
+       returning user_name as "user",
+                 guess_cents as "guessCents",
+                 raw_text as "rawText",
+                 created_at as "createdAt",
+                 updated_at as "updatedAt"`,
+      [PALPITE.roundId, user, cents, String(raw || '').slice(0, 300)]
+    );
+
+    const entry = rows[0];
+
+   
+    palpiteSendAll('palpite-guess', { entry, totalHint: null });
+
+    
+    sseSendAll('palpite-changed', { reason:'guess', entry });
+
+    res.json({ ok:true, entry });
+  }catch(e){
+    console.error('palpite/guess:', e.message);
+    res.status(500).json({ error:'falha_palpite' });
+  }
+});
+
+
+app.get('/api/palpite/state', requireAuth, async (req, res) => {
+  const state = await palpiteStatePayload();
+  res.json(state);
+});
+
+
+app.post('/api/palpite/open', requireAuth, async (req, res) => {
+  try{
+    const buyCents =
+      (typeof req.body?.buyValueCents === 'number' ? (req.body.buyValueCents|0) : null) ??
+      parseMoneyToCents(req.body?.buyValue ?? req.body?.buy ?? 0) ??
+      0;
+
+    let winners =
+      parseInt(req.body?.winnersCount ?? req.body?.winners ?? 3, 10);
+
+    if (!Number.isFinite(winners) || winners < 1) winners = 1;
+    if (winners > 10) winners = 10;
+
+    // fecha rodada anterior se estiver aberta
+    if (PALPITE.roundId && PALPITE.isOpen) {
+      try{
+        await q(
+          `update palpite_rounds
+              set is_open = false,
+                  closed_at = now(),
+                  updated_at = now()
+            where id = $1`,
+          [PALPITE.roundId]
+        );
+      }catch{}
+    }
+
+    const roundId = uid();
+
+    await q(
+      `insert into palpite_rounds (id, is_open, buy_value_cents, winners_count, created_at, updated_at)
+       values ($1, true, $2, $3, now(), now())`,
+      [roundId, buyCents|0, winners|0]
+    );
+
+    PALPITE.roundId = roundId;
+    PALPITE.isOpen = true;
+    PALPITE.buyValueCents = buyCents|0;
+    PALPITE.winnersCount = winners|0;
+    PALPITE.createdAt = new Date().toISOString();
+
+    const state = await palpiteStatePayload();
+
+    palpiteSendAll('palpite-open', state);
+    sseSendAll('palpite-changed', { reason:'open', state });
+
+    res.json({ ok:true, roundId });
+  }catch(e){
+    console.error('palpite/open:', e.message);
+    res.status(500).json({ error:'falha_open' });
+  }
+});
+
+
+app.post('/api/palpite/close', requireAuth, async (req, res) => {
+  try{
+    if (!PALPITE.roundId) return res.json({ ok:true });
+
+    await q(
+      `update palpite_rounds
+          set is_open = false,
+              closed_at = now(),
+              updated_at = now()
+        where id = $1`,
+      [PALPITE.roundId]
+    );
+
+    PALPITE.isOpen = false;
+
+    const state = await palpiteStatePayload();
+    palpiteSendAll('palpite-close', state);
+    sseSendAll('palpite-changed', { reason:'close', state });
+
+    res.json({ ok:true });
+  }catch(e){
+    console.error('palpite/close:', e.message);
+    res.status(500).json({ error:'falha_close' });
+  }
+});
+
+
+app.post('/api/palpite/clear', requireAuth, async (req, res) => {
+  try{
+    if (!PALPITE.roundId) return res.json({ ok:true });
+
+    await q(`delete from palpite_entries where round_id = $1`, [PALPITE.roundId]);
+
+    const state = await palpiteStatePayload();
+    palpiteSendAll('palpite-clear', state);
+    sseSendAll('palpite-changed', { reason:'clear', state });
+
+    res.json({ ok:true });
+  }catch(e){
+    console.error('palpite/clear:', e.message);
+    res.status(500).json({ error:'falha_clear' });
+  }
+});
+
+
+app.get('/palpite-overlay.html', (req, res) => {
+  if (!APP_PUBLIC_KEY) {
+    return res.status(403).send('public_off');
+  }
+  const key = String(req.query?.key || '');
+  if (!key || key !== APP_PUBLIC_KEY) {
+    return res.status(401).send('unauthorized');
+  }
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Palpite Overlay</title>
+<style>
+  html,body{ margin:0; padding:0; background:transparent; font-family:Inter,system-ui,Arial; }
+  .wrap{
+    position:fixed; left:20px; top:20px;
+    width: 460px; max-width: calc(100vw - 40px);
+    color:#fff;
+  }
+  .card{
+    background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+    padding: 12px 12px 10px;
+    backdrop-filter: blur(6px) saturate(1.1);
+  }
+  .head{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .title{ font-weight:800; font-size:16px; letter-spacing:.2px; }
+  .pill{
+    font-size:12px; font-weight:800;
+    padding:6px 10px; border-radius:999px;
+    background: rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.18);
+  }
+  .pill.on{ background: rgba(46, 204, 113, .18); border-color: rgba(46,204,113,.35); }
+  .pill.off{ background: rgba(231,76,60,.18); border-color: rgba(231,76,60,.35); }
+  .sub{ margin:8px 0 0; font-size:12px; opacity:.9; }
+  .log{ margin-top:10px; display:grid; gap:8px; }
+  .item{
+    display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding:10px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.14);
+    animation: in .18s ease-out;
+  }
+  @keyframes in{ from{ opacity:0; transform: translateY(6px) scale(.98);} to{opacity:1; transform:none;} }
+  .name{ font-weight:800; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .val{ font-weight:800; font-variant-numeric: tabular-nums; }
+  .foot{ margin-top:8px; font-size:12px; opacity:.85; display:flex; justify-content:space-between; }
+  .muted{ opacity:.75; }
+  .hide{ opacity:0; transform: translateY(6px); transition: .35s ease; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="head">
+      <div class="title">💰 Palpite Exato</div>
+      <div id="statusPill" class="pill off">FECHADO</div>
+    </div>
+    <div class="sub">
+      Compra (Bonus Buy): <span id="buyVal" class="muted">—</span>
+    </div>
+
+    <div id="log" class="log"></div>
+
+    <div class="foot">
+      <div>Total: <span id="total">0</span></div>
+      <div class="muted">Atualiza ao vivo</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const fmtBRL = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  const params = new URLSearchParams(location.search);
+  const key = params.get('key');
+
+  const elLog = document.getElementById('log');
+  const elTotal = document.getElementById('total');
+  const elBuy = document.getElementById('buyVal');
+  const pill = document.getElementById('statusPill');
+
+  const MAX = 18;
+  const TTL = 12000;
+
+  function setStatus(isOpen){
+    pill.classList.toggle('on', !!isOpen);
+    pill.classList.toggle('off', !isOpen);
+    pill.textContent = isOpen ? 'ABERTO' : 'FECHADO';
+  }
+
+  function renderInit(state){
+    setStatus(state.isOpen);
+    elBuy.textContent = state.buyValueCents ? fmtBRL(state.buyValueCents) : '—';
+    elTotal.textContent = state.total || 0;
+
+    elLog.innerHTML = '';
+    (state.entries || []).slice(0, MAX).forEach(e => addItem(e.user, e.guessCents, false));
+  }
+
+  function addItem(user, cents, animate=true){
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = \`
+      <div class="name">\${escapeHtml(user || '')}</div>
+      <div class="val">\${fmtBRL(cents||0)}</div>
+    \`;
+    if (!animate) div.style.animation = 'none';
+
+    elLog.prepend(div);
+    while (elLog.children.length > MAX) elLog.removeChild(elLog.lastChild);
+
+    setTimeout(() => {
+      div.classList.add('hide');
+      setTimeout(()=> div.remove(), 380);
+    }, TTL);
+  }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  const es = new EventSource('/api/palpite/stream?key=' + encodeURIComponent(key));
+
+  es.addEventListener('palpite-init', (ev)=>{
+    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{}
+  });
+
+  es.addEventListener('palpite-open', (ev)=>{
+    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{}
+  });
+
+  es.addEventListener('palpite-close', (ev)=>{
+    try{
+      const st = JSON.parse(ev.data||'{}');
+      setStatus(false);
+      elTotal.textContent = st.total || elTotal.textContent;
+    }catch{
+      setStatus(false);
+    }
+  });
+
+  es.addEventListener('palpite-clear', (ev)=>{
+    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{
+      elLog.innerHTML = '';
+      elTotal.textContent = '0';
+    }
+  });
+
+  es.addEventListener('palpite-guess', (ev)=>{
+    try{
+      const data = JSON.parse(ev.data||'{}');
+      const entry = data.entry || {};
+      if (entry.user) addItem(entry.user, entry.guessCents, true);
+      // atualiza total via poll leve
+      // (se quiser perfeito, o servidor pode mandar total, mas aqui já fica ok)
+      if (elTotal.textContent) elTotal.textContent = String(Number(elTotal.textContent||0) + 1);
+    }catch{}
+  });
+
+  es.onerror = ()=>{};
+</script>
+</body>
+</html>`);
+});
+
 
 
 
@@ -1235,12 +1707,51 @@ async function ensureCuponsTable(){
 }
 
 
+async function ensurePalpiteTables(){
+  try{
+    await q(`
+      CREATE TABLE IF NOT EXISTS palpite_rounds (
+        id TEXT PRIMARY KEY,
+        is_open BOOLEAN NOT NULL DEFAULT false,
+        buy_value_cents INTEGER NOT NULL DEFAULT 0,
+        winners_count INTEGER NOT NULL DEFAULT 3,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        closed_at TIMESTAMPTZ
+      )
+    `);
+
+    await q(`
+      CREATE TABLE IF NOT EXISTS palpite_entries (
+        id BIGSERIAL PRIMARY KEY,
+        round_id TEXT NOT NULL REFERENCES palpite_rounds(id) ON DELETE CASCADE,
+        user_name TEXT NOT NULL,
+        guess_cents INTEGER NOT NULL,
+        raw_text TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (round_id, user_name)
+      )
+    `);
+  }catch(e){
+    console.error('ensurePalpiteTables:', e.message);
+  }
+}
+
+
+
 
 app.listen(PORT, async () => {
   try{
     await q('select 1');
     await ensureMessageColumns();
     await ensureCuponsTable();
+
+    
+    await ensurePalpiteTables();
+    await palpiteLoadFromDB();
+   
+
     console.log('🗄️  Postgres conectado');
   }
   catch(e){
