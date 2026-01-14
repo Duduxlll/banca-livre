@@ -1,158 +1,207 @@
+
+
 (() => {
   const API = window.location.origin;
-  const KEY_STORAGE = 'palpite_overlay_key';
 
-  const qs = (s, r=document) => r.querySelector(s);
+  const qs = (s, r = document) => r.querySelector(s);
 
-  function getKey(forceAsk = false) {
-    let k = localStorage.getItem(KEY_STORAGE) || '';
-    if (!k && forceAsk) {
-      k = prompt('Cole sua PALPITE_OVERLAY_KEY (a mesma da Render):') || '';
-      k = k.trim();
-      if (k) localStorage.setItem(KEY_STORAGE, k);
-    }
-    return k;
-  }
-
-  async function post(path, body) {
-    const k = getKey(true);
-    if (!k) throw new Error('Sem key');
-
-    const res = await fetch(`${API}${path}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Palpite-Key': k
-      },
-      body: JSON.stringify(body || {})
-    });
-
-    if (!res.ok) {
-      let err;
-      try { err = await res.json(); } catch {}
-      throw new Error(err?.error || `HTTP ${res.status}`);
-    }
-    return res.json();
-  }
-
-  // IDs esperados (usa fallback pra não quebrar)
-  const el = {};
-  function bind() {
-    el.buyValue     = qs('#buyValue')     || qs('#palpiteBuyValue');
-    el.winnersCount = qs('#winnersCount') || qs('#palpiteWinnersCount');
-    el.finalResult  = qs('#finalResult')  || qs('#palpiteFinalResult');
-
-    el.logBox       = qs('#logBox')       || qs('#palpiteLogBox');
-    el.total        = qs('#totalGuesses') || qs('#palpiteTotalGuesses');
-
-    el.btnOpen  = qs('#btnPalpiteOpen');
-    el.btnClose = qs('#btnPalpiteClose');
-    el.btnClear = qs('#btnPalpiteClear');
-    el.btnWin   = qs('#btnPalpiteWinners');
-  }
-
-  function setTotal(n) {
-    if (el.total) el.total.textContent = String(n || 0);
-  }
-
-  function clearLog() {
-    if (el.logBox) el.logBox.innerHTML = '';
-    setTotal(0);
-  }
-
-  function addLogLine(name, value) {
-    if (!el.logBox) return;
-    const div = document.createElement('div');
-    div.innerHTML = `[CHAT] <b>${escapeHtml(name)}</b>: R$ ${Number(value).toFixed(2)}`;
-    el.logBox.appendChild(div);
-    el.logBox.scrollTop = el.logBox.scrollHeight;
-  }
-
-  function escapeHtml(s=''){
-    return String(s).replace(/[&<>"']/g, m => ({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  const esc = (s = '') =>
+    String(s).replace(/[&<>"']/g, m => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[m]));
+
+  // =========================
+  // KEY pela URL (?key=...)
+  // =========================
+  function getKeyFromUrl() {
+    const u = new URL(window.location.href);
+    return (u.searchParams.get('key') || '').trim();
   }
 
-  async function startRound() {
-    const buyValue = Number(el.buyValue?.value || 0) || 0;
-    clearLog();
-    await post('/api/palpite/start', { buyValue });
+  const KEY = getKeyFromUrl();
+
+  function showError(msg) {
+    const box = qs('#overlayError') || qs('#palpiteOverlayError');
+    if (box) {
+      box.style.display = 'block';
+      box.innerHTML = esc(msg);
+    } else {
+      console.error(msg);
+    }
   }
 
-  async function closeRound() {
-    await post('/api/palpite/stop', {});
+  if (!KEY) {
+    showError('Falta a key na URL. Use: .../palpite-overlay.html?key=SUA_KEY');
   }
 
-  async function clearRound() {
-    clearLog();
-    await post('/api/palpite/clear', {});
+  // =========================
+  // DOM (IDs esperados no overlay)
+  // =========================
+  const el = {
+    title: qs('#overlayTitle') || qs('#palpiteTitle'),
+    subtitle: qs('#overlaySubtitle') || qs('#palpiteSubtitle'),
+    buyValue: qs('#overlayBuyValue') || qs('#buyValue'),
+    status: qs('#overlayStatus') || qs('#palpiteStatus'),
+    total: qs('#overlayTotal') || qs('#totalGuesses'),
+    list: qs('#overlayList') || qs('#logBox') || qs('#palpiteLogBox'),
+    winners: qs('#overlayWinners') || qs('#palpiteWinnersBox'),
+    hint: qs('#overlayHint') || qs('#palpiteHint'),
+  };
+
+  function setText(node, txt) {
+    if (!node) return;
+    node.textContent = txt;
   }
 
-  async function winners() {
-    const actual = String(el.finalResult?.value || '').trim().replace(',', '.');
-    const actualResult = Number(actual);
-    const winnersCount = Number(el.winnersCount?.value || 1) || 1;
+  function setHtml(node, html) {
+    if (!node) return;
+    node.innerHTML = html;
+  }
 
-    if (!Number.isFinite(actualResult)) {
-      alert('Digite quanto pagou (resultado real).');
+  function fmtMoney(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '0,00';
+    return v.toFixed(2).replace('.', ',');
+  }
+
+  function clearList() {
+    if (el.list) el.list.innerHTML = '';
+  }
+
+  function addGuessLine(name, value) {
+    if (!el.list) return;
+
+    const row = document.createElement('div');
+    row.className = 'overlay-line';
+    row.innerHTML = `
+      <span class="overlay-name">${esc(name || '—')}</span>
+      <span class="overlay-value">R$ ${esc(fmtMoney(value))}</span>
+    `;
+
+    // adiciona no topo (mais recente primeiro)
+    el.list.prepend(row);
+
+    // limita linhas (pra não crescer infinito)
+    const max = 12;
+    const kids = [...el.list.children];
+    if (kids.length > max) {
+      kids.slice(max).forEach(k => k.remove());
+    }
+  }
+
+  function renderState(st) {
+    // st: { open, buyValue, totalGuesses, lastGuesses }
+    if (!st || typeof st !== 'object') return;
+
+    if (el.buyValue && st.buyValue != null) {
+      setText(el.buyValue, `Bonus: R$ ${fmtMoney(st.buyValue)}`);
+    }
+
+    if (el.status) {
+      setText(el.status, st.open ? 'ABERTO' : 'FECHADO');
+      el.status.classList.toggle('is-open', !!st.open);
+      el.status.classList.toggle('is-closed', !st.open);
+    }
+
+    if (el.total) setText(el.total, String(st.totalGuesses || 0));
+
+    // lista inicial (lastGuesses vindo do backend)
+    if (el.list && Array.isArray(st.lastGuesses)) {
+      clearList();
+      // backend pode mandar do mais antigo pro mais novo
+      // vamos colocar o mais novo primeiro
+      st.lastGuesses.slice().reverse().forEach(g => addGuessLine(g.name, g.value));
+    }
+  }
+
+  function renderWinners(payload) {
+    // payload: { winners: [{name,value,delta}], actualResult, winnersCount }
+    if (!el.winners) return;
+    const winners = payload?.winners || [];
+    if (!winners.length) {
+      setHtml(el.winners, `<div class="overlay-winners-empty">—</div>`);
       return;
     }
 
-    await post('/api/palpite/winners', { actualResult, winnersCount });
+    setHtml(el.winners, winners.map((w, i) => `
+      <div class="overlay-winner">
+        <span class="overlay-winner-rank">#${i + 1}</span>
+        <span class="overlay-winner-name">${esc(w.name || '—')}</span>
+        <span class="overlay-winner-value">R$ ${esc(fmtMoney(w.value))}</span>
+        ${w.delta != null ? `<span class="overlay-winner-delta">(± ${esc(fmtMoney(w.delta))})</span>` : ''}
+      </div>
+    `).join(''));
   }
 
-  // Admin também escuta o stream pra atualizar log/total em tempo real
+  // =========================
+  // SSE (tempo real)
+  // =========================
   let es = null;
-  function connectStream() {
-    const k = getKey(false);
-    if (!k) return; // só conecta depois que você salvar a key (clicando Abrir etc)
 
-    if (es) try { es.close(); } catch {}
-    es = new EventSource(`${API}/api/palpite/stream?key=${encodeURIComponent(k)}`);
+  function connect() {
+    if (!KEY) return;
+
+    // fecha anterior
+    if (es) {
+      try { es.close(); } catch {}
+      es = null;
+    }
+
+    const url = `${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`;
+    es = new EventSource(url);
 
     es.addEventListener('state', (e) => {
-      const st = JSON.parse(e.data || '{}');
-      if (el.buyValue && st.buyValue != null) el.buyValue.value = st.buyValue;
-      setTotal(st.totalGuesses || 0);
-
-      if (el.logBox && Array.isArray(st.lastGuesses)) {
-        el.logBox.innerHTML = '';
-        st.lastGuesses.slice().reverse().forEach(g => addLogLine(g.name, g.value));
+      try {
+        const st = JSON.parse(e.data || '{}');
+        renderState(st);
+      } catch (err) {
+        console.error('state parse error', err);
       }
     });
 
     es.addEventListener('guess', (e) => {
-      const d = JSON.parse(e.data || '{}');
-      addLogLine(d.name, d.value);
-      setTotal(d.totalGuesses || 0);
+      try {
+        const d = JSON.parse(e.data || '{}');
+        addGuessLine(d.name, d.value);
+        if (el.total) setText(el.total, String(d.totalGuesses || 0));
+      } catch (err) {
+        console.error('guess parse error', err);
+      }
+    });
+
+    es.addEventListener('winners', (e) => {
+      try {
+        const d = JSON.parse(e.data || '{}');
+        renderWinners(d);
+      } catch (err) {
+        console.error('winners parse error', err);
+      }
+    });
+
+    es.addEventListener('clear', () => {
+      clearList();
+      if (el.total) setText(el.total, '0');
+      if (el.winners) setHtml(el.winners, `<div class="overlay-winners-empty">—</div>`);
     });
 
     es.onerror = () => {
+      // reconecta sem travar
       try { es.close(); } catch {}
-      setTimeout(connectStream, 1500);
+      es = null;
+      setTimeout(connect, 1500);
     };
   }
 
+  // =========================
+  // Start
+  // =========================
   document.addEventListener('DOMContentLoaded', () => {
-    bind();
+    // texto padrão opcional
+    if (el.hint && !el.hint.textContent.trim()) {
+      setText(el.hint, 'Digite no chat: !231  (somente o valor)');
+    }
+    if (el.winners) setHtml(el.winners, `<div class="overlay-winners-empty">—</div>`);
 
-    // Se seus botões não tiverem esses IDs, coloca eles no HTML (é só “adicionar”, não quebra)
-    el.btnOpen?.addEventListener('click', () => startRound().catch(console.error));
-    el.btnClose?.addEventListener('click', () => closeRound().catch(console.error));
-    el.btnClear?.addEventListener('click', () => clearRound().catch(console.error));
-    el.btnWin?.addEventListener('click', () => winners().catch(console.error));
-
-    // tenta conectar (se ainda não tiver key, conecta depois quando você apertar Abrir e salvar)
-    connectStream();
-
-    // opcional: quando salvar key pela primeira vez, recarrega stream
-    const oldPost = post;
-    post = async (...args) => {
-      const out = await oldPost(...args);
-      if (!es) connectStream();
-      return out;
-    };
+    connect();
   });
 })();
