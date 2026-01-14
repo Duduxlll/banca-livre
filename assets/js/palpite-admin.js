@@ -1,4 +1,4 @@
-// assets/js/palpite-admin.js
+// assets/js/palpite-admin.js  (ADMIN - painel /area.html)
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
@@ -14,12 +14,14 @@
     const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
     const method = (opts.method || "GET").toUpperCase();
 
+    // CSRF do seu server.js
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
       const csrf = getCookie("csrf");
       if (csrf) headers["X-CSRF-Token"] = csrf;
     }
 
     const res = await fetch(`${API}${path}`, { credentials: "include", ...opts, headers });
+
     if (!res.ok) {
       let err;
       try { err = await res.json(); } catch {}
@@ -30,25 +32,30 @@
 
   const el = {};
   function bind() {
-    el.buyValue     = qs("#palpiteBuyValue");
-    el.winnersCount = qs("#palpiteWinnersCount");
-    el.finalResult  = qs("#palpiteFinalResult");
-    el.logBox       = qs("#palpiteLogBox");
-    el.total        = qs("#palpiteTotalGuesses");
-    el.winnersBox   = qs("#palpiteWinnersBox");
+    // inputs (com fallback)
+    el.buyValue     = qs("#palpiteBuyValue")     || qs("#buyValue");
+    el.winnersCount = qs("#palpiteWinnersCount") || qs("#winnersCount");
+    el.finalResult  = qs("#palpiteFinalResult")  || qs("#finalResult");
 
-    // seus IDs no HTML:
-    el.btnOpen  = qs("#palpiteOpen");
-    el.btnClose = qs("#palpiteClose");
-    el.btnClear = qs("#palpiteClear");
-    el.btnCalc  = qs("#palpiteCalc");
+    // UI
+    el.logBox     = qs("#palpiteLogBox")         || qs("#logBox");
+    el.total      = qs("#palpiteTotalGuesses")   || qs("#totalGuesses");
+    el.winnersBox = qs("#palpiteWinnersBox");
+
+    // botões (com fallback)
+    el.btnOpen  = qs("#palpiteOpen")  || qs("#btnPalpiteOpen");
+    el.btnClose = qs("#palpiteClose") || qs("#btnPalpiteClose");
+    el.btnClear = qs("#palpiteClear") || qs("#btnPalpiteClear");
+    el.btnCalc  = qs("#palpiteCalc")  || qs("#btnPalpiteWinners");
   }
 
-  function escapeHtml(s = "") {
-    return String(s).replace(/[&<>"']/g, (m) => ({
+  const esc = (s = "") =>
+    String(s).replace(/[&<>"']/g, (m) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     }[m]));
-  }
+
+  const fmtBRL = (cents) =>
+    (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   function setTotal(n) {
     if (el.total) el.total.textContent = String(n || 0);
@@ -59,135 +66,150 @@
     setTotal(0);
   }
 
-  function addLogLine(name, value) {
+  function addLogLine(user, guessCents) {
     if (!el.logBox) return;
     const div = document.createElement("div");
-    div.innerHTML = `[CHAT] <b>${escapeHtml(name)}</b>: R$ ${Number(value).toFixed(2)}`;
+    div.innerHTML = `[CHAT] <b>${esc(user || "—")}</b>: ${esc(fmtBRL(guessCents))}`;
     el.logBox.appendChild(div);
     el.logBox.scrollTop = el.logBox.scrollHeight;
   }
 
-  function renderWinners(data) {
-  if (!el.winnersBox) return;
+  function renderState(state) {
+    // state do seu server: { roundId,isOpen,buyValueCents,winnersCount,total,entries }
+    if (!state || typeof state !== "object") return;
 
-  const winners = data?.winners || [];
-  const actual  = data?.actualResult;
-
-  if (!winners.length) {
-    el.winnersBox.textContent = "—";
-    return;
-  }
-
-  el.winnersBox.innerHTML = `
-    <div class="pw-head">
-      <span>Resultado real: <b>R$ ${Number(actual).toFixed(2)}</b></span>
-    </div>
-    <div class="pw-list">
-      ${winners.map((w, i) => `
-        <div class="pw-item">
-          <span class="pw-rank">#${i + 1}</span>
-          <span class="pw-name">${escapeHtml(w.name)}</span>
-          <span class="pw-val">R$ ${Number(w.value).toFixed(2)}</span>
-          <span class="pw-diff">± ${Number(w.delta).toFixed(2)}</span>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-
-
-  function renderState(st) {
-    if (el.buyValue && st.buyValue != null) el.buyValue.value = st.buyValue;
+    // preenche buyValue no input (mostra em reais, sem quebrar)
+    if (el.buyValue && state.buyValueCents != null) {
+      const reais = (Number(state.buyValueCents || 0) / 100).toFixed(2).replace(".", ",");
+      // só escreve se o input estiver vazio (pra não atrapalhar você digitando)
+      if (!String(el.buyValue.value || "").trim()) el.buyValue.value = reais;
+    }
 
     clearLog();
-    const last = Array.isArray(st.lastGuesses) ? st.lastGuesses : [];
-    // lastGuesses vem do server “do mais recente pro mais antigo”
-    last.slice().reverse().forEach((g) => addLogLine(g.name, g.value));
-    setTotal(st.totalGuesses || 0);
 
-    if (st.winners && st.winners.length) {
-      renderWinners({ winners: st.winners, actual: st.actualResult });
-    } else {
-      if (el.winnersBox) el.winnersBox.textContent = "—";
-    }
+    const entries = Array.isArray(state.entries) ? state.entries : [];
+    // mostra do mais recente pro mais antigo
+    entries.slice(0, 120).forEach((e) => addLogLine(e.user, e.guessCents));
+
+    setTotal(state.total || entries.length || 0);
   }
 
-  async function startRound() {
-    const buyValue = Number(String(el.buyValue?.value || "0").replace(",", ".")) || 0;
-    await apiFetch("/api/palpite/admin/start", {
+  function renderWinnersList(winners, actualCents) {
+    if (!el.winnersBox) return;
+
+    if (!winners || !winners.length) {
+      el.winnersBox.innerHTML = "—";
+      return;
+    }
+
+    el.winnersBox.innerHTML = `
+      <div style="margin-bottom:8px;opacity:.9">
+        Resultado real: <b>${esc(fmtBRL(actualCents))}</b>
+      </div>
+      <div style="display:grid;gap:8px">
+        ${winners.map((w, i) => `
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px">
+            <div style="display:flex;gap:10px;align-items:center">
+              <b>#${i + 1}</b>
+              <span>${esc(w.user)}</span>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <span>${esc(fmtBRL(w.guessCents))}</span>
+              <span style="opacity:.8">± ${esc(fmtBRL(w.diffCents))}</span>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function parseToCents(v) {
+    const s = String(v || "").trim().replace(/\s/g, "");
+    if (!s) return null;
+    const n = Number(s.replace(",", "."));
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n * 100);
+  }
+
+  // ====== ROTAS CERTAS (igual no seu server.js)
+  async function openRound() {
+    const buyValue = String(el.buyValue?.value || "").trim(); // pode ser "200" ou "200,50"
+    const winnersCount = Number(el.winnersCount?.value || 3) || 3;
+
+    await apiFetch("/api/palpite/open", {
       method: "POST",
-      body: JSON.stringify({ buyValue })
+      body: JSON.stringify({ buyValue, winnersCount })
     });
+
+    // atualiza logo depois de abrir
+    const st = await apiFetch("/api/palpite/state");
+    renderState(st);
   }
 
   async function closeRound() {
-    await apiFetch("/api/palpite/admin/stop", { method: "POST", body: "{}" });
+    await apiFetch("/api/palpite/close", { method: "POST", body: "{}" });
+    const st = await apiFetch("/api/palpite/state");
+    renderState(st);
   }
 
   async function clearRound() {
-    await apiFetch("/api/palpite/admin/clear", { method: "DELETE" });
+    await apiFetch("/api/palpite/clear", { method: "POST", body: "{}" });
+    const st = await apiFetch("/api/palpite/state");
+    renderState(st);
+    if (el.winnersBox) el.winnersBox.innerHTML = "—";
   }
 
+  // ✅ Verificar vencedores (calcula no FRONT agora, sem precisar rota no server)
   async function calcWinners() {
-  const actual = Number(String(el.finalResult?.value || "").trim().replace(",", "."));
-  let winnersCount = Number(el.winnersCount?.value || 3) || 3;
+    const actualCents = parseToCents(el.finalResult?.value);
+    const winnersCount = Math.max(1, Math.min(10, Number(el.winnersCount?.value || 3) || 3));
 
-  if (!Number.isFinite(actual)) {
-    alert("Digite quanto pagou (resultado real).");
-    return;
+    if (actualCents == null) {
+      alert("Digite quanto pagou (resultado real). Ex: 240,50");
+      return;
+    }
+
+    const st = await apiFetch("/api/palpite/state");
+    const entries = Array.isArray(st.entries) ? st.entries : [];
+
+    const ranked = entries
+      .map((e) => ({
+        user: e.user,
+        guessCents: Number(e.guessCents || 0),
+        diffCents: Math.abs(Number(e.guessCents || 0) - actualCents)
+      }))
+      .sort((a, b) => a.diffCents - b.diffCents);
+
+    renderWinnersList(ranked.slice(0, winnersCount), actualCents);
   }
 
-  const out = await apiFetch("/api/palpite/winners", {
-    method: "POST",
-    body: JSON.stringify({ actualResult: actual, winnersCount })
-  });
-
-  renderWinners(out);
-}
-
-
-  // SSE (admin) – não precisa key, só estar logado
-  let es = null;
-  function connectStream() {
-    if (es) try { es.close(); } catch {}
-    es = new EventSource(`${API}/api/palpite/admin/stream`);
-
-    es.addEventListener("state", (e) => {
-      const st = JSON.parse(e.data || "{}");
-      renderState(st);
-    });
-
-    es.addEventListener("guess", (e) => {
-      const d = JSON.parse(e.data || "{}");
-      addLogLine(d.name, d.value);
-      setTotal(d.totalGuesses || 0);
-    });
-
-    es.addEventListener("winners", (e) => {
-      const d = JSON.parse(e.data || "{}");
-      renderWinners(d);
-    });
-
-    es.onerror = () => {
-      try { es.close(); } catch {}
-      setTimeout(connectStream, 1500);
-    };
+  // ====== loop de atualização (admin)
+  let pollTimer = null;
+  function startPoll() {
+    if (pollTimer) return;
+    pollTimer = setInterval(async () => {
+      try {
+        const st = await apiFetch("/api/palpite/state");
+        renderState(st);
+      } catch {}
+    }, 2000);
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
     bind();
-    if (!el.buyValue) return;
+    if (!el.btnOpen && !el.buyValue) return; // não é a página
 
-    el.btnOpen?.addEventListener("click", () => startRound().catch(console.error));
+    el.btnOpen?.addEventListener("click", () => openRound().catch(console.error));
     el.btnClose?.addEventListener("click", () => closeRound().catch(console.error));
     el.btnClear?.addEventListener("click", () => clearRound().catch(console.error));
     el.btnCalc?.addEventListener("click", () => calcWinners().catch(console.error));
 
+    // carrega estado inicial
     try {
-      const st = await apiFetch("/api/palpite/admin/state");
+      const st = await apiFetch("/api/palpite/state");
       renderState(st);
     } catch {}
 
-    connectStream();
+    startPoll();
   });
 })();
