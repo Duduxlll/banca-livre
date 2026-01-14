@@ -24,10 +24,6 @@ const {
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
   APP_PUBLIC_KEY,
-
-  // ✅ NOVO (palpite): chave separada pro palpite/overlay/admin por key
-  PALPITE_OVERLAY_KEY,
-
   EFI_CLIENT_ID,
   EFI_CLIENT_SECRET,
   EFI_CERT_PATH,
@@ -39,9 +35,6 @@ const {
 } = process.env;
 
 const PROD = process.env.NODE_ENV === 'production';
-
-// ✅ chave do palpite (se não tiver, usa a APP_PUBLIC_KEY)
-const PALPITE_KEY = (PALPITE_OVERLAY_KEY || APP_PUBLIC_KEY || '').trim();
 
 ['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
   if(!process.env[k]) {
@@ -118,12 +111,14 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
+
 app.use((req, res, next) => {
   if (req.url.includes('/.git')) {
     return res.status(403).send('Forbidden');
   }
   next();
 });
+
 
 app.use((req, res, next) => {
   res.setHeader(
@@ -198,47 +193,17 @@ function sseSendAll(event, payload = {}) {
   }
 }
 
-// ========= KEYS =========
 
-// ✅ mantém o APP_PUBLIC_KEY para rotas "públicas" do app
+
+// ✅ KEY pública (Render ENV) - aceita X-APP-KEY / ?key= / X-Palpite-Key
 function requireAppKey(req, res, next){
   if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
-  const key = req.get('X-APP-KEY') || req.get('X-Palpite-Key') || req.query?.key;
+  const key =
+    req.get('X-APP-KEY') ||
+    req.get('X-Palpite-Key') ||
+    req.query?.key;
   if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
   next();
-}
-
-// ✅ chave exclusiva do palpite (PALPITE_OVERLAY_KEY ou APP_PUBLIC_KEY)
-function hasValidPalpiteKey(req){
-  if (!PALPITE_KEY) return false;
-  const key = req.get('X-Palpite-Key') || req.get('X-APP-KEY') || req.query?.key;
-  return !!key && key === PALPITE_KEY;
-}
-function requirePalpiteKey(req, res, next){
-  if (!PALPITE_KEY) return res.status(403).json({ error:'palpite_key_off' });
-  if (!hasValidPalpiteKey(req)) return res.status(401).json({ error:'unauthorized' });
-  next();
-}
-
-// ✅ aceita sessão OU key do palpite (pra admin via key funcionar)
-function requireAuthOrPalpiteKey(req, res, next){
-  const token = req.cookies?.session;
-  const data  = token && verifySession(token);
-
-  if (data) {
-    if (['POST','PUT','PATCH','DELETE'].includes(req.method)) {
-      const csrfHeader = req.get('X-CSRF-Token');
-      const csrfCookie = req.cookies?.csrf;
-      if (!csrfHeader || csrfHeader !== csrfCookie) {
-        return res.status(403).json({ error: 'invalid_csrf' });
-      }
-    }
-    req.user = data;
-    return next();
-  }
-
-  if (hasValidPalpiteKey(req)) return next();
-  return res.status(401).json({ error:'unauthorized' });
 }
 
 function parseMoneyToCents(v){
@@ -263,8 +228,9 @@ function parseMoneyToCents(v){
   return Math.round(n * 100);
 }
 
-// ========= PALPITE =========
-
+// =========================
+// PALPITE (estado em memória + DB)
+// =========================
 const PALPITE = {
   roundId: null,
   isOpen: false,
@@ -273,7 +239,7 @@ const PALPITE = {
   createdAt: null
 };
 
-const palpiteSseClients = new Set();
+const palpiteSseClients = new Set(); // overlay (público com key)
 function palpiteSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
   const msg = `event: ${event}\ndata: ${data}\n\n`;
@@ -282,14 +248,24 @@ function palpiteSendAll(event, payload = {}) {
   }
 }
 
+// admin SSE (log/contagem no /area.html)
+const palpiteAdminSseClients = new Set();
+function palpiteAdminSendAll(event, payload = {}) {
+  const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const msg = `event: ${event}\ndata: ${data}\n\n`;
+  for (const res of palpiteAdminSseClients) {
+    try { res.write(msg); } catch {}
+  }
+}
+
 async function palpiteLoadFromDB(){
   try{
     const { rows } = await q(
       `select id,
-              is_open         as "isOpen",
+              is_open      as "isOpen",
               buy_value_cents as "buyValueCents",
-              winners_count   as "winnersCount",
-              created_at      as "createdAt"
+              winners_count as "winnersCount",
+              created_at   as "createdAt"
          from palpite_rounds
         order by created_at desc
         limit 1`
@@ -307,25 +283,13 @@ async function palpiteLoadFromDB(){
   }
 }
 
-async function palpiteCountEntries(){
-  if (!PALPITE.roundId) return 0;
-  const { rows } = await q(
-    `select count(*)::int as total from palpite_entries where round_id = $1`,
-    [PALPITE.roundId]
-  );
-  return rows?.[0]?.total || 0;
-}
-
 async function palpiteGetEntries(limit = 300){
   if (!PALPITE.roundId) return [];
   const lim = Math.min(Math.max(parseInt(limit,10)||300, 1), 1000);
   const { rows } = await q(
-    `select id,
-            user_name   as "user",
+    `select user_name  as "user",
             guess_cents as "guessCents",
             raw_text    as "rawText",
-            status,
-            is_winner   as "isWinner",
             created_at  as "createdAt",
             updated_at  as "updatedAt"
        from palpite_entries
@@ -337,36 +301,47 @@ async function palpiteGetEntries(limit = 300){
   return rows;
 }
 
-async function palpiteStatePayload(){
-  const [total, entries] = await Promise.all([
-    palpiteCountEntries(),
-    palpiteGetEntries(500)
-  ]);
+async function palpiteCountEntries(){
+  if (!PALPITE.roundId) return 0;
+  const { rows } = await q(
+    `select count(*)::int as c from palpite_entries where round_id = $1`,
+    [PALPITE.roundId]
+  );
+  return rows?.[0]?.c ?? 0;
+}
 
+async function palpiteStatePayload(){
+  const entries = await palpiteGetEntries(500);
   return {
     roundId: PALPITE.roundId,
     isOpen: PALPITE.isOpen,
     buyValueCents: PALPITE.buyValueCents,
     winnersCount: PALPITE.winnersCount,
     createdAt: PALPITE.createdAt,
-    total,
+    total: entries.length,
     entries
   };
 }
 
-// compat pro seu palpiteadmin.js (eventos "state" e "guess")
-function palpiteCompatStateFrom(state){
-  const lastGuesses = (state.entries || []).slice(0, 80).map(e => ({
+// estado compacto pro admin (igual seu palpiteadmin.js esperava)
+async function palpiteAdminCompactState(){
+  const entries = await palpiteGetEntries(60); // últimos 60
+  const lastGuesses = entries.slice(0, 24).map(e => ({
     name: e.user,
-    value: Number((e.guessCents || 0) / 100)
+    value: (e.guessCents || 0) / 100
   }));
   return {
-    buyValue: Number((state.buyValueCents || 0) / 100),
-    totalGuesses: state.total || 0,
+    open: PALPITE.isOpen,
+    buyValue: (PALPITE.buyValueCents || 0) / 100,
+    totalGuesses: await palpiteCountEntries(),
     lastGuesses
   };
 }
 
+
+// =========================
+// CUPONS
+// =========================
 function mapCupom(row){
   if (!row) return null;
   return {
@@ -398,7 +373,8 @@ function gerarCodigoCupom(){
   return tmp.slice(0,4) + '-' + tmp.slice(4);
 }
 
-// ========= GLOBAL AUTH /api =========
+
+
 app.use('/api', (req, res, next) => {
   const openRoutes = [
     '/api/auth/login',
@@ -406,22 +382,17 @@ app.use('/api', (req, res, next) => {
     '/api/auth/me',
     '/api/pix/cob',
     '/api/pix/status',
-    '/api/pix/confirmar',        // ✅ melhora: confirmar também pode ser público (mas exige APP_PUBLIC_KEY)
     '/api/public/bancas',
     '/api/sorteio/inscrever',
     '/api/cupons/resgatar',
 
+    // palpite público/overlay
     '/api/palpite/stream',
     '/api/palpite/guess',
     '/api/palpite/state-public'
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
-    return next();
-  }
-
-  // ✅ se for /api/palpite/* e tiver a PALPITE_KEY válida, deixa passar sem sessão
-  if (req.path.startsWith('/palpite') && hasValidPalpiteKey(req)) {
     return next();
   }
 
@@ -436,7 +407,8 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// ========= SSE geral =========
+
+
 app.get('/api/stream', requireAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -458,8 +430,10 @@ app.get('/api/stream', requireAuth, (req, res) => {
   });
 });
 
-// ========= PALPITE SSE (overlay/admin via key) =========
-app.get('/api/palpite/stream', requirePalpiteKey, async (req, res) => {
+// =========================
+// PALPITE: STREAM PÚBLICO (overlay OBS)
+// =========================
+app.get('/api/palpite/stream', requireAppKey, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -469,10 +443,7 @@ app.get('/api/palpite/stream', requirePalpiteKey, async (req, res) => {
 
   try{
     const state = await palpiteStatePayload();
-    // eventos do overlay HTML
     res.write(`event: palpite-init\ndata: ${JSON.stringify(state)}\n\n`);
-    // eventos compat do seu palpiteadmin.js
-    res.write(`event: state\ndata: ${JSON.stringify(palpiteCompatStateFrom(state))}\n\n`);
   }catch{}
 
   const ping = setInterval(() => {
@@ -486,13 +457,49 @@ app.get('/api/palpite/stream', requirePalpiteKey, async (req, res) => {
   });
 });
 
-app.get('/api/palpite/state-public', requirePalpiteKey, async (req, res) => {
+// ✅ estado público (JSON)
+app.get('/api/palpite/state-public', requireAppKey, async (req, res) => {
   const state = await palpiteStatePayload();
   res.json(state);
 });
 
-// ✅ RECEBE PALPITE DO CHAT/CLIENTE (por key)
-app.post('/api/palpite/guess', requirePalpiteKey, async (req, res) => {
+// =========================
+// PALPITE: ADMIN (AREA) - SSE + STATE
+// =========================
+app.get('/api/palpite/admin/stream', requireAuth, async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+
+  res.flushHeaders?.();
+  palpiteAdminSseClients.add(res);
+
+  // manda o state inicial no formato que o admin espera
+  try{
+    const st = await palpiteAdminCompactState();
+    res.write(`event: state\ndata: ${JSON.stringify(st)}\n\n`);
+  }catch{}
+
+  const ping = setInterval(() => {
+    try { res.write(`event: ping\ndata: {}\n\n`); } catch {}
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(ping);
+    palpiteAdminSseClients.delete(res);
+    try { res.end(); } catch {}
+  });
+});
+
+app.get('/api/palpite/admin/state', requireAuth, async (req, res) => {
+  const st = await palpiteAdminCompactState();
+  res.json(st);
+});
+
+// =========================
+// PALPITE: GUESS (CHATBOT / PUBLIC)
+// =========================
+app.post('/api/palpite/guess', requireAppKey, async (req, res) => {
   try{
     if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
     if (!PALPITE.isOpen)  return res.status(409).json({ error:'palpite_closed' });
@@ -515,12 +522,9 @@ app.post('/api/palpite/guess', requirePalpiteKey, async (req, res) => {
        do update set guess_cents = excluded.guess_cents,
                      raw_text   = excluded.raw_text,
                      updated_at = now()
-       returning id,
-                 user_name as "user",
+       returning user_name as "user",
                  guess_cents as "guessCents",
                  raw_text as "rawText",
-                 status,
-                 is_winner as "isWinner",
                  created_at as "createdAt",
                  updated_at as "updatedAt"`,
       [PALPITE.roundId, user, cents, String(raw || '').slice(0, 300)]
@@ -529,46 +533,125 @@ app.post('/api/palpite/guess', requirePalpiteKey, async (req, res) => {
     const entry = rows[0];
     const total = await palpiteCountEntries();
 
-    // overlay HTML
+    // overlay (OBS)
     palpiteSendAll('palpite-guess', { entry, total });
 
-    // compat admin.js
-    palpiteSendAll('guess', {
+    // admin (area)
+    palpiteAdminSendAll('guess', {
       name: entry.user,
-      value: Number((entry.guessCents || 0) / 100),
+      value: (entry.guessCents || 0) / 100,
       totalGuesses: total
     });
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
 
-    // painel SSE geral (se você usa)
+    // SSE geral do painel (se você usa)
     sseSendAll('palpite-changed', { reason:'guess', entry });
 
-    res.json({ ok:true, entry, total });
+    res.json({ ok:true, entry });
   }catch(e){
     console.error('palpite/guess:', e.message);
     res.status(500).json({ error:'falha_palpite' });
   }
 });
 
-// ========= PALPITE ADMIN (sessão) =========
+// =========================
+// PALPITE: ADMIN ACTIONS
+// =========================
 app.get('/api/palpite/state', requireAuth, async (req, res) => {
   const state = await palpiteStatePayload();
   res.json(state);
 });
 
-// ✅ alias pro seu palpiteadmin.js: /start /stop /clear /winners
-app.post('/api/palpite/start', requireAuthOrPalpiteKey, async (req, res) => {
-  // chama a mesma lógica do "open"
-  req.url = '/api/palpite/open';
-  return app._router.handle(req, res, ()=>{});
+// ✅ alias (seu front antigo chama /start)
+app.post('/api/palpite/start', requireAuth, async (req, res) => {
+  // usa mesma lógica do /open, só lendo buyValue e winnersCount
+  req.body = {
+    buyValue: req.body?.buyValue ?? req.body?.buy ?? req.body?.buyValueCents ?? 0,
+    winnersCount: req.body?.winnersCount ?? req.body?.winners ?? 3
+  };
+  // reutiliza o handler do /open (copiado abaixo)
+  try{
+    const buyCents =
+      (typeof req.body?.buyValueCents === 'number' ? (req.body.buyValueCents|0) : null) ??
+      parseMoneyToCents(req.body?.buyValue ?? req.body?.buy ?? 0) ??
+      0;
+
+    let winners =
+      parseInt(req.body?.winnersCount ?? req.body?.winners ?? 3, 10);
+
+    if (!Number.isFinite(winners) || winners < 1) winners = 1;
+    if (winners > 10) winners = 10;
+
+    if (PALPITE.roundId && PALPITE.isOpen) {
+      try{
+        await q(
+          `update palpite_rounds
+              set is_open = false,
+                  closed_at = now(),
+                  updated_at = now()
+            where id = $1`,
+          [PALPITE.roundId]
+        );
+      }catch{}
+    }
+
+    const roundId = uid();
+
+    await q(
+      `insert into palpite_rounds (id, is_open, buy_value_cents, winners_count, created_at, updated_at)
+       values ($1, true, $2, $3, now(), now())`,
+      [roundId, buyCents|0, winners|0]
+    );
+
+    PALPITE.roundId = roundId;
+    PALPITE.isOpen = true;
+    PALPITE.buyValueCents = buyCents|0;
+    PALPITE.winnersCount = winners|0;
+    PALPITE.createdAt = new Date().toISOString();
+
+    const state = await palpiteStatePayload();
+
+    palpiteSendAll('palpite-open', state);
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
+    sseSendAll('palpite-changed', { reason:'open', state });
+
+    res.json({ ok:true, roundId });
+  }catch(e){
+    console.error('palpite/start:', e.message);
+    res.status(500).json({ error:'falha_start' });
+  }
 });
 
-app.post('/api/palpite/stop', requireAuthOrPalpiteKey, async (req, res) => {
-  req.url = '/api/palpite/close';
-  return app._router.handle(req, res, ()=>{});
+// ✅ alias (seu front antigo chama /stop)
+app.post('/api/palpite/stop', requireAuth, async (req, res) => {
+  try{
+    if (!PALPITE.roundId) return res.json({ ok:true });
+
+    await q(
+      `update palpite_rounds
+          set is_open = false,
+              closed_at = now(),
+              updated_at = now()
+        where id = $1`,
+      [PALPITE.roundId]
+    );
+
+    PALPITE.isOpen = false;
+
+    const state = await palpiteStatePayload();
+    palpiteSendAll('palpite-close', state);
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
+    sseSendAll('palpite-changed', { reason:'close', state });
+
+    res.json({ ok:true });
+  }catch(e){
+    console.error('palpite/stop:', e.message);
+    res.status(500).json({ error:'falha_stop' });
+  }
 });
 
-// open (rodada)
-app.post('/api/palpite/open', requireAuthOrPalpiteKey, async (req, res) => {
+// rota "oficial" (mantida)
+app.post('/api/palpite/open', requireAuth, async (req, res) => {
   try{
     const buyCents =
       (typeof req.body?.buyValueCents === 'number' ? (req.body.buyValueCents|0) : null) ??
@@ -611,11 +694,8 @@ app.post('/api/palpite/open', requireAuthOrPalpiteKey, async (req, res) => {
 
     const state = await palpiteStatePayload();
 
-    // overlay HTML
     palpiteSendAll('palpite-open', state);
-    // compat admin.js
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
     sseSendAll('palpite-changed', { reason:'open', state });
 
     res.json({ ok:true, roundId });
@@ -625,7 +705,7 @@ app.post('/api/palpite/open', requireAuthOrPalpiteKey, async (req, res) => {
   }
 });
 
-app.post('/api/palpite/close', requireAuthOrPalpiteKey, async (req, res) => {
+app.post('/api/palpite/close', requireAuth, async (req, res) => {
   try{
     if (!PALPITE.roundId) return res.json({ ok:true });
 
@@ -641,12 +721,8 @@ app.post('/api/palpite/close', requireAuthOrPalpiteKey, async (req, res) => {
     PALPITE.isOpen = false;
 
     const state = await palpiteStatePayload();
-
-    // overlay HTML
     palpiteSendAll('palpite-close', state);
-    // compat admin.js
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
     sseSendAll('palpite-changed', { reason:'close', state });
 
     res.json({ ok:true });
@@ -656,18 +732,17 @@ app.post('/api/palpite/close', requireAuthOrPalpiteKey, async (req, res) => {
   }
 });
 
-app.post('/api/palpite/clear', requireAuthOrPalpiteKey, async (req, res) => {
+app.post('/api/palpite/clear', requireAuth, async (req, res) => {
   try{
     if (!PALPITE.roundId) return res.json({ ok:true });
 
     await q(`delete from palpite_entries where round_id = $1`, [PALPITE.roundId]);
 
     const state = await palpiteStatePayload();
-
-    // overlay HTML
     palpiteSendAll('palpite-clear', state);
-    // compat admin.js
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
+
+    palpiteAdminSendAll('clear', {});
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
 
     sseSendAll('palpite-changed', { reason:'clear', state });
 
@@ -678,210 +753,57 @@ app.post('/api/palpite/clear', requireAuthOrPalpiteKey, async (req, res) => {
   }
 });
 
-// ✅ winners (pro seu palpiteadmin.js)
-app.post('/api/palpite/winners', requireAuthOrPalpiteKey, async (req, res) => {
+// ✅ winners (admin) + evento pro overlay (opcional)
+app.post('/api/palpite/winners', requireAuth, async (req, res) => {
   try{
     if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
 
-    const actualCents =
-      (typeof req.body?.actualResultCents === 'number' ? (req.body.actualResultCents|0) : null) ??
-      parseMoneyToCents(req.body?.actualResult ?? req.body?.result ?? req.body?.actual ?? null);
+    const actualResult = Number(String(req.body?.actualResult ?? req.body?.actual ?? '').replace(',', '.'));
+    let winnersCount = parseInt(req.body?.winnersCount ?? req.body?.winners ?? PALPITE.winnersCount ?? 3, 10);
 
-    if (actualCents == null || actualCents < 0) {
-      return res.status(400).json({ error:'actual_invalido' });
-    }
-
-    let winnersCount = parseInt(req.body?.winnersCount ?? PALPITE.winnersCount ?? 3, 10);
+    if (!Number.isFinite(actualResult)) return res.status(400).json({ error:'actual_invalid' });
     if (!Number.isFinite(winnersCount) || winnersCount < 1) winnersCount = 1;
     if (winnersCount > 10) winnersCount = 10;
 
-    // pega winners mais próximos
-    const { rows } = await q(
-      `select id, user_name as "user", guess_cents as "guessCents",
-              abs(guess_cents - $2)::int as "diffCents"
-         from palpite_entries
-        where round_id = $1
-        order by abs(guess_cents - $2) asc, updated_at asc
-        limit ${winnersCount}`,
-      [PALPITE.roundId, actualCents|0]
-    );
+    const actualCents = Math.round(actualResult * 100);
 
-    // marca winners no banco (permite múltiplos)
-    await q(
-      `update palpite_entries
-          set is_winner = false
-        where round_id = $1`,
-      [PALPITE.roundId]
-    );
-    if (rows.length){
-      const ids = rows.map(r=>r.id);
-      await q(
-        `update palpite_entries
-            set is_winner = true
-          where round_id = $1 and id = any($2::bigint[])`,
-        [PALPITE.roundId, ids]
-      );
-    }
+    const entries = await palpiteGetEntries(2000);
+    const ranked = entries
+      .map(e => ({
+        name: e.user,
+        value: (e.guessCents || 0) / 100,
+        guessCents: e.guessCents || 0,
+        delta: Math.abs((e.guessCents || 0) - actualCents) / 100
+      }))
+      .sort((a,b) => a.delta - b.delta);
 
-    const state = await palpiteStatePayload();
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-    palpiteSendAll('palpite-winners', { actualCents, winners: rows });
+    const winners = ranked.slice(0, winnersCount);
 
-    sseSendAll('palpite-changed', { reason:'winners', winners: rows });
+    const payload = { winners, actualResult, winnersCount };
 
-    res.json({ ok:true, actualCents, winners: rows });
+    // admin
+    palpiteAdminSendAll('winners', payload);
+
+    // overlay (se quiser mostrar lá também)
+    palpiteSendAll('palpite-winners', payload);
+
+    res.json({ ok:true, ...payload });
   }catch(e){
     console.error('palpite/winners:', e.message);
     res.status(500).json({ error:'falha_winners' });
   }
 });
 
-// ✅ (opcional) pegar a key do palpite via sessão (pra você não digitar no prompt)
-app.get('/api/palpite/key', requireAuth, (req, res) => {
-  res.json({ key: PALPITE_KEY || null });
-});
 
-// ========= API pro "palpite-admin.js" (com hífen) =========
-// (lista, status, winner manual, limpar tudo) — funciona só com sessão
-app.get('/api/palpite', requireAuth, async (req, res) => {
-  try{
-    if (!PALPITE.roundId) return res.json({ palpites: [], winnerId: null, winnerName: '' });
-
-    const { rows } = await q(
-      `select id,
-              user_name as nome,
-              guess_cents,
-              raw_text,
-              status,
-              is_winner,
-              created_at,
-              updated_at
-         from palpite_entries
-        where round_id = $1
-        order by updated_at desc, created_at desc
-        limit 1000`,
-      [PALPITE.roundId]
-    );
-
-    const palpites = rows.map(r => ({
-      id: String(r.id),
-      nome: r.nome,
-      palpite: (Number(r.guess_cents || 0) / 100).toFixed(2),
-      createdAt: r.updated_at || r.created_at,
-      status: r.status || 'nao_pago',
-      isWinner: !!r.is_winner
-    }));
-
-    const w = rows.find(x => x.is_winner);
-    res.json({
-      palpites,
-      winnerId: w ? String(w.id) : null,
-      winnerName: w ? String(w.nome || '') : ''
-    });
-  }catch(e){
-    console.error('GET /api/palpite:', e.message);
-    res.status(500).json({ error:'falha_listar_palpite' });
-  }
-});
-
-app.patch('/api/palpite/:id', requireAuth, async (req, res) => {
-  try{
-    const { status } = req.body || {};
-    if (!['pago','nao_pago'].includes(status)) {
-      return res.status(400).json({ error:'status_invalido' });
-    }
-    if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
-
-    const { rows } = await q(
-      `update palpite_entries
-          set status = $3,
-              updated_at = now()
-        where round_id = $1 and id = $2
-        returning id`,
-      [PALPITE.roundId, String(req.params.id), status]
-    );
-    if (!rows.length) return res.status(404).json({ error:'not_found' });
-
-    const state = await palpiteStatePayload();
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
-    res.json({ ok:true });
-  }catch(e){
-    console.error('PATCH /api/palpite/:id:', e.message);
-    res.status(500).json({ error:'falha_status' });
-  }
-});
-
-app.post('/api/palpite/:id/winner', requireAuth, async (req, res) => {
-  try{
-    if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
-
-    await q(`update palpite_entries set is_winner = false where round_id = $1`, [PALPITE.roundId]);
-
-    const { rows } = await q(
-      `update palpite_entries
-          set is_winner = true,
-              updated_at = now()
-        where round_id = $1 and id = $2
-        returning id, user_name`,
-      [PALPITE.roundId, String(req.params.id)]
-    );
-    if (!rows.length) return res.status(404).json({ error:'not_found' });
-
-    const state = await palpiteStatePayload();
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
-    res.json({ ok:true });
-  }catch(e){
-    console.error('POST /api/palpite/:id/winner:', e.message);
-    res.status(500).json({ error:'falha_winner' });
-  }
-});
-
-app.delete('/api/palpite/:id/winner', requireAuth, async (req, res) => {
-  try{
-    if (!PALPITE.roundId) return res.status(409).json({ error:'no_round' });
-
-    await q(
-      `update palpite_entries
-          set is_winner = false,
-              updated_at = now()
-        where round_id = $1 and id = $2`,
-      [PALPITE.roundId, String(req.params.id)]
-    );
-
-    const state = await palpiteStatePayload();
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
-    res.json({ ok:true });
-  }catch(e){
-    console.error('DELETE /api/palpite/:id/winner:', e.message);
-    res.status(500).json({ error:'falha_remove_winner' });
-  }
-});
-
-app.delete('/api/palpite', requireAuth, async (req, res) => {
-  try{
-    if (!PALPITE.roundId) return res.json({ ok:true });
-    await q(`delete from palpite_entries where round_id = $1`, [PALPITE.roundId]);
-
-    const state = await palpiteStatePayload();
-    palpiteSendAll('state', palpiteCompatStateFrom(state));
-
-    res.json({ ok:true });
-  }catch(e){
-    console.error('DELETE /api/palpite:', e.message);
-    res.status(500).json({ error:'falha_delete_palpite' });
-  }
-});
-
-// ========= overlay HTML (continua igual, só troca a key pro PALPITE_KEY) =========
+// =========================
+// HTML DO OVERLAY (mantido no server) - opcional
+// =========================
 app.get('/palpite-overlay.html', (req, res) => {
-  if (!PALPITE_KEY) {
+  if (!APP_PUBLIC_KEY) {
     return res.status(403).send('public_off');
   }
   const key = String(req.query?.key || '');
-  if (!key || key !== PALPITE_KEY) {
+  if (!key || key !== APP_PUBLIC_KEY) {
     return res.status(401).send('unauthorized');
   }
 
@@ -1038,8 +960,12 @@ app.get('/palpite-overlay.html', (req, res) => {
       const entry = data.entry || {};
       if (entry.user) addItem(entry.user, entry.guessCents, true);
       if (data.total != null) elTotal.textContent = String(data.total);
+      else elTotal.textContent = String(Number(elTotal.textContent||0) + 1);
     }catch{}
   });
+
+  // (opcional) winners
+  es.addEventListener('palpite-winners', ()=>{});
 
   es.onerror = ()=>{};
 </script>
@@ -1047,7 +973,9 @@ app.get('/palpite-overlay.html', (req, res) => {
 </html>`);
 });
 
-// ========= AUTH =========
+
+
+
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
@@ -1075,13 +1003,16 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: { username: data.sub } });
 });
 
+
+
 app.get('/area.html', (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
   return res.sendFile(path.join(ROOT, 'area.html'));
 });
 
-// ========= HEALTH =========
+
+
 app.get('/health', async (req, res) => {
   try {
     fs.accessSync(EFI_CERT_PATH);
@@ -1102,7 +1033,8 @@ app.get('/api/pix/ping', async (req, res) => {
   }
 });
 
-// ========= PIX =========
+
+
 app.post('/api/pix/cob', async (req, res) => {
   try {
     const { nome, cpf, valorCentavos } = req.body || {};
@@ -1227,7 +1159,8 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-// ========= PUBLIC bancas =========
+
+
 app.post('/api/public/bancas', async (req, res) => {
   try{
     if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
@@ -1263,7 +1196,8 @@ app.post('/api/public/bancas', async (req, res) => {
   }
 });
 
-// ========= AREA (bancas/pagamentos/extratos/cupons/sorteio) =========
+
+
 const areaAuth = [requireAuth];
 
 app.get('/api/bancas', areaAuth, async (req, res) => {
@@ -1505,6 +1439,8 @@ app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
   }
 });
 
+
+
 app.get('/qr', async (req, res) => {
   try {
     const data = String(req.query.data || '');
@@ -1525,7 +1461,8 @@ app.get('/qr', async (req, res) => {
   }
 });
 
-// ========= SORTEIO =========
+
+
 app.get('/api/sorteio/inscricoes', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -1590,7 +1527,8 @@ app.delete('/api/sorteio/inscricoes', async (req, res) => {
   }
 });
 
-// ========= bancas/manual =========
+
+
 app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   const { nome, depositoCents, pixKey, pixType } = req.body || {};
 
@@ -1647,7 +1585,8 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
   }
 });
 
-// ========= extratos =========
+
+
 app.get('/api/extratos', areaAuth, async (req, res) => {
   let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
 
@@ -1718,7 +1657,7 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
-// ========= cupons =========
+
 app.get('/api/cupons', requireAuth, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -1729,6 +1668,7 @@ app.get('/api/cupons', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
 
 app.post('/api/cupons', requireAuth, async (req, res, next) => {
   try {
@@ -1775,6 +1715,7 @@ app.post('/api/cupons', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
 
 app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
@@ -1830,6 +1771,7 @@ app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
   }
 });
 
+
 app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1846,6 +1788,7 @@ app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
     next(err);
   }
 });
+
 
 app.post('/api/cupons/resgatar', async (req, res, next) => {
   const client = await pool.connect();
@@ -1951,7 +1894,8 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
   }
 });
 
-// ========= ensure tables =========
+
+
 async function ensureMessageColumns(){
   try{
     await q(`alter table if exists bancas add column if not exists message text`);
@@ -1984,6 +1928,7 @@ async function ensureCuponsTable(){
   }
 }
 
+
 async function ensurePalpiteTables(){
   try{
     await q(`
@@ -2010,21 +1955,20 @@ async function ensurePalpiteTables(){
         UNIQUE (round_id, user_name)
       )
     `);
-
-    // ✅ colunas extras pro painel (status / winner)
-    await q(`alter table if exists palpite_entries add column if not exists status text not null default 'nao_pago'`);
-    await q(`alter table if exists palpite_entries add column if not exists is_winner boolean not null default false`);
   }catch(e){
     console.error('ensurePalpiteTables:', e.message);
   }
 }
 
-// ========= start =========
+
+
+
 app.listen(PORT, async () => {
   try{
     await q('select 1');
     await ensureMessageColumns();
     await ensureCuponsTable();
+
     await ensurePalpiteTables();
     await palpiteLoadFromDB();
 
@@ -2033,9 +1977,7 @@ app.listen(PORT, async () => {
   catch(e){
     console.error('❌ Postgres falhou:', e.message);
   }
-
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
-  console.log(`🔑 PALPITE_KEY ativa? ${PALPITE_KEY ? 'SIM' : 'NÃO'}`);
 });
