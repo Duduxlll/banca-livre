@@ -184,6 +184,17 @@ function requireAuth(req, res, next){
   next();
 }
 
+// ✅ Somente admin (usa a mesma validação do requireAuth e checa role)
+function requireAdmin(req, res, next) {
+  return requireAuth(req, res, () => {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'forbidden_admin' });
+    }
+    next();
+  });
+}
+
+
 const sseClients = new Set();
 function sseSendAll(event, payload = {}) {
   const data = typeof payload === 'string' ? payload : JSON.stringify(payload);
@@ -316,21 +327,21 @@ async function palpiteCountEntries(){
 
 async function palpiteStatePayload(){
   const entries = await palpiteGetEntries(500);
+  const total = await palpiteCountEntries();
   return {
     roundId: PALPITE.roundId,
     isOpen: PALPITE.isOpen,
     buyValueCents: PALPITE.buyValueCents,
     winnersCount: PALPITE.winnersCount,
     createdAt: PALPITE.createdAt,
-    total: entries.length,
+    total,
     entries,
-
-    
     actualResultCents: PALPITE.actualResultCents,
     winners: PALPITE.winners,
     winnersAt: PALPITE.winnersAt
   };
 }
+
 
 
 // estado compacto pro admin (igual seu palpiteadmin.js esperava)
@@ -773,89 +784,65 @@ PALPITE.winnersAt = null;
 // POST /api/palpite/winners
 // body: { actualResultCents OR actualResult, winnersCount }
 // =========================
-app.post("/api/palpite/winners", requireAdmin, (req, res) => {
+app.post('/api/palpite/winners', requireAdmin, async (req, res) => {
   try {
-    // ===== 1) garante rodada ativa =====
-    if (!palpiteState || !palpiteState.roundId) {
-      return res.status(400).json({ error: "sem_rodada" });
-    }
+    if (!PALPITE.roundId) return res.status(409).json({ error: 'no_round' });
 
-    // ===== 2) lê actual result =====
+    // aceita cents OU valor normal
     let actualCents =
-      req.body?.actualResultCents != null ? Number(req.body.actualResultCents) :
-      req.body?.actualResult != null ? Math.round(Number(req.body.actualResult) * 100) :
-      null;
+      req.body?.actualResultCents != null ? Number(req.body.actualResultCents) : null;
 
     if (!Number.isFinite(actualCents)) {
-      return res.status(400).json({ error: "actual_invalido" });
+      actualCents = parseMoneyToCents(req.body?.actualResult ?? req.body?.actual ?? req.body?.value);
     }
 
-    // ===== 3) winnersCount =====
-    let winnersCount = Number(req.body?.winnersCount ?? 3);
+    if (!Number.isFinite(actualCents) || actualCents == null) {
+      return res.status(400).json({ error: 'actual_invalido' });
+    }
+
+    let winnersCount = Number(req.body?.winnersCount ?? PALPITE.winnersCount ?? 3);
     winnersCount = Math.max(1, Math.min(3, winnersCount));
 
-    
-    const raw =
-      (Array.isArray(palpiteState.entries) && palpiteState.entries) ||
-      (Array.isArray(palpiteState.guesses) && palpiteState.guesses) ||
-      (Array.isArray(palpiteState.lastGuesses) && palpiteState.lastGuesses) ||
-      [];
-
-    // normaliza para { name, guessCents }
-    const norm = raw.map((g) => {
-      const name = g.user ?? g.name ?? g.nome ?? "—";
-
-      const guessCents =
-        g.guessCents != null ? Number(g.guessCents) :
-        g.valueCents != null ? Number(g.valueCents) :
-        g.value != null ? Math.round(Number(g.value) * 100) :
-        g.guess != null ? Math.round(Number(g.guess) * 100) :
-        null;
-
-      return { name, guessCents };
-    }).filter(x => x.name && Number.isFinite(x.guessCents));
-
-    if (!norm.length) {
-      // aqui era onde você tava caindo em falha_winners
-      return res.status(400).json({ error: "falha_winners", detail: "sem_palpites_validos" });
+    const entries = await palpiteGetEntries(1000);
+    if (!entries.length) {
+      return res.status(400).json({ error: 'sem_palpites' });
     }
 
-    // ===== 5) calcula diferença e ordena =====
-    const ranked = norm.map((p) => ({
-      name: p.name,
-      valueCents: p.guessCents,
-      deltaCents: Math.abs(p.guessCents - actualCents),
-    }))
-    .sort((a, b) => a.deltaCents - b.deltaCents);
+    const ranked = entries
+      .map(e => ({
+        name: e.user,
+        valueCents: Number(e.guessCents || 0) | 0,
+        deltaCents: Math.abs((Number(e.guessCents || 0) | 0) - actualCents),
+      }))
+      .sort((a, b) => a.deltaCents - b.deltaCents);
 
     const winners = ranked.slice(0, winnersCount);
 
-    // ===== 6) salva no state (para overlay) =====
-    palpiteState.actualResultCents = actualCents;
-    palpiteState.winnersCount = winnersCount;
-    palpiteState.winners = winners;
-    palpiteState.winnersAt = new Date().toISOString();
-    palpiteState.isOpen = false; // opcional: fecha quando verifica
+    // salva no estado em memória (overlay lê via /state-public)
+    PALPITE.actualResultCents = actualCents;
+    PALPITE.winnersCount = winnersCount;
+    PALPITE.winners = winners;
+    PALPITE.winnersAt = new Date().toISOString();
+    PALPITE.isOpen = false; // opcional: fecha quando verifica
 
-    // ===== 7) emite SSE para admin + overlay =====
-    emitPalpiteEvent("winners", {
-      winners,
-      actualResultCents: actualCents,
-      winnersCount,
-    });
+    const state = await palpiteStatePayload();
 
-    emitPalpiteEvent("palpite-winners", {
-      winners,
-      actualResultCents: actualCents,
-      winnersCount,
-    });
+    // overlay
+    palpiteSendAll('palpite-winners', state);
 
-    return res.json({ winners, actualResultCents: actualCents, winnersCount });
-  } catch (err) {
-    console.error("winners error:", err);
-    return res.status(500).json({ error: "falha_winners", detail: "exception" });
+    // admin / area
+    palpiteAdminSendAll('state', await palpiteAdminCompactState());
+
+    // SSE geral (se você usa no front)
+    sseSendAll('palpite-changed', { reason: 'winners', winners, actualResultCents: actualCents });
+
+    return res.json({ ok: true, winners, actualResultCents: actualCents, winnersCount });
+  } catch (e) {
+    console.error('palpite/winners:', e.message);
+    return res.status(500).json({ error: 'falha_winners' });
   }
 });
+
 
 
 
