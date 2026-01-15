@@ -1,147 +1,164 @@
-// assets/js/palpiteadmin.js  (OVERLAY)
+// assets/js/palpiteadmin.js  (OVERLAY - OBS)
 (() => {
   const API = window.location.origin;
+
   const qs = (s, r = document) => r.querySelector(s);
 
-  const esc = (s = '') =>
-    String(s).replace(/[&<>"']/g, m => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[m]));
+  // pega key da URL (?key=...)
+  function getKeyFromUrl() {
+    const u = new URL(window.location.href);
+    return (u.searchParams.get("key") || "").trim();
+  }
+  const KEY = getKeyFromUrl();
 
-  // key vem da URL: /palpite-overlay.html?key=SUA_KEY
-  const KEY = new URL(location.href).searchParams.get('key')?.trim() || '';
+  // elementos do overlay (seu overlay inline já tem esses IDs)
+  const elLog = qs("#log");
+  const elTotal = qs("#total");
+  const elBuy = qs("#buyVal");
+  const pill = qs("#statusPill");
 
-  // IDs do overlay (bate com o overlay que seu server gera hoje)
-  const el = {
-    status: qs('#statusPill') || qs('#overlayStatus'),
-    buy: qs('#buyVal') || qs('#overlayBuyValue'),
-    total: qs('#total') || qs('#overlayTotal'),
-    log: qs('#log') || qs('#overlayList'),
-    winners: qs('#overlayWinners') || qs('#winners'),
-    error: qs('#overlayError') || qs('#palpiteOverlayError'),
-  };
+  // fallback se você mudar IDs no futuro
+  const elAltLog = qs("#overlayList") || qs("#logBox") || qs("#palpiteLogBox");
+  const elAltTotal = qs("#overlayTotal") || qs("#totalGuesses") || qs("#palpiteTotalGuesses");
+  const elAltBuy = qs("#overlayBuyValue") || qs("#buyValue") || qs("#palpiteBuyValue");
+  const elAltPill = qs("#overlayStatus") || qs("#palpiteStatus");
+
+  const LOG = elLog || elAltLog;
+  const TOTAL = elTotal || elAltTotal;
+  const BUY = elBuy || elAltBuy;
+  const PILL = pill || elAltPill;
 
   const fmtBRL = (cents) =>
-    (Number(cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  function setStatus(isOpen) {
+    if (!PILL) return;
+    // seu overlay inline usa classes on/off
+    PILL.classList.toggle("on", !!isOpen);
+    PILL.classList.toggle("off", !isOpen);
+    PILL.textContent = isOpen ? "ABERTO" : "FECHADO";
+  }
+
+  function clearList() {
+    if (LOG) LOG.innerHTML = "";
+    if (TOTAL) TOTAL.textContent = "0";
+  }
+
+  // mostra lista com limite e TTL
   const MAX = 18;
   const TTL = 12000;
 
-  function showError(msg) {
-    if (el.error) {
-      el.error.style.display = 'block';
-      el.error.innerHTML = esc(msg);
-    } else {
-      console.error(msg);
-    }
-  }
-
-  function setStatus(isOpen) {
-    if (!el.status) return;
-    el.status.classList.toggle('on', !!isOpen);
-    el.status.classList.toggle('off', !isOpen);
-    el.status.textContent = isOpen ? 'ABERTO' : 'FECHADO';
-  }
-
-  function clearLog() {
-    if (el.log) el.log.innerHTML = '';
-  }
-
   function addItem(user, guessCents, animate = true) {
-    if (!el.log) return;
+    if (!LOG) return;
 
-    const div = document.createElement('div');
-    div.className = 'item';
+    const div = document.createElement("div");
+    div.className = "item";
+
+    // se seu overlay NÃO tiver .item/.name/.val, isso ainda mostra texto
     div.innerHTML = `
-      <div class="name">${esc(user || '')}</div>
-      <div class="val">${esc(fmtBRL(guessCents || 0))}</div>
+      <div class="name">${escapeHtml(user || "")}</div>
+      <div class="val">${escapeHtml(fmtBRL(guessCents))}</div>
     `;
 
-    if (!animate) div.style.animation = 'none';
+    if (!animate) div.style.animation = "none";
 
-    el.log.prepend(div);
-    while (el.log.children.length > MAX) el.log.removeChild(el.log.lastChild);
+    // mais recente em cima
+    LOG.prepend(div);
+    while (LOG.children.length > MAX) LOG.removeChild(LOG.lastChild);
 
-    // some depois de um tempo (efeito overlay)
+    // some depois do TTL
     setTimeout(() => {
-      div.classList.add('hide');
+      div.classList.add("hide");
       setTimeout(() => div.remove(), 380);
     }, TTL);
   }
 
-  function renderState(state) {
-    // state vindo do server: { isOpen, buyValueCents, total, entries: [{user, guessCents}] }
-    setStatus(!!state?.isOpen);
-
-    if (el.buy) el.buy.textContent = state?.buyValueCents ? fmtBRL(state.buyValueCents) : '—';
-    if (el.total) el.total.textContent = String(state?.total || 0);
-
-    clearLog();
-    (state?.entries || []).slice(0, MAX).forEach(e => addItem(e.user, e.guessCents, false));
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[m]));
   }
 
-  function renderWinners(payload) {
-    if (!el.winners) return;
-    const winners = payload?.winners || [];
-    if (!winners.length) {
-      el.winners.innerHTML = `<div class="overlay-winners-empty">—</div>`;
-      return;
+  // render inicial do estado (payload do seu server.js)
+  function renderInit(state) {
+    // state: { isOpen, buyValueCents, total, entries }
+    setStatus(!!state.isOpen);
+
+    if (BUY) {
+      BUY.textContent = state.buyValueCents ? fmtBRL(state.buyValueCents) : "—";
     }
 
-    el.winners.innerHTML = winners.map((w, i) => `
-      <div class="overlay-winner">
-        <span class="overlay-winner-rank">#${i + 1}</span>
-        <span class="overlay-winner-name">${esc(w.user || w.name || '—')}</span>
-        <span class="overlay-winner-value">${esc(fmtBRL(w.guessCents ?? w.valueCents ?? 0))}</span>
-        <span class="overlay-winner-delta">(± ${esc(fmtBRL(w.deltaCents ?? 0))})</span>
-      </div>
-    `).join('');
+    if (TOTAL) TOTAL.textContent = String(state.total || 0);
+
+    if (LOG) {
+      LOG.innerHTML = "";
+      const entries = Array.isArray(state.entries) ? state.entries : [];
+      // seu server manda entries já em ordem desc, então tá ok
+      entries.slice(0, MAX).forEach((e) => addItem(e.user, e.guessCents, false));
+    }
   }
+
+  // conecta SSE certo
+  let es = null;
 
   function connect() {
     if (!KEY) {
-      showError('Falta a key na URL. Use: /palpite-overlay.html?key=SUA_KEY');
+      console.error("Falta ?key= na URL do overlay");
+      setStatus(false);
       return;
     }
 
-    const es = new EventSource(`${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`);
+    if (es) {
+      try { es.close(); } catch {}
+      es = null;
+    }
 
-    es.addEventListener('palpite-init', (ev) => {
-      try { renderState(JSON.parse(ev.data || '{}')); } catch {}
+    const url = `${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`;
+    es = new EventSource(url);
+
+    // eventos REAIS do seu server.js:
+    es.addEventListener("palpite-init", (ev) => {
+      try { renderInit(JSON.parse(ev.data || "{}")); } catch {}
     });
 
-    es.addEventListener('palpite-open', (ev) => {
-      try { renderState(JSON.parse(ev.data || '{}')); } catch {}
+    es.addEventListener("palpite-open", (ev) => {
+      try { renderInit(JSON.parse(ev.data || "{}")); } catch {}
     });
 
-    es.addEventListener('palpite-close', () => {
-      setStatus(false);
-    });
-
-    es.addEventListener('palpite-clear', (ev) => {
-      try { renderState(JSON.parse(ev.data || '{}')); } catch { clearLog(); }
-      if (el.total) el.total.textContent = '0';
-    });
-
-    es.addEventListener('palpite-guess', (ev) => {
+    es.addEventListener("palpite-close", (ev) => {
       try {
-        const d = JSON.parse(ev.data || '{}');
-        const entry = d.entry || {};
+        const st = JSON.parse(ev.data || "{}");
+        setStatus(false);
+        if (TOTAL) TOTAL.textContent = String(st.total ?? TOTAL.textContent ?? "0");
+      } catch {
+        setStatus(false);
+      }
+    });
+
+    es.addEventListener("palpite-clear", (ev) => {
+      try { renderInit(JSON.parse(ev.data || "{}")); }
+      catch { clearList(); }
+    });
+
+    es.addEventListener("palpite-guess", (ev) => {
+      try {
+        const data = JSON.parse(ev.data || "{}");
+        const entry = data.entry || {};
         if (entry.user) addItem(entry.user, entry.guessCents, true);
 
-        // se o server mandar total, usa
-        if (d.total != null && el.total) el.total.textContent = String(d.total);
+        // seu server NÃO manda total no evento -> incrementa local
+        if (TOTAL) TOTAL.textContent = String(Number(TOTAL.textContent || 0) + 1);
       } catch {}
     });
 
-    es.addEventListener('palpite-winners', (ev) => {
-      try { renderWinners(JSON.parse(ev.data || '{}')); } catch {}
-    });
-
     es.onerror = () => {
-      // overlay pode reconectar sozinho ao recarregar o OBS
+      try { es.close(); } catch {}
+      es = null;
+      setTimeout(connect, 1500);
     };
   }
 
-  document.addEventListener('DOMContentLoaded', connect);
+  document.addEventListener("DOMContentLoaded", () => {
+    connect();
+  });
 })();
