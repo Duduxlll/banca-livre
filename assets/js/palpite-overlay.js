@@ -48,9 +48,7 @@
 
   es.addEventListener("guess", (e) => {
     const st = JSON.parse(e.data || "{}");
-    // server manda guess individual + total; a lista completa chega no state,
-    // então aqui só atualiza rápido colocando no topo:
-    // (opcional: você pode ignorar e só confiar no state)
+    
   });
 
   es.onerror = () => {
