@@ -44,7 +44,6 @@
     return (n / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
-  // ===== Helpers p/ ler winnersCount do painel (Top 1/2/3) via state =====
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
   // ===== RENDER HEADER =====
@@ -100,7 +99,6 @@
 
     const winnersCount = clamp(Number(state?.winnersCount || 3), 1, 3);
 
-    // winners podem vir em: state.winners OU state.entriesWinners (dependendo do teu server)
     const winnersRaw =
       Array.isArray(state?.winners) ? state.winners :
       Array.isArray(state?.topWinners) ? state.topWinners :
@@ -108,7 +106,6 @@
 
     const winners = winnersRaw.map(normalizeWinner).slice(0, winnersCount);
 
-    // Sem winners ainda
     if (!winners.length) {
       if (el.winnersHint) el.winnersHint.textContent = "Aguardando verificação…";
       el.winners.innerHTML = Array.from({ length: winnersCount }).map((_, i) => `
@@ -126,7 +123,6 @@
       return;
     }
 
-    // Hint com resultado real (se existir)
     const actual = state?.actualResultCents != null ? fmtBRL(state.actualResultCents) : null;
     if (el.winnersHint) {
       el.winnersHint.textContent = actual ? `Resultado real: ${actual}` : `Top ${winnersCount}`;
@@ -147,14 +143,13 @@
     `).join("");
   }
 
-  // ===== TOAST: ÚLTIMA ENTRADA AO VIVO (some em 3s ou quando chega outra) =====
+  // ===== TOAST: ÚLTIMA ENTRADA AO VIVO =====
   let toastTimer = null;
   let lastToastEl = null;
 
   function showGuessToast(user, guessCents) {
     if (!el.toastHost) return;
 
-    // mata anterior (some quando chega outra)
     if (toastTimer) clearTimeout(toastTimer);
     if (lastToastEl) {
       lastToastEl.classList.add("hide");
@@ -182,7 +177,7 @@
     }, 3000);
   }
 
-  // ===== BUSCA STATE (pra manter winners/top sempre atualizados) =====
+  // ===== BUSCA STATE =====
   async function fetchStatePublic() {
     if (!KEY) return null;
     const res = await fetch(`${API}/api/palpite/state-public?key=${encodeURIComponent(KEY)}`, {
@@ -194,11 +189,46 @@
     return res.json();
   }
 
+  // ===== Anti-pisca: só re-render quando mudou =====
+  let lastWinnersKey = "";
+  let lastHeaderKey = "";
+  let sseAlive = false;
+  let pollTimer = null;
+  let syncLock = false;
+
   async function syncFullState() {
-    const st = await fetchStatePublic();
-    if (!st) return;
-    renderHeader(st);
-    renderWinners(st);
+    if (syncLock) return;
+    syncLock = true;
+
+    try {
+      const st = await fetchStatePublic();
+      if (!st) return;
+
+      const headerKey = JSON.stringify({
+        isOpen: !!st.isOpen,
+        buyValueCents: st.buyValueCents ?? null,
+        total: st.total ?? null,
+        roundId: st.roundId ?? null
+      });
+
+      if (headerKey !== lastHeaderKey) {
+        lastHeaderKey = headerKey;
+        renderHeader(st);
+      }
+
+      const winnersKey = JSON.stringify({
+        winnersCount: st.winnersCount ?? 3,
+        actualResultCents: st.actualResultCents ?? null,
+        winners: Array.isArray(st.winners) ? st.winners : []
+      });
+
+      if (winnersKey !== lastWinnersKey) {
+        lastWinnersKey = winnersKey;
+        renderWinners(st);
+      }
+    } finally {
+      syncLock = false;
+    }
   }
 
   // ===== SSE =====
@@ -211,29 +241,24 @@
 
     es = new EventSource(`${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`);
 
-    // Sempre que qualquer evento relevante vier, sincroniza via state-public
+    // SSE ok -> desliga polling (evita re-render duplo)
+    sseAlive = true;
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
     const onStateAny = async () => { await syncFullState(); };
 
-    // eventos antigos (compat)
     es.addEventListener("palpite-init", onStateAny);
     es.addEventListener("palpite-open", onStateAny);
     es.addEventListener("palpite-close", onStateAny);
     es.addEventListener("palpite-clear", onStateAny);
     es.addEventListener("palpite-winners", onStateAny);
 
-    // eventos novos (recomendado)
     es.addEventListener("state", onStateAny);
     es.addEventListener("winners", onStateAny);
 
-    // Guess (tempo real)
     const onGuessAny = (ev) => {
       try {
         const data = JSON.parse(ev.data || "{}");
-
-        // formatos possíveis:
-        // - { entry: { user, guessCents } }
-        // - { name, value }  (value em número)
-        // - { user, guessCents }
         const entry = data.entry || data;
 
         const name = entry.user || entry.name || entry.nome || "—";
@@ -245,7 +270,6 @@
 
         showGuessToast(name, guessCents);
 
-        // total: tenta usar do payload; senão soma 1
         if (el.total) {
           const hinted = data.total ?? data.totalGuesses ?? data.totalHint;
           if (hinted != null) el.total.textContent = String(hinted);
@@ -260,6 +284,11 @@
     es.onerror = () => {
       try { es.close(); } catch {}
       es = null;
+
+      // SSE caiu -> liga polling como fallback
+      sseAlive = false;
+      if (!pollTimer) pollTimer = setInterval(syncFullState, 2500);
+
       setTimeout(connectSSE, 1500);
     };
   }
@@ -269,7 +298,9 @@
     await syncFullState();
     connectSSE();
 
-    // poll leve pra winners/top sempre acompanhar o painel (caso não venha via SSE)
-    setInterval(syncFullState, 2500);
+    // fallback: só roda se SSE cair (evita “pisca”)
+    pollTimer = setInterval(() => {
+      if (!sseAlive) syncFullState();
+    }, 2500);
   });
 })();
