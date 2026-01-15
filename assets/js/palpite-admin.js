@@ -203,44 +203,36 @@
   // 1) tenta pedir pro server calcular e SALVAR (para o overlay receber)
   // 2) se não tiver rota no server, calcula só pro painel
   async function verifyWinners() {
-    const actualCents = parseMoneyToCents(el.finalResult?.value || "");
-    if (actualCents == null) {
-      alert("Digite quanto pagou (resultado real).");
-      return;
-    }
+  const actualCents = parseMoneyToCents(el.finalResult?.value || "");
+  if (actualCents == null) {
+    alert("Digite quanto pagou (resultado real).");
+    return;
+  }
 
-    let winnersCount = Number(el.winnersCount?.value || 3);
-    winnersCount = Math.max(1, Math.min(3, winnersCount));
+  let winnersCount = Number(el.winnersCount?.value || 3);
+  winnersCount = Math.max(1, Math.min(3, winnersCount));
 
-    // tenta rotas possíveis no server (uma delas deve existir no seu server.js)
-    const tryPaths = [
-      "/api/palpite/winners",
-      "/api/palpite/verify-winners",
-      "/api/palpite/calc-winners",
-    ];
+  try {
+    const out = await apiFetch("/api/palpite/winners", {
+      method: "POST",
+      body: JSON.stringify({ actualResultCents: actualCents, winnersCount })
+    });
 
-    for (const p of tryPaths) {
-      try {
-        const out = await apiFetch(p, {
-          method: "POST",
-          body: JSON.stringify({ actualResultCents: actualCents, winnersCount }),
-        });
+    const winners = (out?.winners || []).map(w => ({
+      name: w.name ?? w.user ?? w.nome ?? "—",
+      valueCents: w.valueCents ?? w.guessCents ?? 0,
+      deltaCents: w.deltaCents ?? w.diffCents ?? w.delta ?? w.diff ?? 0,
+    }));
 
-        // se server respondeu winners, renderiza no painel e pronto
-        if (out?.winners?.length) {
-          const winners = out.winners.map((w) => ({
-            name: w.name ?? w.user ?? w.nome ?? "—",
-            valueCents: w.valueCents ?? w.guessCents ?? 0,
-            deltaCents: w.deltaCents ?? w.diffCents ?? w.delta ?? w.diff ?? 0,
-          }));
-          renderWinnersList(winners.slice(0, winnersCount), actualCents);
+    renderWinnersList(winners.slice(0, winnersCount), actualCents);
 
-          // puxa state porque o server pode ter salvo winners no estado (overlay usa isso)
-          await refreshState();
-          return;
-        }
-      } catch (_) {}
-    }
+    // puxa state (se o server salvou winners, o overlay vai pegar daqui)
+    await refreshState();
+  } catch (err) {
+    alert("Erro ao verificar vencedores: " + err.message);
+  }
+
+
 
     // fallback: calcula no painel (overlay só recebe se o server salvar winners)
     const st = await apiFetch("/api/palpite/state");
