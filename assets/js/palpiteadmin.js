@@ -1,113 +1,108 @@
-// assets/js/palpiteadmin.js  (OVERLAY - OBS)
+// assets/js/palpiteadmin.js  (OVERLAY - para palpite-overlay.html)
 (() => {
   const API = window.location.origin;
-
   const qs = (s, r = document) => r.querySelector(s);
 
-  // pega key da URL (?key=...)
+  // DOM do seu overlay.html
+  const elStatus = qs("#ovStatus"); // FECHADO/ABERTO
+  const elSub = qs("#ovSub");       // Aguardando... / Compra... / Total...
+  const elList = qs("#ovList");     // lista de palpites
+
+  const fmtBRL = (cents) =>
+    (Number(cents || 0) / 100).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[m]));
+  }
+
   function getKeyFromUrl() {
     const u = new URL(window.location.href);
     return (u.searchParams.get("key") || "").trim();
   }
+
   const KEY = getKeyFromUrl();
 
-  // elementos do overlay (seu overlay inline já tem esses IDs)
-  const elLog = qs("#log");
-  const elTotal = qs("#total");
-  const elBuy = qs("#buyVal");
-  const pill = qs("#statusPill");
-
-  // fallback se você mudar IDs no futuro
-  const elAltLog = qs("#overlayList") || qs("#logBox") || qs("#palpiteLogBox");
-  const elAltTotal = qs("#overlayTotal") || qs("#totalGuesses") || qs("#palpiteTotalGuesses");
-  const elAltBuy = qs("#overlayBuyValue") || qs("#buyValue") || qs("#palpiteBuyValue");
-  const elAltPill = qs("#overlayStatus") || qs("#palpiteStatus");
-
-  const LOG = elLog || elAltLog;
-  const TOTAL = elTotal || elAltTotal;
-  const BUY = elBuy || elAltBuy;
-  const PILL = pill || elAltPill;
-
-  const fmtBRL = (cents) =>
-    (Number(cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
   function setStatus(isOpen) {
-    if (!PILL) return;
-    // seu overlay inline usa classes on/off
-    PILL.classList.toggle("on", !!isOpen);
-    PILL.classList.toggle("off", !isOpen);
-    PILL.textContent = isOpen ? "ABERTO" : "FECHADO";
+    if (!elStatus) return;
+    elStatus.textContent = isOpen ? "ABERTO" : "FECHADO";
+    elStatus.classList.toggle("is-open", !!isOpen);
+    elStatus.classList.toggle("is-closed", !isOpen);
+  }
+
+  function setSub(text) {
+    if (!elSub) return;
+    elSub.textContent = text;
   }
 
   function clearList() {
-    if (LOG) LOG.innerHTML = "";
-    if (TOTAL) TOTAL.textContent = "0";
+    if (elList) elList.innerHTML = "";
   }
 
-  // mostra lista com limite e TTL
-  const MAX = 18;
+  // controla quantas linhas aparecem no overlay
+  const MAX = 12;
   const TTL = 12000;
 
-  function addItem(user, guessCents, animate = true) {
-    if (!LOG) return;
+  function addLine(user, guessCents, animate = true) {
+    if (!elList) return;
 
     const div = document.createElement("div");
-    div.className = "item";
-
-    // se seu overlay NÃO tiver .item/.name/.val, isso ainda mostra texto
+    div.className = "ov-item";
     div.innerHTML = `
-      <div class="name">${escapeHtml(user || "")}</div>
-      <div class="val">${escapeHtml(fmtBRL(guessCents))}</div>
+      <span class="ov-name">${escapeHtml(user || "—")}</span>
+      <span class="ov-val">${escapeHtml(fmtBRL(guessCents))}</span>
     `;
 
-    if (!animate) div.style.animation = "none";
-
     // mais recente em cima
-    LOG.prepend(div);
-    while (LOG.children.length > MAX) LOG.removeChild(LOG.lastChild);
+    elList.prepend(div);
 
-    // some depois do TTL
-    setTimeout(() => {
-      div.classList.add("hide");
-      setTimeout(() => div.remove(), 380);
-    }, TTL);
+    // limita tamanho
+    while (elList.children.length > MAX) {
+      elList.removeChild(elList.lastChild);
+    }
+
+    if (animate) {
+      setTimeout(() => {
+        div.classList.add("ov-hide");
+        setTimeout(() => div.remove(), 380);
+      }, TTL);
+    }
   }
 
-  function escapeHtml(s) {
-    return String(s || "").replace(/[&<>"']/g, (m) => ({
-      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-    }[m]));
-  }
-
-  // render inicial do estado (payload do seu server.js)
   function renderInit(state) {
     // state: { isOpen, buyValueCents, total, entries }
-    setStatus(!!state.isOpen);
+    const open = !!state?.isOpen;
+    setStatus(open);
 
-    if (BUY) {
-      BUY.textContent = state.buyValueCents ? fmtBRL(state.buyValueCents) : "—";
-    }
+    const buy = state?.buyValueCents ? fmtBRL(state.buyValueCents) : "—";
+    const total = Number(state?.total || 0);
 
-    if (TOTAL) TOTAL.textContent = String(state.total || 0);
+    setSub(open ? `Compra: ${buy} • Total: ${total}` : `Aguardando… • Compra: ${buy}`);
 
-    if (LOG) {
-      LOG.innerHTML = "";
-      const entries = Array.isArray(state.entries) ? state.entries : [];
-      // seu server manda entries já em ordem desc, então tá ok
-      entries.slice(0, MAX).forEach((e) => addItem(e.user, e.guessCents, false));
-    }
+    clearList();
+    const entries = Array.isArray(state?.entries) ? state.entries : [];
+    // entries já vem desc no seu server, então ok
+    entries.slice(0, MAX).forEach((e) => addLine(e.user, e.guessCents, false));
   }
 
-  // conecta SSE certo
   let es = null;
 
   function connect() {
     if (!KEY) {
-      console.error("Falta ?key= na URL do overlay");
       setStatus(false);
+      setSub("Falta ?key= na URL do overlay");
       return;
     }
 
+    // fecha SSE anterior
     if (es) {
       try { es.close(); } catch {}
       es = null;
@@ -116,7 +111,7 @@
     const url = `${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`;
     es = new EventSource(url);
 
-    // eventos REAIS do seu server.js:
+    // eventos do seu server.js
     es.addEventListener("palpite-init", (ev) => {
       try { renderInit(JSON.parse(ev.data || "{}")); } catch {}
     });
@@ -126,28 +121,42 @@
     });
 
     es.addEventListener("palpite-close", (ev) => {
+      setStatus(false);
+      // tenta manter compra/total se tiver no payload
       try {
         const st = JSON.parse(ev.data || "{}");
-        setStatus(false);
-        if (TOTAL) TOTAL.textContent = String(st.total ?? TOTAL.textContent ?? "0");
+        const buy = st?.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
+        const total = Number(st?.total || 0);
+        setSub(`Fechado • Compra: ${buy} • Total: ${total}`);
       } catch {
-        setStatus(false);
+        setSub("Fechado • Aguardando…");
       }
     });
 
     es.addEventListener("palpite-clear", (ev) => {
-      try { renderInit(JSON.parse(ev.data || "{}")); }
-      catch { clearList(); }
+      try {
+        renderInit(JSON.parse(ev.data || "{}"));
+      } catch {
+        clearList();
+        setSub("Limpo • Aguardando…");
+      }
     });
 
     es.addEventListener("palpite-guess", (ev) => {
       try {
         const data = JSON.parse(ev.data || "{}");
         const entry = data.entry || {};
-        if (entry.user) addItem(entry.user, entry.guessCents, true);
+        if (entry.user) addLine(entry.user, entry.guessCents, true);
 
-        // seu server NÃO manda total no evento -> incrementa local
-        if (TOTAL) TOTAL.textContent = String(Number(TOTAL.textContent || 0) + 1);
+        // atualiza o "Total" no sub (server não manda total aqui)
+        const old = elSub?.textContent || "";
+        // se tiver "... Total: N", incrementa
+        const m = old.match(/Total:\s*(\d+)/i);
+        const nextTotal = m ? (Number(m[1]) + 1) : null;
+
+        if (nextTotal != null) {
+          setSub(old.replace(/Total:\s*\d+/i, `Total: ${nextTotal}`));
+        }
       } catch {}
     });
 
@@ -159,6 +168,8 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    setStatus(false);
+    setSub("Aguardando…");
     connect();
   });
 })();
