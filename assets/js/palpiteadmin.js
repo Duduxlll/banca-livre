@@ -14,6 +14,7 @@
     return (u.searchParams.get("key") || "").trim();
   })();
 
+  // ===== DOM =====
   const el = {
     err: qs("#overlayError"),
 
@@ -43,6 +44,9 @@
     return (n / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
+  // ===== Helpers p/ ler winnersCount do painel (Top 1/2/3) via state =====
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
   // ===== RENDER HEADER =====
   function setStatus(isOpen) {
     if (!el.status) return;
@@ -71,11 +75,38 @@
   }
 
   // ===== TOP WINNERS =====
+  function normalizeWinner(w) {
+    const name = w?.name ?? w?.user ?? w?.nome ?? "—";
+
+    const valueCents =
+      w?.valueCents != null ? Number(w.valueCents) :
+      w?.guessCents != null ? Number(w.guessCents) :
+      w?.value != null ? Math.round(Number(w.value) * 100) :
+      w?.guess != null ? Math.round(Number(w.guess) * 100) :
+      0;
+
+    const deltaCents =
+      w?.deltaCents != null ? Number(w.deltaCents) :
+      w?.diffCents != null ? Number(w.diffCents) :
+      w?.delta != null ? Math.round(Number(w.delta) * 100) :
+      w?.diff != null ? Math.round(Number(w.diff) * 100) :
+      null;
+
+    return { name, valueCents, deltaCents };
+  }
+
   function renderWinners(state) {
     if (!el.winners) return;
 
-    const winnersCount = Math.max(1, Math.min(3, Number(state?.winnersCount || 3)));
-    const winners = Array.isArray(state?.winners) ? state.winners : [];
+    const winnersCount = clamp(Number(state?.winnersCount || 3), 1, 3);
+
+    // winners podem vir em: state.winners OU state.entriesWinners (dependendo do teu server)
+    const winnersRaw =
+      Array.isArray(state?.winners) ? state.winners :
+      Array.isArray(state?.topWinners) ? state.topWinners :
+      [];
+
+    const winners = winnersRaw.map(normalizeWinner).slice(0, winnersCount);
 
     // Sem winners ainda
     if (!winners.length) {
@@ -101,38 +132,19 @@
       el.winnersHint.textContent = actual ? `Resultado real: ${actual}` : `Top ${winnersCount}`;
     }
 
-    // winners podem vir como cents ou valor normal — vamos aceitar ambos
-    const top = winners.slice(0, winnersCount);
-
-    el.winners.innerHTML = top.map((w, i) => {
-      const name = w.name ?? w.user ?? w.nome ?? "—";
-
-      // tenta achar valor em cents primeiro
-      const valueCents =
-        (w.valueCents != null ? Number(w.valueCents) :
-        (w.guessCents != null ? Number(w.guessCents) :
-        (w.value != null ? Math.round(Number(w.value) * 100) : 0)));
-
-      const deltaCents =
-        (w.deltaCents != null ? Number(w.deltaCents) :
-        (w.diffCents != null ? Number(w.diffCents) :
-        (w.delta != null ? Math.round(Number(w.delta) * 100) :
-        (w.diff != null ? Math.round(Number(w.diff) * 100) : null))));
-
-      return `
-        <div class="ov-win">
-          <div class="ov-win-left">
-            <div class="ov-rank">#${i + 1}</div>
-            <div class="ov-name">${esc(name)}</div>
-          </div>
-
-          <div class="ov-win-right">
-            <div class="ov-val">${fmtBRL(valueCents)}</div>
-            ${deltaCents != null ? `<div class="ov-delta">± ${fmtBRL(deltaCents)}</div>` : `<div class="ov-delta"></div>`}
-          </div>
+    el.winners.innerHTML = winners.map((w, i) => `
+      <div class="ov-win">
+        <div class="ov-win-left">
+          <div class="ov-rank">#${i + 1}</div>
+          <div class="ov-name">${esc(w.name)}</div>
         </div>
-      `;
-    }).join("");
+
+        <div class="ov-win-right">
+          <div class="ov-val">${fmtBRL(w.valueCents)}</div>
+          ${w.deltaCents != null ? `<div class="ov-delta">± ${fmtBRL(w.deltaCents)}</div>` : `<div class="ov-delta"></div>`}
+        </div>
+      </div>
+    `).join("");
   }
 
   // ===== TOAST: ÚLTIMA ENTRADA AO VIVO (some em 3s ou quando chega outra) =====
@@ -199,16 +211,17 @@
 
     es = new EventSource(`${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`);
 
-    // Compat: alguns servidores mandam palpite-init/open/guess...
-    // outros mandam state/guess/winners...
+    // Sempre que qualquer evento relevante vier, sincroniza via state-public
     const onStateAny = async () => { await syncFullState(); };
 
+    // eventos antigos (compat)
     es.addEventListener("palpite-init", onStateAny);
     es.addEventListener("palpite-open", onStateAny);
     es.addEventListener("palpite-close", onStateAny);
     es.addEventListener("palpite-clear", onStateAny);
     es.addEventListener("palpite-winners", onStateAny);
 
+    // eventos novos (recomendado)
     es.addEventListener("state", onStateAny);
     es.addEventListener("winners", onStateAny);
 
@@ -227,7 +240,8 @@
 
         const guessCents =
           entry.guessCents != null ? Number(entry.guessCents) :
-          (entry.value != null ? Math.round(Number(entry.value) * 100) : 0);
+          (entry.value != null ? Math.round(Number(entry.value) * 100) :
+          (entry.guess != null ? Math.round(Number(entry.guess) * 100) : 0));
 
         showGuessToast(name, guessCents);
 

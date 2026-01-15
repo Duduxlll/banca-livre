@@ -314,3 +314,9 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,.22) rgba(255,255,255,.04);
 }
+
+
+#tab-palpite #palpiteLogBox{
+  scroll-behavior: auto;
+  overscroll-behavior: contain;
+}

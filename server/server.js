@@ -805,16 +805,22 @@ app.post('/api/palpite/winners', requireAuth, async (req, res) => {
       delta: Number(r.deltaCents || 0) / 100
     }));
 
-    PALPITE.actualResultCents = actualCents | 0;
-    PALPITE.winners = winners;
-    PALPITE.winnersAt = new Date().toISOString();
+    // salva no estado em memória (pra state-public devolver também)
+PALPITE.actualResultCents = actualResultCents;
+PALPITE.winners = winners;
+PALPITE.winnersAt = new Date().toISOString();
+PALPITE.winnersCount = winnersCount;
 
-    // manda evento (se você quiser mostrar em overlay depois)
-    palpiteSendAll('palpite-winners', {
-      actualResult: actualCents / 100,
-      winnersCount,
-      winners
-    });
+// manda pro overlay (SSE público)
+palpiteSendAll('winners', {
+  winners,
+  actualResultCents,
+  winnersCount
+});
+
+// (opcional, mas ajuda MUITO): manda um "state" atualizado também
+palpiteSendAll('state', await palpiteStatePayload());
+
 
     // atualiza admin via /api/stream
     sseSendAll('palpite-changed', { reason: 'winners', winnersCount });

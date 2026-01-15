@@ -66,16 +66,26 @@
     setTotal(0);
   }
 
-  function addLogLine(user, guessCents) {
-    if (!el.logBox) return;
-    const div = document.createElement("div");
-    div.innerHTML = `[CHAT] <b>${esc(user || "—")}</b>: ${esc(fmtBRL(guessCents))}`;
-    el.logBox.appendChild(div);
-    el.logBox.scrollTop = el.logBox.scrollHeight;
-  }
+  function isNearBottom(box, gap = 28) {
+  return (box.scrollHeight - (box.scrollTop + box.clientHeight)) < gap;
+}
+
+function addLogLine(name, value) {
+  if (!el.logBox) return;
+
+  
+  const stick = isNearBottom(el.logBox);
+
+  const div = document.createElement("div");
+  div.innerHTML = `[CHAT] <b>${escapeHtml(name)}</b>: R$ ${Number(value).toFixed(2)}`;
+  el.logBox.appendChild(div);
+
+  if (stick) el.logBox.scrollTop = el.logBox.scrollHeight;
+}
+
 
   function renderState(state) {
-    // state do seu server: { roundId,isOpen,buyValueCents,winnersCount,total,entries }
+   
     if (!state || typeof state !== "object") return;
 
     // preenche buyValue no input (mostra em reais, sem quebrar)
