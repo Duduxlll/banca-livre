@@ -34,7 +34,7 @@ export function initTwitchBot({
     channels: [chan],
   });
 
-  // fila simples pra processar 1 por vez (evita corrida)
+  
   let queue = Promise.resolve();
   const enqueue = (fn) => {
     queue = queue.then(fn).catch((e) => log.error("[twitch-bot] erro:", e));
@@ -44,13 +44,11 @@ export function initTwitchBot({
     const text = String(msg || "").trim();
     if (!text.startsWith("!")) return null;
 
-    // !palpite 230,50  |  !p 230,50
+    
     let m = text.match(/^!palpite\b\s*(.+)$/i) || text.match(/^!p\b\s*(.+)$/i);
     if (m && m[1]) return m[1].trim();
 
-    // !230,50  (somente número após "!")
-    m = text.match(/^!\s*([0-9][0-9.,]*)\s*$/);
-    if (m && m[1]) return m[1].trim();
+    
 
     return null;
   }
