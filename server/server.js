@@ -14,6 +14,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
+import { initTwitchBot } from "./twitch-bot.js";
+
 const { Pool } = pkg;
 
 const {
@@ -684,7 +686,7 @@ app.post('/api/palpite/open', requireAuth, async (req, res) => {
     if (!Number.isFinite(winners) || winners < 1) winners = 1;
     if (winners > 10) winners = 10;
 
-    // fecha rodada anterior se estiver aberta
+    
     if (PALPITE.roundId && PALPITE.isOpen) {
       try{
         await q(
@@ -721,6 +723,10 @@ app.post('/api/palpite/open', requireAuth, async (req, res) => {
     palpiteAdminSendAll('state', await palpiteAdminCompactState());
     sseSendAll('palpite-changed', { reason:'open', state });
 
+    if (twitchBot?.enabled) {
+  twitchBot.say(`🔔 PALPITE ABERTO! Digite: !palpite 230,50`);
+}
+
     res.json({ ok:true, roundId });
   }catch(e){
     console.error('palpite/open:', e.message);
@@ -747,6 +753,10 @@ app.post('/api/palpite/close', requireAuth, async (req, res) => {
     palpiteSendAll('palpite-close', state);
     palpiteAdminSendAll('state', await palpiteAdminCompactState());
     sseSendAll('palpite-changed', { reason:'close', state });
+
+    if (twitchBot?.enabled) {
+  twitchBot.say(`⛔ PALPITE FECHADO!`);
+}
 
     res.json({ ok:true });
   }catch(e){
@@ -2012,8 +2022,7 @@ async function ensurePalpiteTables(){
   }
 }
 
-
-
+let twitchBot = { enabled: false, say: async () => {} };
 
 app.listen(PORT, async () => {
   try{
@@ -2025,11 +2034,23 @@ app.listen(PORT, async () => {
     await palpiteLoadFromDB();
 
     console.log('🗄️  Postgres conectado');
-  }
-  catch(e){
+  } catch(e){
     console.error('❌ Postgres falhou:', e.message);
   }
+
+  // inicia o bot (rodando no MESMO server)
+  twitchBot = initTwitchBot({
+    port: PORT,
+    apiKey: APP_PUBLIC_KEY, // usa a constante que você já leu do env
+    botUsername: process.env.TWITCH_BOT_USERNAME,
+    oauthToken: process.env.TWITCH_OAUTH_TOKEN,
+    channel: process.env.TWITCH_CHANNEL,
+    enabled: true,
+    onLog: console,
+  });
+
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
 });
+
