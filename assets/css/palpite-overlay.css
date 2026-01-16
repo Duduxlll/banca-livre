@@ -3,17 +3,23 @@
   --pad: 12px;
   --radius: 16px;
 
-  --glass: rgba(18, 18, 22, .52);
-  --glass2: rgba(18, 18, 22, .35);
-  --border: rgba(255,255,255,.14);
-  --text: rgba(255,255,255,.92);
-  --muted: rgba(255,255,255,.70);
+  /* ✅ MAIS CLARO (vidro) */
+  --glass:  rgba(32, 32, 40, .40);
+  --glass2: rgba(32, 32, 40, .26);
 
-  --ok: rgba(46, 204, 113, 1);
-  --bad: rgba(231, 76, 60, 1);
+  /* ✅ Borda um pouco mais visível */
+  --border: rgba(255,255,255,.18);
+
+  /* Texto */
+  --text:  rgba(255,255,255,.94);
+  --muted: rgba(255,255,255,.76);
+
+  --ok:   rgba(46, 204, 113, 1);
+  --bad:  rgba(231, 76, 60, 1);
   --gold: rgba(255, 205, 75, 1);
 
-  --shadow: 0 18px 60px rgba(0,0,0,.42);
+  /* ✅ Sombra mais suave (menos “peso”) */
+  --shadow: 0 18px 60px rgba(0,0,0,.30);
 }
 
 *{ box-sizing: border-box; }
@@ -79,14 +85,14 @@
   align-items: baseline;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.10);
 }
 
 .ov-chip-label{
   font-size: 11px;
   font-weight: 800;
-  opacity: .8;
+  opacity: .85;
 }
 
 .ov-chip-val{
@@ -97,7 +103,7 @@
 
 .ov-sub{
   font-size: 12px;
-  opacity: .85;
+  opacity: .88;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -109,8 +115,8 @@
   letter-spacing: .5px;
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.10);
   min-width: 86px;
   text-align:center;
   align-self: flex-start;
@@ -118,20 +124,20 @@
 }
 
 .ov-status--open{
-  border-color: rgba(46,204,113,.35);
-  background: rgba(46,204,113,.16);
-  box-shadow: 0 0 0 6px rgba(46,204,113,.06);
+  border-color: rgba(46,204,113,.40);
+  background: rgba(46,204,113,.18);
+  box-shadow: 0 0 0 6px rgba(46,204,113,.07);
   animation: ovPulse 1.6s ease-in-out infinite;
 }
 
 .ov-status--closed{
-  border-color: rgba(231,76,60,.35);
-  background: rgba(231,76,60,.14);
+  border-color: rgba(231,76,60,.40);
+  background: rgba(231,76,60,.16);
 }
 
 @keyframes ovPulse{
-  0%,100%{ box-shadow: 0 0 0 6px rgba(46,204,113,.06); }
-  50%{ box-shadow: 0 0 0 10px rgba(46,204,113,.10); }
+  0%,100%{ box-shadow: 0 0 0 6px rgba(46,204,113,.07); }
+  50%{ box-shadow: 0 0 0 10px rgba(46,204,113,.12); }
 }
 
 /* WINNERS */
@@ -155,7 +161,7 @@
 
 .ov-winners-hint{
   font-size: 11px;
-  opacity: .75;
+  opacity: .78;
   text-align: right;
   white-space: nowrap;
 }
@@ -172,8 +178,11 @@
   gap: 10px;
   padding: 10px 10px;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.07);
+
+  /* ✅ MAIS CLARO */
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.10);
+
   animation: ovIn .18s ease-out;
 }
 
@@ -193,9 +202,9 @@
   justify-content:center;
   font-weight: 950;
   font-size: 12px;
-  background: rgba(255, 205, 75, .18);
-  border: 1px solid rgba(255, 205, 75, .35);
-  color: rgba(255,255,255,.95);
+  background: rgba(255, 205, 75, .20);
+  border: 1px solid rgba(255, 205, 75, .40);
+  color: rgba(255,255,255,.96);
 }
 
 .ov-name{
@@ -221,7 +230,7 @@
 
 .ov-delta{
   font-size: 11px;
-  opacity: .78;
+  opacity: .82;
   font-variant-numeric: tabular-nums;
 }
 
@@ -243,11 +252,17 @@
   width: 100%;
   padding: 12px 12px;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(0,0,0,.55);
+
+  /* ✅ MAIS CLARO */
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(20,20,26,.38);
+
   backdrop-filter: blur(10px) saturate(1.15);
   -webkit-backdrop-filter: blur(10px) saturate(1.15);
-  box-shadow: 0 16px 60px rgba(0,0,0,.45);
+
+  /* ✅ sombra mais leve */
+  box-shadow: 0 16px 60px rgba(0,0,0,.30);
+
   display:flex;
   align-items:center;
   justify-content: space-between;
@@ -281,7 +296,7 @@
 }
 .ov-toast .t-sub{
   font-size: 11px;
-  opacity: .75;
+  opacity: .78;
 }
 .ov-toast .t-val{
   font-weight: 950;
@@ -294,7 +309,7 @@
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid rgba(231,76,60,.45);
-  background: rgba(231,76,60,.16);
+  background: rgba(231,76,60,.18);
   font-weight: 800;
   font-size: 12px;
 }
