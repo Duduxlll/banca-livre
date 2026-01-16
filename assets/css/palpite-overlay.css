@@ -3,23 +3,23 @@
   --pad: 12px;
   --radius: 16px;
 
-  /* ✅ MAIS CLARO (vidro) */
-  --glass:  rgba(32, 32, 40, .40);
-  --glass2: rgba(32, 32, 40, .26);
+  /* ✅ MUITO MAIS CLARO + MAIS OPACO (fica bem visível no OBS) */
+  --glass:  rgba(70, 70, 82, .88);
+  --glass2: rgba(52, 52, 62, .76);
 
-  /* ✅ Borda um pouco mais visível */
-  --border: rgba(255,255,255,.18);
+  /* ✅ borda mais forte */
+  --border: rgba(255,255,255,.26);
 
-  /* Texto */
-  --text:  rgba(255,255,255,.94);
-  --muted: rgba(255,255,255,.76);
+  /* texto */
+  --text: rgba(255,255,255,.96);
+  --muted: rgba(255,255,255,.80);
 
-  --ok:   rgba(46, 204, 113, 1);
-  --bad:  rgba(231, 76, 60, 1);
+  --ok: rgba(46, 204, 113, 1);
+  --bad: rgba(231, 76, 60, 1);
   --gold: rgba(255, 205, 75, 1);
 
-  /* ✅ Sombra mais suave (menos “peso”) */
-  --shadow: 0 18px 60px rgba(0,0,0,.30);
+  /* ✅ sombra mais “limpa” */
+  --shadow: 0 16px 55px rgba(0,0,0,.28);
 }
 
 *{ box-sizing: border-box; }
@@ -29,6 +29,16 @@
   background: transparent !important;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   color: var(--text);
+}
+
+/* ✅ deixa o overlay mais “nítido” no vídeo */
+.ov-body, .ov-card, .ov-win, .ov-chip, .ov-status, .ov-toast{
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.ov-title, .ov-name, .ov-val, .ov-status, .ov-chip-val, .ov-winners-title{
+  text-shadow: 0 1px 2px rgba(0,0,0,.35);
 }
 
 /* container do overlay */
@@ -48,8 +58,8 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(10px) saturate(1.15);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  backdrop-filter: blur(8px) saturate(1.10);
+  -webkit-backdrop-filter: blur(8px) saturate(1.10);
   overflow: hidden;
 }
 
@@ -85,14 +95,14 @@
   align-items: baseline;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.14);
 }
 
 .ov-chip-label{
   font-size: 11px;
   font-weight: 800;
-  opacity: .85;
+  opacity: .88;
 }
 
 .ov-chip-val{
@@ -103,7 +113,7 @@
 
 .ov-sub{
   font-size: 12px;
-  opacity: .88;
+  opacity: .90;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,8 +125,8 @@
   letter-spacing: .5px;
   padding: 8px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(255,255,255,.14);
   min-width: 86px;
   text-align:center;
   align-self: flex-start;
@@ -124,20 +134,20 @@
 }
 
 .ov-status--open{
-  border-color: rgba(46,204,113,.40);
-  background: rgba(46,204,113,.18);
-  box-shadow: 0 0 0 6px rgba(46,204,113,.07);
+  border-color: rgba(46,204,113,.45);
+  background: rgba(46,204,113,.22);
+  box-shadow: 0 0 0 6px rgba(46,204,113,.10);
   animation: ovPulse 1.6s ease-in-out infinite;
 }
 
 .ov-status--closed{
-  border-color: rgba(231,76,60,.40);
-  background: rgba(231,76,60,.16);
+  border-color: rgba(231,76,60,.45);
+  background: rgba(231,76,60,.20);
 }
 
 @keyframes ovPulse{
-  0%,100%{ box-shadow: 0 0 0 6px rgba(46,204,113,.07); }
-  50%{ box-shadow: 0 0 0 10px rgba(46,204,113,.12); }
+  0%,100%{ box-shadow: 0 0 0 6px rgba(46,204,113,.10); }
+  50%{ box-shadow: 0 0 0 10px rgba(46,204,113,.16); }
 }
 
 /* WINNERS */
@@ -161,7 +171,7 @@
 
 .ov-winners-hint{
   font-size: 11px;
-  opacity: .78;
+  opacity: .82;
   text-align: right;
   white-space: nowrap;
 }
@@ -179,9 +189,9 @@
   padding: 10px 10px;
   border-radius: 14px;
 
-  /* ✅ MAIS CLARO */
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(255,255,255,.10);
+  /* ✅ mais claro */
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.16);
 
   animation: ovIn .18s ease-out;
 }
@@ -202,9 +212,9 @@
   justify-content:center;
   font-weight: 950;
   font-size: 12px;
-  background: rgba(255, 205, 75, .20);
-  border: 1px solid rgba(255, 205, 75, .40);
-  color: rgba(255,255,255,.96);
+  background: rgba(255, 205, 75, .26);
+  border: 1px solid rgba(255, 205, 75, .46);
+  color: rgba(255,255,255,.98);
 }
 
 .ov-name{
@@ -230,7 +240,7 @@
 
 .ov-delta{
   font-size: 11px;
-  opacity: .82;
+  opacity: .86;
   font-variant-numeric: tabular-nums;
 }
 
@@ -253,14 +263,12 @@
   padding: 12px 12px;
   border-radius: 16px;
 
-  /* ✅ MAIS CLARO */
-  border: 1px solid rgba(255,255,255,.16);
-  background: rgba(20,20,26,.38);
+  /* ✅ mais claro e bem legível */
+  border: 1px solid rgba(255,255,255,.24);
+  background: rgba(78, 78, 92, .92);
 
-  backdrop-filter: blur(10px) saturate(1.15);
-  -webkit-backdrop-filter: blur(10px) saturate(1.15);
-
-  /* ✅ sombra mais leve */
+  backdrop-filter: blur(8px) saturate(1.10);
+  -webkit-backdrop-filter: blur(8px) saturate(1.10);
   box-shadow: 0 16px 60px rgba(0,0,0,.30);
 
   display:flex;
@@ -296,7 +304,7 @@
 }
 .ov-toast .t-sub{
   font-size: 11px;
-  opacity: .78;
+  opacity: .82;
 }
 .ov-toast .t-val{
   font-weight: 950;
@@ -308,8 +316,8 @@
 .ov-error{
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(231,76,60,.45);
-  background: rgba(231,76,60,.18);
+  border: 1px solid rgba(231,76,60,.50);
+  background: rgba(231,76,60,.22);
   font-weight: 800;
   font-size: 12px;
 }
