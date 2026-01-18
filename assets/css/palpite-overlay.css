@@ -3,14 +3,14 @@
   --pad: 12px;
   --radius: 16px;
 
-  /* ✅ MUITO MAIS CLARO + MAIS OPACO (fica bem visível no OBS) */
+  
   --glass:  rgba(70, 70, 82, .88);
   --glass2: rgba(52, 52, 62, .76);
 
-  /* ✅ borda mais forte */
+
   --border: rgba(255,255,255,.26);
 
-  /* texto */
+ 
   --text: rgba(255,255,255,.96);
   --muted: rgba(255,255,255,.80);
 
@@ -18,7 +18,7 @@
   --bad: rgba(231, 76, 60, 1);
   --gold: rgba(255, 205, 75, 1);
 
-  /* ✅ sombra mais “limpa” */
+  
   --shadow: 0 16px 55px rgba(0,0,0,.28);
 }
 

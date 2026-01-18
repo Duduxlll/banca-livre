@@ -21,7 +21,7 @@ form.addEventListener('submit', async (e)=>{
       err.textContent = j.error === 'invalid_credentials' ? 'Usuário ou senha inválidos.' : 'Falha ao entrar.';
       return;
     }
-    // ok -> vai pra área
+    
     location.href = '/area.html';
   }catch(e){
     err.textContent = 'Erro de rede.';

@@ -1,4 +1,3 @@
-// assets/js/palpiteadmin.js  (OVERLAY)
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
@@ -8,13 +7,11 @@
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     }[m]));
 
-  // ===== KEY pela URL (?key=...) =====
   const KEY = (() => {
     const u = new URL(window.location.href);
     return (u.searchParams.get("key") || "").trim();
   })();
 
-  // ===== DOM =====
   const el = {
     err: qs("#overlayError"),
 
@@ -46,7 +43,6 @@
 
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
 
-  // ===== RENDER HEADER =====
   function setStatus(isOpen) {
     if (!el.status) return;
     el.status.textContent = isOpen ? "ABERTO" : "FECHADO";
@@ -73,7 +69,6 @@
     }
   }
 
-  // ===== TOP WINNERS =====
   function normalizeWinner(w) {
     const name = w?.name ?? w?.user ?? w?.nome ?? "—";
 
@@ -143,7 +138,6 @@
     `).join("");
   }
 
-  // ===== TOAST: ÚLTIMA ENTRADA AO VIVO =====
   let toastTimer = null;
   let lastToastEl = null;
 
@@ -177,7 +171,6 @@
     }, 3000);
   }
 
-  // ===== BUSCA STATE =====
   async function fetchStatePublic() {
     if (!KEY) return null;
     const res = await fetch(`${API}/api/palpite/state-public?key=${encodeURIComponent(KEY)}`, {
@@ -189,7 +182,6 @@
     return res.json();
   }
 
-  // ===== Anti-pisca: só re-render quando mudou =====
   let lastWinnersKey = "";
   let lastHeaderKey = "";
   let sseAlive = false;
@@ -231,7 +223,6 @@
     }
   }
 
-  // ===== SSE =====
   let es = null;
 
   function connectSSE() {
@@ -241,7 +232,6 @@
 
     es = new EventSource(`${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`);
 
-    // SSE ok -> desliga polling (evita re-render duplo)
     sseAlive = true;
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
@@ -285,7 +275,6 @@
       try { es.close(); } catch {}
       es = null;
 
-      // SSE caiu -> liga polling como fallback
       sseAlive = false;
       if (!pollTimer) pollTimer = setInterval(syncFullState, 2500);
 
@@ -293,12 +282,10 @@
     };
   }
 
-  // ===== START =====
   document.addEventListener("DOMContentLoaded", async () => {
     await syncFullState();
     connectSSE();
 
-    // fallback: só roda se SSE cair (evita “pisca”)
     pollTimer = setInterval(() => {
       if (!sseAlive) syncFullState();
     }, 2500);

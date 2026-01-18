@@ -1,22 +1,21 @@
-// palpite.routes.js
 const express = require('express');
 const router = express.Router();
 
-const KEY = process.env.PALPITE_OVERLAY_KEY || ''; // defina na Render
+const KEY = process.env.PALPITE_OVERLAY_KEY || '';
 const clients = new Set();
 
 const state = {
   isOpen: false,
   buyValue: 0,
   totalGuesses: 0,
-  guesses: [],          // [{ name, value, ts }]
-  byUser: {},           // name -> { name, value, ts }
+  guesses: [],
+  byUser: {},
   winners: [],
   actualResult: null,
 };
 
 function authed(req) {
-  if (!KEY) return true; // se você não setar, fica aberto (não recomendo)
+  if (!KEY) return true;
   const k = req.query.key || req.get('x-palpite-key') || '';
   return k === KEY;
 }
@@ -33,7 +32,7 @@ function broadcast(event, data) {
 }
 
 function publicState() {
-  const last = state.guesses.slice(-30).reverse(); // últimos 30
+  const last = state.guesses.slice(-30).reverse();
   return {
     isOpen: state.isOpen,
     buyValue: state.buyValue,
@@ -52,7 +51,6 @@ function cleanName(raw) {
 }
 
 function parseMoney(raw) {
-  // aceita 231, 231.5, 231,50
   const s = String(raw || '').trim().replace(',', '.');
   const n = Number(s);
   if (!Number.isFinite(n)) return null;
@@ -69,7 +67,6 @@ function resetRound(buyValue) {
   state.actualResult = null;
 }
 
-// SSE stream (overlay/admin escutam daqui)
 router.get('/stream', (req, res) => {
   if (!authed(req)) return res.status(401).end();
 
@@ -84,7 +81,6 @@ router.get('/stream', (req, res) => {
   req.on('close', () => clients.delete(res));
 });
 
-// Admin: start
 router.post('/start', (req, res) => {
   if (!authed(req)) return res.status(401).json({ error: 'unauthorized' });
 
@@ -94,7 +90,6 @@ router.post('/start', (req, res) => {
   res.json({ ok: true });
 });
 
-// Admin: stop
 router.post('/stop', (req, res) => {
   if (!authed(req)) return res.status(401).json({ error: 'unauthorized' });
 
@@ -104,7 +99,6 @@ router.post('/stop', (req, res) => {
   res.json({ ok: true });
 });
 
-// Admin: clear (zera e some overlay)
 router.post('/clear', (req, res) => {
   if (!authed(req)) return res.status(401).json({ error: 'unauthorized' });
 
@@ -121,7 +115,6 @@ router.post('/clear', (req, res) => {
   res.json({ ok: true });
 });
 
-// Chat/Bot: guess
 router.post('/guess', (req, res) => {
   if (!authed(req)) return res.status(401).json({ error: 'unauthorized' });
   if (!state.isOpen) return res.json({ ok: false, reason: 'round_closed' });
@@ -131,16 +124,13 @@ router.post('/guess', (req, res) => {
 
   if (!name || value == null) return res.status(400).json({ error: 'bad_payload' });
 
-  // regra: só aceita acima do buyValue (se buyValue foi definido)
   if (state.buyValue > 0 && value <= state.buyValue) {
     return res.json({ ok: false, reason: 'below_buy' });
   }
 
   const ts = Date.now();
-  // último palpite do usuário vale
   state.byUser[name] = { name, value, ts };
 
-  // mantém histórico pro feed (limitado)
   state.guesses.push({ name, value, ts });
   if (state.guesses.length > 800) state.guesses.splice(0, state.guesses.length - 800);
 
@@ -150,7 +140,6 @@ router.post('/guess', (req, res) => {
   res.json({ ok: true });
 });
 
-// Admin: winners (calcula com base no que o servidor recebeu)
 router.post('/winners', (req, res) => {
   if (!authed(req)) return res.status(401).json({ error: 'unauthorized' });
 

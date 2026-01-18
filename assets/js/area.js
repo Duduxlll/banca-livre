@@ -175,7 +175,7 @@ const tabPagamentosEl = qs('#tab-pagamentos');
 const tabExtratosEl   = qs('#tab-extratos');
 const tabCuponsEl     = qs('#tab-cupons');
 const tabSorteioEl    = qs('#tab-sorteio');
-const tabPalpiteEl    = qs('#tab-palpite'); // ✅ NOVO
+const tabPalpiteEl    = qs('#tab-palpite'); 
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -1729,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     totalBanEl.addEventListener('click', ()=> showTotaisPopup('bancas', totalBanEl));
   }
 
-  // ✅ Se o módulo do Palpite existir, inicializa
+  
   if (window.PalpiteAdmin && typeof window.PalpiteAdmin.init === 'function') {
     try { window.PalpiteAdmin.init(); } catch(e){ console.error(e); }
   }

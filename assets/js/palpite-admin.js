@@ -1,11 +1,7 @@
-// assets/js/palpite-admin.js  (PAINEL / area.html)
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
 
-  // =========================
-  // Helpers (cookies / fetch)
-  // =========================
   function getCookie(name) {
     const m = document.cookie.match(
       new RegExp("(?:^|; )" + name.replace(/([$?*|{}\\^])/g, "\\$1") + "=([^;]*)")
@@ -17,7 +13,6 @@
     const method = (opts.method || "GET").toUpperCase();
     const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
 
-    // CSRF só em métodos que alteram estado
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
       const csrf = getCookie("csrf");
       if (csrf) headers["X-CSRF-Token"] = csrf;
@@ -42,7 +37,6 @@
     return res.status === 204 ? null : res.json();
   }
 
-  // Tenta uma lista de rotas (pra compatibilidade com versões diferentes do server)
   async function apiFetchFirstOk(paths, opts) {
     let lastErr = null;
 
@@ -51,20 +45,15 @@
         return await apiFetch(p, opts);
       } catch (e) {
         lastErr = e;
-        // se for 404, tenta a próxima; se for outro erro, ainda tenta a próxima, mas guarda
       }
     }
 
     throw lastErr || new Error("Falha ao chamar API");
   }
 
-  // =========================
-  // DOM
-  // =========================
   const el = {};
 
   function bind() {
-    // inputs/boxes
     el.buyValue     = qs("#palpiteBuyValue");
     el.winnersCount = qs("#palpiteWinnersCount");
     el.finalResult  = qs("#palpiteFinalResult");
@@ -73,7 +62,6 @@
     el.total        = qs("#palpiteTotalGuesses");
     el.winnersBox   = qs("#palpiteWinnersBox");
 
-    // IDs reais do seu HTML
     el.btnOpen    = qs("#btnPalpiteOpen");
     el.btnClose   = qs("#btnPalpiteClose");
     el.btnClear   = qs("#btnPalpiteClear");
@@ -102,10 +90,6 @@
     if (el.total) el.total.textContent = String(n || 0);
   }
 
-  // =========================
-  // LOG (scroll sem “bugar”)
-  // - Só auto-desce se estiver perto do final
-  // =========================
   function isNearBottom(box, threshold = 24) {
     if (!box) return true;
     const delta = box.scrollHeight - box.scrollTop - box.clientHeight;
@@ -128,16 +112,12 @@
 
     el.logBox.appendChild(div);
 
-    // limita (não explode)
     const max = 250;
     while (el.logBox.children.length > max) el.logBox.removeChild(el.logBox.firstChild);
 
     if (nearBottom) el.logBox.scrollTop = el.logBox.scrollHeight;
   }
 
-  // =========================
-  // WINNERS (painel)
-  // =========================
   function renderWinnersList(winners, actualCents) {
     if (!el.winnersBox) return;
 
@@ -163,13 +143,7 @@
     `;
   }
 
-  // =========================
-  // STATE
-  // =========================
   async function fetchState() {
-    // Compat:
-    // - /api/palpite/state (novo)
-    // - /api/palpite/admin/state (antigo)
     return apiFetchFirstOk(
       ["/api/palpite/state", "/api/palpite/admin/state"],
       { method: "GET" }
@@ -179,31 +153,25 @@
   async function refreshState({ reloadLog = false } = {}) {
     const st = await fetchState();
 
-    // total
     setTotal(st?.total ?? st?.totalGuesses ?? 0);
 
-    // compra
     if (el.buyValue && st?.buyValueCents != null) {
       el.buyValue.value = (Number(st.buyValueCents) / 100).toFixed(2);
     } else if (el.buyValue && st?.buyValue != null) {
-      // caso o server mande em reais
       const n = Number(st.buyValue);
       el.buyValue.value = Number.isFinite(n) ? n.toFixed(2) : "";
     }
 
-    // winnersCount
     if (el.winnersCount && st?.winnersCount != null) {
       el.winnersCount.value = String(st.winnersCount);
     }
 
-    // log (recarrega sem “puxar” o scroll do usuário)
     if (reloadLog && el.logBox) {
       const keepBottom = isNearBottom(el.logBox);
       const oldTop = el.logBox.scrollTop;
 
       clearLog(true);
 
-      // entries pode vir como entries OR lastGuesses etc
       const entries =
         Array.isArray(st?.entries) ? st.entries :
         Array.isArray(st?.lastGuesses) ? st.lastGuesses :
@@ -223,7 +191,6 @@
       if (!keepBottom) el.logBox.scrollTop = oldTop;
     }
 
-    // winners já salvos no estado (para refletir no painel)
     if (Array.isArray(st?.winners) && st.winners.length && st.actualResultCents != null) {
       const winners = st.winners.map((w) => ({
         name: w.name ?? w.user ?? w.nome ?? "—",
@@ -239,16 +206,12 @@
     return st;
   }
 
-  // =========================
-  // AÇÕES
-  // =========================
   async function openRound() {
     const buyCents = parseMoneyToCents(el.buyValue?.value || 0) ?? 0;
 
     let winnersCount = Number(el.winnersCount?.value || 3);
     winnersCount = Math.max(1, Math.min(3, winnersCount));
 
-    // Compat payloads (manda os dois jeitos)
     const payload = {
       buyValueCents: buyCents,
       buyValue: Number((buyCents / 100).toFixed(2)),
@@ -273,7 +236,6 @@
   }
 
   async function clearRound() {
-    // alguns servers usam POST, outros DELETE
     try {
       await apiFetchFirstOk(
         ["/api/palpite/clear", "/api/palpite/admin/clear"],
@@ -292,9 +254,6 @@
     await refreshState({ reloadLog: true });
   }
 
-  // Verificar vencedores:
-  // - chama o server (pra salvar winners e o overlay receber)
-  // - se falhar, calcula só no painel como fallback
   async function verifyWinners() {
     const actualCents = parseMoneyToCents(el.finalResult?.value || "");
     if (actualCents == null) {
@@ -305,7 +264,6 @@
     let winnersCount = Number(el.winnersCount?.value || 3);
     winnersCount = Math.max(1, Math.min(3, winnersCount));
 
-    // 1) tenta server (salva/emit winners)
     try {
       const out = await apiFetchFirstOk(
         ["/api/palpite/winners", "/api/palpite/admin/winners"],
@@ -327,15 +285,12 @@
 
       renderWinnersList(winners.slice(0, winnersCount), actualCents);
 
-      // puxa state pra refletir winners salvos (e manter tudo consistente)
       await refreshState({ reloadLog: false });
       return;
     } catch (err) {
       console.warn("Server winners falhou, fallback local:", err?.message || err);
-      // cai pro fallback abaixo
     }
 
-    // 2) fallback local (painel)
     const st = await fetchState();
     const entries =
       Array.isArray(st?.entries) ? st.entries :
@@ -367,16 +322,11 @@
     alert("Mostrei no painel. Para aparecer no overlay, o server precisa salvar/emitir winners no state-public.");
   }
 
-  // =========================
-  // SSE (admin) — tenta duas rotas
-  // =========================
   let es = null;
   let streamPathIndex = 0;
 
   const STREAM_PATHS = [
-    // mais comum pro palpite
     { path: "/api/palpite/admin/stream", mode: "palpite" },
-    // stream global do teu projeto (se existir)
     { path: "/api/stream", mode: "global" },
   ];
 
@@ -387,12 +337,10 @@
     es = new EventSource(`${API}${current.path}`);
 
     if (current.mode === "palpite") {
-      // state (puxa tudo)
       es.addEventListener("state", () => {
         refreshState({ reloadLog: true }).catch(() => {});
       });
 
-      // guess (atualiza log na hora)
       es.addEventListener("guess", (e) => {
         try {
           const d = JSON.parse(e.data || "{}");
@@ -407,7 +355,6 @@
 
           addLogLine(name, cents);
 
-          // total se vier no payload, usa; senão soma +1
           if (el.total) {
             const hinted = d.total ?? d.totalGuesses;
             if (hinted != null) el.total.textContent = String(hinted);
@@ -416,7 +363,6 @@
         } catch {}
       });
 
-      // winners/clear etc
       es.addEventListener("winners", () => {
         refreshState({ reloadLog: false }).catch(() => {});
       });
@@ -427,12 +373,10 @@
         refreshState({ reloadLog: false }).catch(() => {});
       });
     } else {
-      // mode === "global": escuta evento do seu server (palpite-changed)
       es.addEventListener("palpite-changed", (e) => {
         try {
           const data = JSON.parse(e.data || "{}");
 
-          // quando chegar palpite novo
           if (data.reason === "guess" && data.entry) {
             addLogLine(data.entry.user, data.entry.guessCents);
             if (data.total != null) setTotal(data.total);
@@ -440,47 +384,37 @@
             return;
           }
 
-          // open/close/clear/winners
           refreshState({ reloadLog: false }).catch(() => {});
         } catch {}
       });
     }
 
-    // fallback automático de rota
     es.onerror = () => {
       try { es.close(); } catch {}
       es = null;
 
-      // tenta próxima rota se a atual não responder
       streamPathIndex = (streamPathIndex + 1) % STREAM_PATHS.length;
 
       setTimeout(connectStream, 1500);
     };
   }
 
-  // =========================
-  // START
-  // =========================
   document.addEventListener("DOMContentLoaded", async () => {
     bind();
 
-    // se não tiver os elementos do palpite, não roda
     if (!el.buyValue || !el.btnOpen) return;
 
-    // listeners
     el.btnOpen.addEventListener("click", () => openRound().catch(err => alert(err.message)));
     el.btnClose.addEventListener("click", () => closeRound().catch(err => alert(err.message)));
     el.btnClear.addEventListener("click", () => clearRound().catch(err => alert(err.message)));
     el.btnWinners.addEventListener("click", () => verifyWinners().catch(err => alert(err.message)));
 
-    // estado inicial + log inicial
     try {
       await refreshState({ reloadLog: true });
     } catch (e) {
       console.warn("Falha ao carregar state inicial:", e?.message || e);
     }
 
-    // stream
     connectStream();
   });
 })();

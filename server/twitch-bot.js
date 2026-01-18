@@ -1,4 +1,4 @@
-// server/twitch-bot.js
+
 import tmiPkg from "tmi.js";
 
 
@@ -54,15 +54,15 @@ export function initTwitchBot({
   }
 
   async function submitGuessToServer(user, rawGuess) {
-    // chama teu endpoint existente
+    
     const url = `http://127.0.0.1:${port}/api/palpite/guess?key=${encodeURIComponent(apiKey)}`;
 
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        user,          // nome do chat
-        guess: rawGuess, // "230,50" ou "230.50" ou "230"
+        user,          
+        guess: rawGuess, 
         source: "twitch",
       }),
     });
