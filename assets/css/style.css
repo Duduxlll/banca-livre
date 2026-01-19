@@ -137,6 +137,8 @@ select.input{
   overflow:hidden;
 }
 
+
+
 @keyframes float{0%,100%{ transform: translateY(0)} 50%{ transform: translateY(-12px)}}
 
 .toast{
@@ -152,15 +154,7 @@ select.input{
 .error.show{display:block}
 .success{color:var(--success)}
 
-.hero-shape{
-  position:absolute; inset:auto -120px -120px auto;
-  width:420px; height:420px; border-radius:50%;
-  background: conic-gradient(from 0deg,
-    rgba(34,224,122,.55),
-    rgba(124,255,179,.5),
-    rgba(34,224,122,.55));
-  filter: blur(42px); opacity:.22; animation: float 8s ease-in-out infinite;
-}
+
 
 footer{margin-top:36px; color:var(--muted); text-align:center; font-size:.9rem}
 
