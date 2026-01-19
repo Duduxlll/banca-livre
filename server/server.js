@@ -384,7 +384,6 @@ app.use('/api', (req, res, next) => {
     '/api/auth/me',
     '/api/pix/cob',
     '/api/pix/status',
-    '/api/public/bancas',
     '/api/sorteio/inscrever',
     '/api/cupons/resgatar',
     '/api/palpite/stream',
@@ -1148,40 +1147,7 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
-app.post('/api/public/bancas', async (req, res) => {
-  try{
-    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
-    const key = req.get('X-APP-KEY');
-    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
 
-    const { nome, depositoCents, pixType=null, pixKey=null, message=null } = req.body || {};
-    if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
-      return res.status(400).json({ error: 'dados_invalidos' });
-    }
-
-    const id = uid();
-    const { rows } = await q(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7, now())
-       returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-                 pix_type as "PixType", pix_key as "pixKey", message as "message", created_at as "createdAt"`,
-      [id, nome, depositoCents, null, pixType, pixKey, message]
-    );
-
-    await q(
-      `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
-       values ($1,$2,$3,'deposito',$4, now())`,
-      [uid(), rows[0].id, nome, depositoCents]
-    );
-    sseSendAll('extratos-changed', { reason: 'deposito-manual' });
-
-    sseSendAll('bancas-changed', { reason: 'insert-public' });
-    return res.json(rows[0]);
-  }catch(e){
-    console.error('public/bancas:', e.message);
-    return res.status(500).json({ error:'falha_public' });
-  }
-});
 
 const areaAuth = [requireAuth];
 
