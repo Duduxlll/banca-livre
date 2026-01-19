@@ -233,52 +233,53 @@
   }
 
   function desenharRoletaSorteio(){
-    const w = canvas.width;
-    const h = canvas.height;
-    const cx = w / 2;
-    const cy = h / 2;
-    const outsideRadius = Math.min(w, h) / 2 - 10;
-    const textRadius = outsideRadius - 24;
+  const w = canvas.width;
+  const h = canvas.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const outsideRadius = Math.min(w, h) / 2 - 10;
+  const textRadius = outsideRadius - 24;
 
-    ctx.clearRect(0, 0, w, h);
+  ctx.clearRect(0, 0, w, h);
 
-    const n = inscritos.length || 1;
-    const arc = (Math.PI * 2) / n;
+  const n = inscritos.length || 1;
+  const arc = (Math.PI * 2) / n;
 
-    for (let i = 0; i < n; i++) {
-      const angle = startAngle + i * arc;
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, outsideRadius, angle, angle + arc, false);
-      ctx.closePath();
-      ctx.fillStyle = inscritos.length ? colors[i % colors.length] : '#333';
-      ctx.fill();
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle + arc / 2);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#111';
-      ctx.font = '12px system-ui';
-      const label = inscritos.length ? (inscritos[i].nome_twitch || '') : 'Sem inscritos';
-      ctx.fillText(label, textRadius, 4);
-      ctx.restore();
-    }
+  for (let i = 0; i < n; i++) {
+    const angle = startAngle + i * arc;
 
     ctx.beginPath();
-    ctx.arc(cx, cy, 55, 0, Math.PI * 2);
-    ctx.fillStyle = '#120806';
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, outsideRadius, angle, angle + arc, false);
+    ctx.closePath();
+    ctx.fillStyle = inscritos.length ? colors[i % colors.length] : '#333';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,180,120,.5)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
 
-    ctx.fillStyle = '#ffd76b';
-    ctx.font = 'bold 16px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('SORTEIO', cx, cy + 6);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle + arc / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#111';
+    ctx.font = '12px system-ui';
+    const label = inscritos.length ? (inscritos[i].nome_twitch || '') : 'Sem inscritos';
+    ctx.fillText(label, textRadius, 4);
+    ctx.restore();
   }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 55, 0, Math.PI * 2);
+  ctx.fillStyle = '#061b10';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(34,224,122,.55)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#7CFFB3';
+  ctx.font = 'bold 16px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('SORTEIO', cx, cy + 6);
+}
+
 
   function calcularIndiceVencedorPeloAngulo(angleFinal){
     if (!inscritos.length) return -1;

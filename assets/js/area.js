@@ -476,7 +476,7 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); // ✅
+    tabPalpiteEl?.classList.remove('show'); 
     renderBancas();
     updateTotals();
 
@@ -486,7 +486,7 @@ async function render(){
     tabExtratosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); // ✅
+    tabPalpiteEl?.classList.remove('show'); 
     renderPagamentos();
 
   } else if (TAB === 'extratos') {
@@ -495,7 +495,7 @@ async function render(){
     tabPagamentosEl?.classList.remove('show');
     tabCuponsEl?.classList.remove('show');
     tabSorteioEl?.classList.remove('show');
-    tabPalpiteEl?.classList.remove('show'); // ✅
+    tabPalpiteEl?.classList.remove('show'); 
     renderExtratos();
 
   } else if (TAB === 'cupons') {
