@@ -1,12 +1,11 @@
 :root{
-  
-  --bg:#120a04;                 
-  --card:#1a120a;               
+  --bg:#050A07;
+  --card:#0A1510;
   --text:#e7e9f3;
-  --muted:#c8cbd6;
-  --brand:#FF7A00;              
-  --brand2:#FFC13A;             
-  --line:rgba(255,180,120,.16); 
+  --muted:#b3b8cc;
+  --brand:#22E07A;
+  --brand2:#7CFFB3;
+  --line:rgba(34,224,122,.16);
 }
 
 *{box-sizing:border-box}
@@ -15,10 +14,9 @@ html,body{height:100%}
 body{
   margin:0;
   font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
-  
   background:
-    radial-gradient(900px 600px at -10% -10%, rgba(255,140,0,.20), transparent 60%),
-    radial-gradient(900px 600px at 110% 10%, rgba(255,193,58,.14), transparent 60%),
+    radial-gradient(900px 600px at -10% -10%, rgba(34,224,122,.20), transparent 60%),
+    radial-gradient(900px 600px at 110% 10%, rgba(124,255,179,.14), transparent 60%),
     var(--bg);
   color:var(--text);
 }
@@ -36,7 +34,7 @@ body{
   border:1px solid var(--line);
   border-radius:16px;
   padding:22px;
-  box-shadow:0 28px 80px rgba(20,10,4,.65);
+  box-shadow:0 28px 80px rgba(1,10,6,.75);
 }
 
 h1{margin:0 0 6px}
@@ -48,15 +46,14 @@ label{display:block; margin:12px 0 8px; font-weight:600}
   width:100%;
   padding:12px 14px;
   border-radius:12px;
-  
-  background:#161006;
+  background:#0B1711;
   border:1px solid var(--line);
   color:var(--text);
 }
 .input:focus{
   outline:none;
   border-color: color-mix(in srgb, var(--brand) 70%, white);
-  box-shadow:0 0 0 4px rgba(255,122,0,.20);
+  box-shadow:0 0 0 4px rgba(34,224,122,.20);
 }
 
 .cta{
@@ -65,12 +62,11 @@ label{display:block; margin:12px 0 8px; font-weight:600}
   padding:14px;
   border-radius:12px;
   border:0;
-  
   background:linear-gradient(90deg, var(--brand), var(--brand2));
-  color:#1b0e03;
+  color:#061b10;
   font-weight:800;
   cursor:pointer;
-  box-shadow: 0 12px 30px rgba(255,122,0,.25), 0 8px 20px rgba(255,193,58,.18);
+  box-shadow: 0 12px 30px rgba(34,224,122,.25), 0 8px 20px rgba(124,255,179,.18);
 }
 .cta:hover{ filter:brightness(1.03); }
 .cta:active{ transform: translateY(1px); }
