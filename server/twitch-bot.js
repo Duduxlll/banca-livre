@@ -35,7 +35,7 @@ export function initTwitchBot({
   const publicUrl =
     cashbackPublicUrl ||
     process.env.CASHBACK_PUBLIC_URL ||
-    "https://banca-teste.onrender.com/cashback-publico.html";
+    "https://banca-livre.onrender.com/cashback-publico";
 
   const sayOnJoin = String(process.env.TOURNEY_SAY_JOIN || "").trim().toLowerCase() === "true";
   const announceEnabled = String(process.env.TOURNEY_ANNOUNCE || "").trim().toLowerCase() === "true";
