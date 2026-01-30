@@ -236,7 +236,7 @@ form?.addEventListener('submit', async (ev) => {
     submitResult.innerHTML =
       `<div class="msgTitle">Pedido enviado ✅</div>
        <div class="msgLine">Protocolo: <strong>${esc(data.id)}</strong></div>
-       <div class="msgLine">Acompanhe pelo chat se foi aprovado para receber seu cashback com <strong>!status</strong>.</div>`;
+       <div class="msgLine">Acompanhe pelo chat se você foi aprovado para receber seu cashback com o comando <strong>!status</strong>.</div>`;
 
     form.reset();
     screenshotDataUrl = null;

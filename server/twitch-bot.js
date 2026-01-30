@@ -389,18 +389,18 @@ export function initTwitchBot({
 
         const st = await getTorneioState();
         if (st.error) {
-          await say(`${mention} não consegui verificar o torneio agora. Tenta de novo já já.`);
+          await say(`${mention} Não consegui verificar o torneio agora. Tenta de novo já já.`);
           return;
         }
 
         if (!st.data?.active) {
-          await say(`${mention} torneio não está ativo agora.`);
+          await say(`${mention} Torneio não está ativo agora.`);
           return;
         }
 
         const phase = st.data?.phase;
         if (!phase) {
-          await say(`${mention} torneio ativo, mas a fase não está disponível agora.`);
+          await say(`${mention} Torneio ativo, mas a fase não está disponível agora.`);
           return;
         }
 
@@ -429,11 +429,11 @@ export function initTwitchBot({
           return;
         }
         if (r.error === "nao_classificado") {
-          await say(`${mention} você não está classificado para esta fase.`);
+          await say(`${mention} Você não está classificado para esta fase.`);
           return;
         }
         if (r.error === "time_invalido") {
-          await say(`${mention} time inválido. ${formatTeamsHint(teams, 6)}`);
+          await say(`${mention} Time inválido. ${formatTeamsHint(teams, 6)}`);
           return;
         }
         if (r.error) {
@@ -452,7 +452,7 @@ export function initTwitchBot({
 
       if (cmd.type === "cashback") {
         const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} Cadastre-se na !borawin ou !melbet e envie o print do deposito feito na data de hoje 👉 ${publicUrl} • depois use !status`);
+        await say(`${mention} Cadastre-se na !borawin ou !melbet e envie o print do depósito realizado hoje 👉 ${publicUrl} • Depois, use !status.`);
         return;
       }
 
@@ -460,7 +460,7 @@ export function initTwitchBot({
         const mention = userTag ? `@${userTag}` : `@${user}`;
         const st = await getCashbackStatus(userTag || user);
         if (st.notFound) {
-          await say(`${mention} você ainda não pediu seu cashback. Use !cashback`);
+          await say(`${mention} Você ainda não pediu seu cashback. Use !cashback`);
           return;
         }
         if (st.error) {
