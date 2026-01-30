@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cashback</title>
+
+  <meta name="app-key" content="82ba166463e0d2ae345b9649ebc976d71176c5afe887b5e83affa633122beb9a">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/cashback-publico.css">
+</head>
+<body>
+  <div class="bg">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo">
+  <img src="assets/img/banner.png" alt="Cashback">
+</div>
+
+      <div class="brandText">
+        <div class="brandTitle">Cashback</div>
+        <div class="brandSub">Envie seu pedido</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="grid" style="max-width:980px;margin:0 auto">
+    <section class="card">
+      <div class="cardHead">
+        <h2>Solicitar cashback</h2>
+        <div class="badge live" id="submitBadge">Formulário</div>
+      </div>
+
+      <form id="cashbackForm" class="form" novalidate>
+        <div class="row">
+          <label class="field">
+            <span>Nick da Twitch</span>
+            <input id="twitchName" name="twitchName" type="text" placeholder="Ex: SeuNick" autocomplete="off" required>
+          </label>
+
+          <label class="field">
+            <span>Tipo de PIX</span>
+            <select id="pixType" name="pixType" required>
+              <option value="random">Chave aleatória</option>
+              <option value="cpf">CPF</option>
+              <option value="email">E-mail</option>
+              <option value="phone">Telefone</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Chave PIX</span>
+          <input id="pixKey" name="pixKey" type="text" placeholder="Sua chave Pix" autocomplete="off" required>
+        </label>
+
+        <div class="upload">
+          <div class="uploadLeft">
+            <div class="uploadTitle">Print do deposito</div>
+            <div class="uploadSub">Aviso: Deixe visível a data e hora que foi feito o deposito</div>
+            <input id="screenshot" name="screenshot" type="file" accept="image/png,image/jpeg,image/webp" class="file" required>
+            <button type="button" class="btn ghost" id="pickBtn">Selecionar imagem</button>
+          </div>
+
+          <div class="preview" id="previewBox">
+            <div class="previewEmpty" id="previewEmpty">
+              <div class="spark"></div>
+              <div class="previewText">Prévia</div>
+            </div>
+            <img id="previewImg" alt="">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="sendBtn" type="submit">
+            <span class="btnText">Enviar</span>
+            <span class="btnGlow"></span>
+          </button>
+          <div class="hint">
+            Depois, Acompanhe pelo chat se foi aprovado para receber seu cashback com <strong>!status</strong>.
+          </div>
+        </div>
+
+        <div class="result" id="submitResult" aria-live="polite"></div>
+      </form>
+    </section>
+  </main>
+
+  <script src="assets/js/cashback-publico.js"></script>
+</body>
+</html>
