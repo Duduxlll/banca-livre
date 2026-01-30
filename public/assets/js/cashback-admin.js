@@ -476,7 +476,7 @@ function ensureProofModal() {
     reload?.addEventListener('click', () => CashbackAdmin.refresh());
 
     copy?.addEventListener('click', async () => {
-      const link = `${window.location.origin}/cashback-publico.html`;
+      const link = `${window.location.origin}/cashback-publico`;
       try {
         await navigator.clipboard.writeText(link);
         notify('Link copiado!', 'ok');
