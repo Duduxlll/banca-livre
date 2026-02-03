@@ -658,3 +658,87 @@ dialog.cb-modal.cb-proof.is-zoom #cbPImg{
   padding: 8px 10px !important;
   font-size: .82rem !important;
 }
+
+#tab-cashbacks #cbTbl{
+  table-layout: fixed !important;
+}
+
+#tab-cashbacks #cbTbl th,
+#tab-cashbacks #cbTbl td{
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  vertical-align: middle !important;
+}
+
+#tab-cashbacks #cbTbl th{
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(1),
+#tab-cashbacks #cbTbl td:nth-child(1){
+  width: 12% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(2),
+#tab-cashbacks #cbTbl td:nth-child(2){
+  width: 15% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3){
+  width: 15% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4){
+  width: 10% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(5),
+#tab-cashbacks #cbTbl td:nth-child(5){
+  width: 20% !important;
+  white-space: normal !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){
+  width: 10% !important;
+  text-align: center !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(6){
+  white-space: normal !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(6) .btn{
+  padding: 8px 10px !important;
+  font-size: .82rem !important;
+  white-space: nowrap !important;
+  min-width: 72px;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(7),
+#tab-cashbacks #cbTbl td:nth-child(7){
+  width: 18% !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) > div{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) > div .btn{
+  width: 100% !important;
+  padding: 8px 10px !important;
+  font-size: .82rem !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) > div .btn:nth-child(3){
+  grid-column: 1 / -1 !important;
+}
