@@ -479,3 +479,106 @@ dialog.cb-modal.cb-proof.is-zoom #cbPImg{
 .cb-x:hover{
   background: rgba(46, 204, 113, .12);
 }
+
+
+#tab-cashbacks #cbTbl{
+  width:100% !important;
+  min-width:0 !important;
+  table-layout:fixed !important;
+}
+
+#tab-cashbacks #cbTbl th,
+#tab-cashbacks #cbTbl td{
+  min-width:0 !important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  vertical-align:middle;
+}
+
+#tab-cashbacks #cbTbl td{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(1),
+#tab-cashbacks #cbTbl td:nth-child(1),
+#tab-cashbacks #cbTbl th:nth-child(2),
+#tab-cashbacks #cbTbl td:nth-child(2),
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3),
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4),
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){
+  white-space:nowrap;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(1),
+#tab-cashbacks #cbTbl td:nth-child(1){
+  width:130px !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(2),
+#tab-cashbacks #cbTbl td:nth-child(2){
+  width:160px !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3){
+  width:140px !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4){
+  width:110px !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){
+  width:110px !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(7),
+#tab-cashbacks #cbTbl td:nth-child(7){
+  width:160px !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(5){
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) > div{
+  display:grid !important;
+  gap:8px;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) .btn{
+  width:100%;
+  justify-content:center;
+  padding:8px 10px !important;
+}
+
+@media (max-width: 1100px){
+  #tab-cashbacks .table thead th,
+  #tab-cashbacks .table tbody td{
+    padding:10px 10px !important;
+  }
+
+  #tab-cashbacks #cbTbl th:nth-child(1),
+  #tab-cashbacks #cbTbl td:nth-child(1){
+    width:120px !important;
+  }
+
+  #tab-cashbacks #cbTbl th:nth-child(2),
+  #tab-cashbacks #cbTbl td:nth-child(2){
+    width:150px !important;
+  }
+
+  #tab-cashbacks #cbTbl th:nth-child(7),
+  #tab-cashbacks #cbTbl td:nth-child(7){
+    width:150px !important;
+  }
+}
