@@ -479,3 +479,41 @@ dialog.cb-modal.cb-proof .cb-proof-hint{
 #appToast.toast.toast--info{
   border-color:rgba(0,163,255,.35) !important;
 }
+
+#tab-cashbacks #cbTbl th:nth-child(1),
+#tab-cashbacks #cbTbl td:nth-child(1){ width: 120px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(2),
+#tab-cashbacks #cbTbl td:nth-child(2){ width: 150px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3){ width: 140px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4){ width: 110px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(5),
+#tab-cashbacks #cbTbl td:nth-child(5){ width: 210px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){ width: 190px !important; }
+
+#tab-cashbacks .cb-actions-grid{
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#tab-cashbacks .cb-actions-grid > button{
+  width: 100%;
+  height: 34px !important;
+  padding: 7px 8px !important;
+  font-size: 12px !important;
+  border-radius: 12px !important;
+  min-width: 0 !important;
+  white-space: nowrap;
+}
+
+#tab-cashbacks .cb-actions-grid > button:nth-child(3){
+  grid-column: 1 / -1;
+}
