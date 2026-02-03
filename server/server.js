@@ -1195,6 +1195,220 @@ app.post('/api/pix/confirmar', async (req, res) => {
   }
 });
 
+
+
+
+
+
+
+// ===== DEV SEED (ADMIN ONLY) =====
+const DEV_SEED_ENABLED = String(process.env.DEV_SEED_ENABLED || "").trim().toLowerCase() === "true";
+
+function requireDevSeed(req, res, next) {
+  if (!DEV_SEED_ENABLED) return res.status(404).json({ error: "not_found" });
+  next();
+}
+
+function randInt(min, max) {
+  const a = Math.ceil(min);
+  const b = Math.floor(max);
+  return Math.floor(Math.random() * (b - a + 1)) + a;
+}
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function normalizeLc(name) {
+  return String(name || "")
+    .trim()
+    .replace(/^@+/, "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+}
+
+// 2.1) SEED SORTEIO (gera N inscrições)
+app.post("/api/dev/seed/sorteio", requireAdmin, requireDevSeed, async (req, res) => {
+  try {
+    const count = Math.min(Math.max(parseInt(req.body?.count || "100", 10) || 100, 1), 2000);
+    const prefix = String(req.body?.prefix || "teste").trim().slice(0, 20) || "teste";
+
+    // tenta inserir em lote
+    let inserted = 0;
+    for (let i = 1; i <= count; i++) {
+      const nome_twitch = `${prefix}_${String(i).padStart(4, "0")}`;
+      const mensagem = `ID_${prefix}_${Date.now().toString(36)}_${i}`; // tende a ser único
+      try {
+        await q(
+          `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem)
+           VALUES ($1, $2)`,
+          [nome_twitch, mensagem]
+        );
+        inserted++;
+      } catch (e) {
+        // se bater unique (23505), só ignora e segue
+        if (e?.code !== "23505") throw e;
+      }
+    }
+
+    return res.json({ ok: true, inserted, requested: count });
+  } catch (e) {
+    console.error("dev/seed/sorteio:", e?.message || e);
+    return res.status(500).json({ error: "falha_seed_sorteio" });
+  }
+});
+
+// 2.2) SEED PALPITE (gera N palpites na rodada atual e dispara SSE pro overlay)
+app.post("/api/dev/seed/palpite", requireAdmin, requireDevSeed, async (req, res) => {
+  try {
+    const count = Math.min(Math.max(parseInt(req.body?.count || "200", 10) || 200, 1), 5000);
+    const prefix = String(req.body?.prefix || "bot").trim().slice(0, 20) || "bot";
+
+    if (!PALPITE.roundId) return res.status(409).json({ error: "no_round" });
+
+    // pega total atual uma vez (pra atualizar overlay sem query a cada insert)
+    const { rows: c0 } = await q(
+      `select count(*)::int as c from palpite_entries where round_id = $1`,
+      [PALPITE.roundId]
+    );
+    let total = c0?.[0]?.c ?? 0;
+
+    // valores: se tiver buyValue, usa como faixa base; senão usa aleatório
+    const base = Number(PALPITE.buyValueCents || 0) | 0;
+
+    for (let i = 1; i <= count; i++) {
+      const user = `${prefix}${String(i).padStart(4, "0")}`;
+
+      const guessCents =
+        base > 0
+          ? Math.max(0, base + randInt(-base * 0.8, base * 0.8))
+          : randInt(100, 250000);
+
+      await q(
+        `insert into palpite_entries (round_id, user_name, guess_cents, raw_text, created_at, updated_at)
+         values ($1, $2, $3, $4, now(), now())
+         on conflict (round_id, user_name)
+         do update set guess_cents = excluded.guess_cents,
+                       raw_text   = excluded.raw_text,
+                       updated_at = now()`,
+        [PALPITE.roundId, user, guessCents | 0, String((guessCents / 100).toFixed(2)).slice(0, 300)]
+      );
+
+      total++;
+
+      // dispara SSE pro overlay como se fosse palpite real
+      try {
+        palpiteSendAll?.("palpite-guess", { entry: { user, guessCents }, total });
+        palpiteAdminSendAll?.("guess", { name: user, value: guessCents / 100, totalGuesses: total });
+      } catch {}
+    }
+
+    // avisa geral (admin)
+    sseSendAll?.("palpite-changed", { reason: "seed", total });
+
+    return res.json({ ok: true, roundId: PALPITE.roundId, inserted: count, total });
+  } catch (e) {
+    console.error("dev/seed/palpite:", e?.message || e);
+    return res.status(500).json({ error: "falha_seed_palpite" });
+  }
+});
+
+// 2.3) SEED TORNEIO (gera N participantes e escolhas na fase atual)
+app.post("/api/dev/seed/torneio", requireAdmin, requireDevSeed, async (req, res) => {
+  try {
+    const count = Math.min(Math.max(parseInt(req.body?.count || "300", 10) || 300, 1), 5000);
+    const prefix = String(req.body?.prefix || "u").trim().slice(0, 20) || "u";
+
+    // torneio ativo
+    const { rows: torRows } = await q(
+      `SELECT id, name, status, current_phase AS "currentPhase"
+       FROM torneios
+       WHERE status = 'ATIVO'
+       ORDER BY created_at DESC
+       LIMIT 1`
+    );
+    const tor = torRows?.[0];
+    if (!tor?.id) return res.status(400).json({ error: "torneio_inativo" });
+
+    // fase atual
+    const { rows: phRows } = await q(
+      `SELECT phase_number AS "phaseNumber", status, teams_json AS "teamsJson",
+              team_a_name AS "teamAName", team_b_name AS "teamBName", team_c_name AS "teamCName"
+       FROM torneio_phases
+       WHERE torneio_id = $1 AND phase_number = $2
+       LIMIT 1`,
+      [tor.id, tor.currentPhase]
+    );
+    const ph = phRows?.[0];
+    if (!ph) return res.status(400).json({ error: "fase_invalida" });
+    if (String(ph.status || "").toUpperCase() !== "ABERTA") return res.status(400).json({ error: "fase_fechada" });
+
+    // teams
+    let teams = [];
+    if (Array.isArray(ph.teamsJson) && ph.teamsJson.length) {
+      teams = ph.teamsJson
+        .map(t => {
+          const key = String(t?.key || "").trim();
+          const name = String(t?.name || key).trim();
+          if (!key) return null;
+          return { key, name };
+        })
+        .filter(Boolean);
+    }
+    if (!teams.length) {
+      teams = [
+        { key: "timea", name: ph.teamAName || "Time A" },
+        { key: "timeb", name: ph.teamBName || "Time B" },
+        { key: "timec", name: ph.teamCName || "Time C" },
+      ];
+    }
+
+    let inserted = 0;
+    for (let i = 1; i <= count; i++) {
+      const twitchName = `${prefix}${String(i).padStart(4, "0")}`;
+      const twitchLc = normalizeLc(twitchName);
+      const displayName = `Teste ${twitchName}`;
+      const team = pick(teams);
+
+      await q(
+        `INSERT INTO torneio_participants
+          (id, torneio_id, twitch_name, twitch_name_lc, display_name, alive, joined_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, true, now(), now())
+         ON CONFLICT (torneio_id, twitch_name_lc)
+         DO UPDATE SET
+           twitch_name = EXCLUDED.twitch_name,
+           display_name = COALESCE(EXCLUDED.display_name, torneio_participants.display_name),
+           updated_at = now()`,
+        [uid(), tor.id, twitchName, twitchLc, displayName]
+      );
+
+      await q(
+        `INSERT INTO torneio_choices
+          (id, torneio_id, phase_number, twitch_name_lc, team, chosen_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, now(), now())
+         ON CONFLICT (torneio_id, phase_number, twitch_name_lc)
+         DO UPDATE SET team = EXCLUDED.team, updated_at = now()`,
+        [uid(), tor.id, ph.phaseNumber, twitchLc, team.key]
+      );
+
+      inserted++;
+    }
+
+    sseSendAll?.("torneio-changed", { reason: "seed", torneioId: tor.id, phase: ph.phaseNumber });
+
+    return res.json({ ok: true, torneioId: tor.id, phase: ph.phaseNumber, inserted, teams });
+  } catch (e) {
+    console.error("dev/seed/torneio:", e?.message || e);
+    return res.status(500).json({ error: "falha_seed_torneio" });
+  }
+});
+
+
+
+
+
+
+
+
+
 app.post('/api/cashbacks/submit', requireAppKey, async (req, res) => {
   try{
     const twitchNick = normalizeNick(req.body?.twitchNick ?? req.body?.nick ?? req.body?.user ?? req.body?.username);
