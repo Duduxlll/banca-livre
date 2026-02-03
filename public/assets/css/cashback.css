@@ -582,3 +582,79 @@ dialog.cb-modal.cb-proof.is-zoom #cbPImg{
     width:150px !important;
   }
 }
+
+#tab-cashbacks .table-wrap{
+  overflow-x: hidden !important;
+}
+
+#tab-cashbacks #cbTbl{
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+#tab-cashbacks #cbTbl th,
+#tab-cashbacks #cbTbl td{
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(1),
+#tab-cashbacks #cbTbl td:nth-child(1){
+  width: 14% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(2),
+#tab-cashbacks #cbTbl td:nth-child(2){
+  width: 16% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3){
+  width: 16% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4){
+  width: 12% !important;
+  white-space: nowrap !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(5),
+#tab-cashbacks #cbTbl td:nth-child(5){
+  width: 20% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){
+  width: 10% !important;
+  text-align: center !important;
+  white-space: normal !important;
+}
+
+#tab-cashbacks #cbTbl th:nth-child(7),
+#tab-cashbacks #cbTbl td:nth-child(7){
+  width: 12% !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(5){
+  line-height: 1.15 !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) > div{
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+}
+
+#tab-cashbacks #cbTbl td:nth-child(7) .btn{
+  width: 100% !important;
+  padding: 8px 10px !important;
+  font-size: .82rem !important;
+}
