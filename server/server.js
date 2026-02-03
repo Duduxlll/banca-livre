@@ -1023,19 +1023,44 @@ app.get('/palpite-overlay.html', (req, res) => {
 });
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
-  const { username, password } = req.body || {};
-  if (!username || !password) {
-    return res.status(400).json({ error: 'missing_fields' });
+  try {
+    const body = req.body || {};
+
+    const username =
+      typeof body.username === "string" ? body.username.trim() : "";
+
+    
+    const rawPass = body.password ?? body.senha;
+
+    const password =
+      typeof rawPass === "string" ? rawPass : "";
+
+    if (!username || !password) {
+      return res.status(400).json({ error: "missing_fields" });
+    }
+
+    if (typeof ADMIN_PASSWORD_HASH !== "string" || !ADMIN_PASSWORD_HASH.trim()) {
+      return res.status(500).json({ error: "hash_admin_nao_configurado" });
+    }
+
+    const userOk = username === ADMIN_USER;
+
+    
+    const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
+
+    if (!userOk || !passOk) {
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
+
+    const token = signSession({ sub: ADMIN_USER, role: "admin" });
+    setAuthCookies(res, token);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("login error:", e);
+    return res.status(500).json({ error: "login_failed" });
   }
-  const userOk = username === ADMIN_USER;
-  const passOk = await bcrypt.compare(password, ADMIN_PASSWORD_HASH);
-  if (!userOk || !passOk) {
-    return res.status(401).json({ error: 'invalid_credentials' });
-  }
-  const token = signSession({ sub: ADMIN_USER, role: 'admin' });
-  setAuthCookies(res, token);
-  return res.json({ ok: true });
 });
+
 
 app.post('/api/auth/logout', (req, res) => {
   clearAuthCookies(res);
