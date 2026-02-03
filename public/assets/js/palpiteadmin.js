@@ -33,7 +33,7 @@
   }
 
   if (!KEY) {
-    showError("Falta a key na URL. Use: /palpite-overlay.html?key=SUA_APP_PUBLIC_KEY");
+    showError("Falta a key na URL. Use: /palpite-overlay?key=SUA_APP_PUBLIC_KEY");
   }
 
   const fmtBRL = (cents) => {

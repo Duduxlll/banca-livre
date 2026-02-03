@@ -14,7 +14,7 @@
       if (!r.ok) throw new Error("unauth");
       
     } catch {
-      location.href = "/login.html";
+      location.href = "/login";
     }
   }
 
@@ -29,7 +29,7 @@
       });
       if (resp.ok) {
         
-        location.href = "/login.html";
+        location.href = "/login";
       } else {
         alert("Não foi possível sair. Tente novamente.");
       }

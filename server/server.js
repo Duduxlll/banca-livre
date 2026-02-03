@@ -147,8 +147,8 @@ app.use(express.static(ROOT, { extensions: ['html'] }));
 
 app.get(['/area', '/area.html'], (req, res) => {
   const token = req.cookies?.session;
-  if (!token || !verifySession(token)) return res.redirect('/login.html');
-  return res.sendFile(path.join(PRIVATE_ROOT, 'area.html'));
+  if (!token || !verifySession(token)) return res.redirect('/login');
+  return res.sendFile(path.join(PRIVATE_ROOT, 'area'));
 });
 
 
