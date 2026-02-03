@@ -1198,14 +1198,6 @@ app.post('/api/pix/confirmar', async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
 app.post('/api/cashbacks/submit', requireAppKey, async (req, res) => {
   try{
     const twitchNick = normalizeNick(req.body?.twitchNick ?? req.body?.nick ?? req.body?.user ?? req.body?.username);
