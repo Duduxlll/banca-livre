@@ -270,40 +270,53 @@
     }
 
     tbody.innerHTML = arr.map(x => {
-      const s = String(x.status || '');
-      const info =
-        s === 'REPROVADO'
-          ? (x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : 'Reprovado')
-          : (s === 'PENDENTE'
-              ? (x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '—')
-              : 'Aprovado');
+  const s = String(x.status || '');
 
-      const proofBtn = x.hasScreenshot
-        ? `<button class="btn ghost" data-act="proof" data-id="${esc(x.id)}">Abrir</button>`
-        : `<span class="muted">—</span>`;
+ 
+  const note = (() => {
+    if (s === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : 'Reprovado';
+    if (s === 'PENDENTE')  return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '';
+    return '';
+  })();
 
-      return `
-        <tr>
-          <td>${esc(fmtDT(x.createdAt))}</td>
-          <td><strong>${esc(x.twitchName || '')}</strong></td>
-          <td>${esc(maskPixKey(x.pixKey || ''))}${x.pixType ? ` <span class="muted">(${esc(x.pixType)})</span>` : ''}</td>
-          <td>${statusBadge(x.status)}</td>
-          <td>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <div class="muted">${info}</div>
-              ${proofBtn}
-            </div>
-          </td>
-          <td>
-            <div class="cb-actions-grid">
-              <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
-              <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
-              <button class="btn ghost" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+  
+  const pixHtml = `
+    <div class="cb-pix">
+      <div class="cb-pix-key">${esc(maskPixKey(x.pixKey || ''))}</div>
+      <div class="cb-pix-type">${x.pixType ? `(${esc(x.pixType)})` : ''}</div>
+    </div>
+  `;
+
+  
+  const proofBtn = x.hasScreenshot
+    ? `<button class="btn ghost cb-proof-btn" data-act="proof" data-id="${esc(x.id)}">Abrir</button>`
+    : `<span class="muted">—</span>`;
+
+  const noteHtml = note ? `<div class="muted cb-proof-note">${note}</div>` : '';
+
+  return `
+    <tr>
+      <td>${esc(fmtDT(x.createdAt))}</td>
+      <td><strong>${esc(x.twitchName || '')}</strong></td>
+      <td>${pixHtml}</td>
+      <td>${statusBadge(x.status)}</td>
+      <td>
+        <div class="cb-proof-cell">
+          ${proofBtn}
+          ${noteHtml}
+        </div>
+      </td>
+      <td>
+        <div class="cb-actions-grid">
+          <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
+          <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
+          <button class="btn ghost" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}).join('');
+
   }
 
   async function loadList() {

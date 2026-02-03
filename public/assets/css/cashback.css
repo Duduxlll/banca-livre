@@ -517,3 +517,57 @@ dialog.cb-modal.cb-proof .cb-proof-hint{
 #tab-cashbacks .cb-actions-grid > button:nth-child(3){
   grid-column: 1 / -1;
 }
+
+
+#tab-cashbacks .cb-pix{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  line-height:1.1;
+}
+#tab-cashbacks .cb-pix-key{
+  font-weight:800;
+  color:#fff;
+}
+#tab-cashbacks .cb-pix-type{
+  font-size:11px;
+  opacity:.75;
+  white-space:nowrap;
+}
+
+
+#tab-cashbacks .cb-proof-cell{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  align-items:flex-start;
+}
+
+#tab-cashbacks .cb-proof-btn{
+  height:30px !important;
+  padding:6px 10px !important;
+  font-size:12px !important;
+  border-radius:12px !important;
+  min-width:96px !important;
+}
+
+#tab-cashbacks .cb-proof-note{
+  max-width: 220px;
+  overflow:hidden;
+  display:-webkit-box;
+  
+  -webkit-box-orient:vertical;
+}
+
+
+#tab-cashbacks #cbTbl th:nth-child(3),
+#tab-cashbacks #cbTbl td:nth-child(3){ width: 175px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(4),
+#tab-cashbacks #cbTbl td:nth-child(4){ width: 125px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(5),
+#tab-cashbacks #cbTbl td:nth-child(5){ width: 180px !important; }
+
+#tab-cashbacks #cbTbl th:nth-child(6),
+#tab-cashbacks #cbTbl td:nth-child(6){ width: 170px !important; }
