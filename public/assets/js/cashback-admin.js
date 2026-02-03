@@ -136,7 +136,6 @@ function maskPixKey(key = '') {
                 <th>Nick Twitch</th>
                 <th>PIX</th>
                 <th>Status</th>
-                <th>Motivo / Prazo</th>
                 <th>Comprovante</th>
                 <th>Ações</th>
               </tr>
@@ -178,10 +177,7 @@ function maskPixKey(key = '') {
             </select>
           </label>
 
-          <label class="field" id="cbMPrazoWrap">
-            <span>Prazo (texto)</span>
-            <input id="cbMPrazo" class="input" placeholder="Ex: Pix em até 24h">
-          </label>
+          
 
           <label class="field">
             <span>Motivo / Observação</span>
