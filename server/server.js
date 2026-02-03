@@ -151,6 +151,8 @@ app.get(['/area', '/area.html'], (req, res) => {
   return res.sendFile(path.join(PRIVATE_ROOT, 'area.html'));
 });
 
+app.get('/area.html', (req, res) => res.redirect(301, '/area'));
+
 
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
