@@ -772,3 +772,8 @@ dialog.pix-modal::backdrop{
     grid-template-columns:1fr;
   }
 }
+
+
+#tab-torneio .card:has(#trWinners){
+  border-bottom-color: transparent !important; 
+}
