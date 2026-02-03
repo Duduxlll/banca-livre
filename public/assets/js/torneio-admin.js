@@ -425,7 +425,7 @@
               <div style="display:grid;gap:8px;justify-items:end">
                 <div class="tr-points">
                   <span class="tr-mini">Valor</span>
-                  <input class="input" data-role="points" inputmode="numeric" placeholder="0" value="${esc(String(pval))}">
+                  <input class="input" data-role="points" inputmode="decimal" placeholder="0,00" value="${esc(String(pval))}">
                 </div>
                 <button class="btn btn--primary" data-action="win" data-team="${esc(id)}" ${(!canWinNow || disabledWin) ? "disabled" : ""}>
                   Definir vencedor
@@ -653,23 +653,58 @@
       }
     });
 
-    tab.addEventListener("input", (e) => {
-      const inp = e.target.closest('input[data-role="points"]');
-      if (!inp) return;
-      const card = inp.closest('[data-team-card="1"]');
-      const teamId = card?.dataset?.teamId || "";
-      const torId = lastData?.torneio?.id || "";
-      const phNum = lastData?.phase?.number || "";
-      if (!teamId || !torId || !phNum) return;
+    function sanitizeDecimalBR(val) {
+  
+  let s = String(val ?? "").trim();
 
-      let v = String(inp.value || "").replace(/[^\d]/g, "");
-      if (v.length > 6) v = v.slice(0, 6);
-      inp.value = v;
+  
+  s = s.replace(/[^\d.,]/g, "");
 
-      const obj = loadPoints(torId, phNum);
-      obj[teamId] = v;
-      savePoints(torId, phNum, obj);
-    });
+  
+  const lastComma = s.lastIndexOf(",");
+  const lastDot   = s.lastIndexOf(".");
+  const decPos = Math.max(lastComma, lastDot);
+
+  let intPart = "";
+  let decPart = "";
+
+  if (decPos >= 0) {
+    intPart = s.slice(0, decPos).replace(/[^\d]/g, "");
+    decPart = s.slice(decPos + 1).replace(/[^\d]/g, "").slice(0, 2);
+  } else {
+    intPart = s.replace(/[^\d]/g, "");
+  }
+
+  
+  intPart = intPart.slice(0, 9);
+
+  
+  const display = decPos >= 0 ? `${intPart}${","}${decPart}` : intPart;
+
+  
+  const normalized = decPart ? `${intPart || "0"}.${decPart}` : `${intPart || "0"}`;
+
+  return { display, normalized };
+}
+
+tab.addEventListener("input", (e) => {
+  const inp = e.target.closest('input[data-role="points"]');
+  if (!inp) return;
+
+  const card = inp.closest('[data-team-card="1"]');
+  const teamId = card?.dataset?.teamId || "";
+  const torId  = lastData?.torneio?.id || "";
+  const phNum  = lastData?.phase?.number || "";
+  if (!teamId || !torId || !phNum) return;
+
+  const { display, normalized } = sanitizeDecimalBR(inp.value);
+  inp.value = display;
+
+  const obj = loadPoints(torId, phNum);
+  obj[teamId] = normalized; 
+  savePoints(torId, phNum, obj);
+});
+
   }
 
   function init() {
