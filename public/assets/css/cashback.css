@@ -7,6 +7,11 @@
   --cb-muted: rgba(234,255,246,.55);
   --cb-shadow: 0 18px 60px rgba(0,0,0,.35);
   --cb-r: 16px;
+
+  --cb-green: rgba(76,217,100,1);
+  --cb-red: rgba(255,69,58,1);
+  --cb-blue: rgba(0,163,255,1);
+  --cb-amber: rgba(255,214,102,1);
 }
 
 #tab-cashbacks .card{
@@ -74,15 +79,67 @@
   box-shadow: none;
   padding: 10px 12px;
   height: 40px;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .08s ease;
 }
 
 #tab-cashbacks .btn:hover{
   background: rgba(0,255,150,.08);
 }
 
+#tab-cashbacks .btn:active{
+  transform: translateY(1px);
+}
+
 #tab-cashbacks .btn.ghost{
   background: rgba(255,255,255,.02);
   border-color: rgba(0,255,150,.18);
+}
+
+#tab-cashbacks button[data-act="approve"]{
+  border-color: rgba(76,217,100,.55) !important;
+  background: linear-gradient(180deg, rgba(76,217,100,.18), rgba(76,217,100,.08)) !important;
+  color: rgba(234,255,246,.98) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,.18);
+}
+
+#tab-cashbacks button[data-act="approve"]:hover{
+  background: linear-gradient(180deg, rgba(76,217,100,.26), rgba(76,217,100,.12)) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22);
+}
+
+#tab-cashbacks button[data-act="reject"]{
+  border-color: rgba(255,69,58,.55) !important;
+  background: linear-gradient(180deg, rgba(255,69,58,.16), rgba(255,69,58,.07)) !important;
+  color: rgba(255,235,233,.98) !important;
+  box-shadow: 0 10px 26px rgba(0,0,0,.18);
+}
+
+#tab-cashbacks button[data-act="reject"]:hover{
+  background: linear-gradient(180deg, rgba(255,69,58,.24), rgba(255,69,58,.10)) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22);
+}
+
+#tab-cashbacks button[data-act="copy"]{
+  border-color: rgba(0,163,255,.55) !important;
+  background: linear-gradient(180deg, rgba(0,163,255,.16), rgba(0,163,255,.07)) !important;
+  color: rgba(232,248,255,.98) !important;
+}
+
+#tab-cashbacks button[data-act="copy"]:hover{
+  background: linear-gradient(180deg, rgba(0,163,255,.24), rgba(0,163,255,.10)) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22);
+}
+
+#tab-cashbacks button[data-act="proof"]{
+  border-color: rgba(255,214,102,.55) !important;
+  background: linear-gradient(180deg, rgba(255,214,102,.16), rgba(255,214,102,.07)) !important;
+  color: rgba(255,246,220,.98) !important;
+}
+
+#tab-cashbacks button[data-act="proof"]:hover{
+  background: linear-gradient(180deg, rgba(255,214,102,.24), rgba(255,214,102,.10)) !important;
+  box-shadow: 0 14px 34px rgba(0,0,0,.22);
 }
 
 #tab-cashbacks .badge{
@@ -148,13 +205,14 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  background: linear-gradient(180deg, rgba(0,255,150,.16), rgba(0,255,150,.06)) !important;
+  background: linear-gradient(180deg, rgba(6,16,12,.96), rgba(5,14,10,.92)) !important;
   color: #dfffee !important;
   font-weight: 900;
   border-bottom: 1px solid rgba(0,255,150,.20) !important;
   padding: 10px 10px !important;
   border-right: 1px solid rgba(0,255,150,.12) !important;
   white-space: nowrap;
+  backdrop-filter: blur(8px);
 }
 
 #tab-cashbacks .table thead th:first-child{
@@ -252,7 +310,6 @@
   max-width: 100%;
   overflow:hidden;
   display:-webkit-box;
-  
   -webkit-box-orient:vertical;
 }
 
@@ -272,7 +329,8 @@
   display:grid;
   grid-template-columns: 1fr 1fr;
   gap:8px;
-  align-items:center;
+  align-items:stretch;
+  justify-items:stretch;
 }
 
 #tab-cashbacks .cb-actions-grid .cb-action-full{
