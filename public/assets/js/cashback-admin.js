@@ -141,24 +141,7 @@ function notify(msg, type='ok'){
         </div>
       </div>
 
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-          <h3 style="margin:0">Ranking (Aprovados)</h3>
-          <button class="btn ghost" id="cbRankReload" type="button">Atualizar ranking</button>
-        </div>
-        <div class="table-wrap" style="margin-top:10px">
-          <table class="table" id="cbRankTbl">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Usuário</th>
-                <th>Pontos</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
+       
     `;
 
     return tab;
