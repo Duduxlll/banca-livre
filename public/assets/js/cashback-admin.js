@@ -95,7 +95,7 @@ function notify(msg, type='ok'){
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;gap:12px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap">
           <div>
-            <h2 style="margin:0">Cashbacks</h2>
+            <h2 style="margin:0">Print dos depositos</h2>
             <div class="muted" style="margin-top:6px">Chat: !cashback • Status: !status</div>
           </div>
 
