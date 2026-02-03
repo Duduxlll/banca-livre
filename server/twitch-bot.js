@@ -88,7 +88,7 @@ export function initTwitchBot({
     let m = text.match(/^!palpite\b\s*(.+)$/i) || text.match(/^!p\b\s*(.+)$/i);
     if (m && m[1]) return { type: "guess", payload: m[1].trim() };
 
-    if (/^!cashback\b/i.test(text)) return { type: "cashback" };
+    if (/^!(cashback|print)\b/i.test(text)) return { type: "cashback" };
     if (/^!status\b/i.test(text)) return { type: "status" };
 
     const t = text.match(/^!time\b\s*(.+)$/i);
