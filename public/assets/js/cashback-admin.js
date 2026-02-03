@@ -46,6 +46,11 @@
   return el;
 }
 
+
+
+
+
+
 function toast(msg, type='ok'){
   const el = ensureToastEl();
   el.textContent = String(msg || '');
@@ -70,13 +75,13 @@ function notify(msg, type='ok'){
   window.notify(msg, type);
 }
 
-
-  function maskPixKey(key = '') {
-    const k = String(key || '').trim();
-    if (!k) return '—';
-    if (k.length <= 10) return k;
-    return `${k.slice(0, 4)}…${k.slice(-4)}`;
-  }
+function maskPixKey(key = '') {
+  const k = String(key || '').trim();
+  if (!k) return '—';
+  const clean = k.replace(/\s+/g, '');
+  return '*'.repeat(Math.max(clean.length, 10));
+}
+  
 
   function statusBadge(status = '') {
     const s = String(status || '').toUpperCase();
