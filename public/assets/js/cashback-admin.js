@@ -270,16 +270,21 @@
     }
 
     tbody.innerHTML = arr.map(x => {
-  const s = String(x.status || '');
+  const st = String(x.status || '').toUpperCase();
 
- 
-  const note = (() => {
-    if (s === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : 'Reprovado';
-    if (s === 'PENDENTE')  return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '';
+  const statusNote = (() => {
+    if (st === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : '';
+    if (st === 'PENDENTE')  return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '';
     return '';
   })();
 
-  
+  const statusHtml = `
+    <div class="cb-status-cell">
+      ${statusBadge(x.status)}
+      ${statusNote ? `<div class="cb-status-note">${statusNote}</div>` : ``}
+    </div>
+  `;
+
   const pixHtml = `
     <div class="cb-pix">
       <div class="cb-pix-key">${esc(maskPixKey(x.pixKey || ''))}</div>
@@ -287,35 +292,28 @@
     </div>
   `;
 
-  
-  const proofBtn = x.hasScreenshot
+  const proofHtml = x.hasScreenshot
     ? `<button class="btn ghost cb-proof-btn" data-act="proof" data-id="${esc(x.id)}">Abrir</button>`
     : `<span class="muted">—</span>`;
-
-  const noteHtml = note ? `<div class="muted cb-proof-note">${note}</div>` : '';
 
   return `
     <tr>
       <td>${esc(fmtDT(x.createdAt))}</td>
       <td><strong>${esc(x.twitchName || '')}</strong></td>
       <td>${pixHtml}</td>
-      <td>${statusBadge(x.status)}</td>
-      <td>
-        <div class="cb-proof-cell">
-          ${proofBtn}
-          ${noteHtml}
-        </div>
-      </td>
+      <td>${statusHtml}</td>
+      <td class="cb-proof-td">${proofHtml}</td>
       <td>
         <div class="cb-actions-grid">
           <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
           <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
-          <button class="btn ghost" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
+          <button class="btn ghost cb-action-full" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
         </div>
       </td>
     </tr>
   `;
 }).join('');
+
 
   }
 
