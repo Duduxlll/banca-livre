@@ -728,7 +728,7 @@ app.post('/api/palpite/open', requireAuth, async (req, res) => {
     sseSendAll('palpite-changed', { reason:'open', state });
 
     if (twitchBot?.enabled) {
-      twitchBot.say(`🔔 PALPITE ABERTO! Digite: !palpite 230,50`);
+      twitchBot.say(`🔔 PALPITE ABERTO! Digite: !p 230,50`);
     }
 
     res.json({ ok:true, roundId });
