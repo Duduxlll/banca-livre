@@ -1204,10 +1204,10 @@ app.post('/api/pix/confirmar', async (req, res) => {
     );
 
     await q(
-      `insert into extratos (id, ref_id, nome, tipo, valor_cents, created_at)
-       values ($1,$2,$3,'deposito',$4, now())`,
-      [uid(), rows[0].id, nome, valorCentavos]
-    );
+  `insert into extratos (id, ref_id, nome, tipo, origem, valor_cents, created_at)
+   values ($1,$2,$3,'deposito','pix',$4, now())`,
+  [uid(), rows[0].id, nome, valorCentavos]
+);
     sseSendAll('extratos-changed', { reason: 'deposito' });
 
     tokenStore.delete(token);
@@ -1760,10 +1760,11 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
     const row = insertBanca.rows[0];
 
     await client.query(
-      `INSERT INTO extratos (id, ref_id, nome, tipo, valor_cents, created_at)
-       VALUES ($1, $2, $3, 'deposito', $4, now())`,
-      [uid(), row.id, nomeTrim, deposito]
-    );
+  `INSERT INTO extratos (id, ref_id, nome, tipo, origem, valor_cents, created_at)
+   VALUES ($1, $2, $3, 'deposito', 'manual', $4, now())`,
+  [uid(), row.id, nomeTrim, deposito]
+);
+
 
     await client.query('COMMIT');
 
@@ -1797,8 +1798,13 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   let i = 1;
 
   if (tipo && ['deposito','pagamento'].includes(tipo)) {
-    conds.push(`tipo = $${i++}`);
-    params.push(tipo);
+  conds.push(`tipo = $${i++}`);
+  params.push(tipo);
+
+  if (tipo === 'deposito') {
+    conds.push(`(origem is null or origem = 'pix')`);
+  }
+
   }
   if (nome) {
     conds.push(`lower(nome) LIKE $${i++}`);
@@ -2045,10 +2051,11 @@ app.post('/api/cupons/resgatar', async (req, res, next) => {
     );
 
     await client.query(
-      `INSERT INTO extratos (id, ref_id, nome, tipo, valor_cents, created_at)
-       VALUES ($1, $2, $3, 'deposito', $4, now())`,
-      [uid(), bancaId, nome, valorCents]
-    );
+  `INSERT INTO extratos (id, ref_id, nome, tipo, origem, valor_cents, created_at)
+   VALUES ($1, $2, $3, 'deposito', 'cupom', $4, now())`,
+  [uid(), bancaId, nome, valorCents]
+);
+
 
     await client.query(
       `UPDATE cupons
@@ -2154,6 +2161,17 @@ async function ensurePalpiteTables(){
   }
 }
 
+
+async function ensureExtratosOrigemColumn(){
+  try{
+    await q(`alter table if exists extratos add column if not exists origem text`);
+    await q(`create index if not exists extratos_tipo_origem_created_idx on extratos (tipo, origem, created_at desc)`);
+  }catch(e){
+    console.error('ensureExtratosOrigemColumn:', e.message);
+  }
+}
+
+
 async function ensureCashbacksTable(){
   try{
     await q(`
@@ -2202,6 +2220,8 @@ app.listen(PORT, async () => {
     await palpiteLoadFromDB();
     await ensureCashbackTables(q);
     await ensureTorneioTables(q);
+    await ensureExtratosOrigemColumn();
+
 
 
     console.log('🗄️  Postgres conectado');
