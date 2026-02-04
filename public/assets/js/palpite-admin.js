@@ -39,7 +39,6 @@
 
   async function apiFetchFirstOk(paths, opts) {
     let lastErr = null;
-
     for (const p of paths) {
       try {
         return await apiFetch(p, opts);
@@ -47,13 +46,14 @@
         lastErr = e;
       }
     }
-
     throw lastErr || new Error("Falha ao chamar API");
   }
 
   const el = {};
 
   function bind() {
+    el.tab          = qs("#tab-palpite");
+
     el.buyValue     = qs("#palpiteBuyValue");
     el.winnersCount = qs("#palpiteWinnersCount");
     el.finalResult  = qs("#palpiteFinalResult");
@@ -62,10 +62,13 @@
     el.total        = qs("#palpiteTotalGuesses");
     el.winnersBox   = qs("#palpiteWinnersBox");
 
-    el.btnOpen    = qs("#btnPalpiteOpen");
-    el.btnClose   = qs("#btnPalpiteClose");
-    el.btnClear   = qs("#btnPalpiteClear");
-    el.btnWinners = qs("#btnPalpiteWinners");
+    el.btnOpen      = qs("#btnPalpiteOpen");
+    el.btnClose     = qs("#btnPalpiteClose");
+    el.btnClear     = qs("#btnPalpiteClear");
+    el.btnWinners   = qs("#btnPalpiteWinners");
+
+    el.statusBadge  = qs("#palpiteStatusBadge");
+    el.statusText   = qs("#palpiteStatusText");
   }
 
   function escapeHtml(s = "") {
@@ -143,6 +146,43 @@
     `;
   }
 
+  function normalizeIsOpen(st) {
+    const v =
+      st?.isOpen ??
+      st?.open ??
+      st?.roundOpen ??
+      st?.opened ??
+      (String(st?.status || "").toLowerCase() === "open") ??
+      (String(st?.status || "").toLowerCase() === "aberto");
+
+    return !!v;
+  }
+
+  function setStatusUI(isOpen) {
+    if (el.tab) el.tab.classList.toggle("palpite-open", !!isOpen);
+
+    if (el.statusBadge) {
+      el.statusBadge.textContent = isOpen ? "ABERTO" : "FECHADO";
+      el.statusBadge.classList.toggle("p-open", !!isOpen);
+      el.statusBadge.classList.toggle("p-closed", !isOpen);
+    }
+
+    if (el.statusText) {
+      el.statusText.textContent = isOpen
+        ? "Palpites estão abertos — o chat pode enviar agora"
+        : "Palpites estão fechados — clique em Abrir Palpites";
+    }
+
+    if (el.btnOpen) {
+      el.btnOpen.disabled = !!isOpen;
+      el.btnOpen.setAttribute("aria-disabled", String(!!isOpen));
+    }
+    if (el.btnClose) {
+      el.btnClose.disabled = !isOpen;
+      el.btnClose.setAttribute("aria-disabled", String(!isOpen));
+    }
+  }
+
   async function fetchState() {
     return apiFetchFirstOk(
       ["/api/palpite/state", "/api/palpite/admin/state"],
@@ -152,6 +192,9 @@
 
   async function refreshState({ reloadLog = false } = {}) {
     const st = await fetchState();
+
+    const isOpen = normalizeIsOpen(st);
+    setStatusUI(isOpen);
 
     setTotal(st?.total ?? st?.totalGuesses ?? 0);
 
@@ -207,6 +250,8 @@
   }
 
   async function openRound() {
+    if (el.btnOpen?.disabled) return;
+
     const buyCents = parseMoneyToCents(el.buyValue?.value || 0) ?? 0;
 
     let winnersCount = Number(el.winnersCount?.value || 3);
@@ -218,6 +263,8 @@
       winnersCount
     };
 
+    setStatusUI(true);
+
     await apiFetchFirstOk(
       ["/api/palpite/open", "/api/palpite/admin/start"],
       { method: "POST", body: JSON.stringify(payload) }
@@ -227,6 +274,10 @@
   }
 
   async function closeRound() {
+    if (el.btnClose?.disabled) return;
+
+    setStatusUI(false);
+
     await apiFetchFirstOk(
       ["/api/palpite/close", "/api/palpite/admin/stop"],
       { method: "POST", body: "{}" }
@@ -287,9 +338,7 @@
 
       await refreshState({ reloadLog: false });
       return;
-    } catch (err) {
-      console.warn("Server winners falhou, fallback local:", err?.message || err);
-    }
+    } catch (err) {}
 
     const st = await fetchState();
     const entries =
@@ -319,7 +368,6 @@
       .slice(0, winnersCount);
 
     renderWinnersList(winners, actualCents);
-    alert("Mostrei no painel. Para aparecer no overlay, o server precisa salvar/emitir winners no state-public.");
   }
 
   let es = null;
@@ -394,7 +442,6 @@
       es = null;
 
       streamPathIndex = (streamPathIndex + 1) % STREAM_PATHS.length;
-
       setTimeout(connectStream, 1500);
     };
   }
@@ -411,9 +458,7 @@
 
     try {
       await refreshState({ reloadLog: true });
-    } catch (e) {
-      console.warn("Falha ao carregar state inicial:", e?.message || e);
-    }
+    } catch (e) {}
 
     connectStream();
   });

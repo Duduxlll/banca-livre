@@ -311,11 +311,17 @@
         <div class="card" style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
             <div>
-              <h2 style="margin:0">💰 Palpites</h2>
-              <p class="muted" style="margin:6px 0 0">
+                <h2 style="margin:0">💰 Palpites</h2>
+                <div class="palpite-status-row">
+                  <span id="palpiteStatusBadge" class="p-status p-closed">FECHADO</span>
+                  <span id="palpiteStatusText" class="p-status-text">Palpites estão fechados</span>
+                </div>
+
+                <p class="muted" style="margin:6px 0 0">
                 Chat: <code>!p 231</code> (somente valor)
-              </p>
+                </p>
             </div>
+
 
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn--primary" id="btnPalpiteOpen">🟢 Abrir Palpites</button>

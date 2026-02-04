@@ -1,314 +1,208 @@
-
-
-:root{
-  --palpite-bg: rgba(255,255,255,.06);
-  --palpite-bd: rgba(255,255,255,.12);
-  --palpite-shadow: 0 28px 80px rgba(0,0,0,.55);
-
-  --palpite-ok: #00ff88;
-  --palpite-bad: #ff4757;
-  --palpite-gold: #ffd700;
-
-  --palpite-muted: rgba(231,233,243,.75);
+#tab-palpite{
+  --p-bg: rgba(7, 18, 22, .66);
+  --p-bg2: rgba(255,255,255,.04);
+  --p-line: rgba(120, 255, 214, .18);
+  --p-line2: rgba(120, 255, 214, .10);
+  --p-text: rgba(234,255,246,.92);
+  --p-muted: rgba(234,255,246,.58);
+  --p-shadow: 0 18px 60px rgba(0,0,0,.35);
+  --p-r: 16px;
 }
 
 #tab-palpite .card{
-  border: 1px solid var(--palpite-bd);
-}
-
-#tab-palpite .palpite-header-card{
-  padding: 16px;
-}
-
-#tab-palpite .palpite-header{
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-  flex-wrap:wrap;
-}
-
-#tab-palpite .palpite-header h2{
-  margin:0;
-  font-size: 1.2rem;
-  font-weight: 900;
-  letter-spacing:.2px;
-}
-
-#tab-palpite .palpite-header p{
-  margin: 4px 0 0;
-  color: var(--palpite-muted);
-  font-size: .85rem;
-  line-height: 1.35;
-}
-
-#tab-palpite .palpite-actions{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex-wrap:wrap;
-}
-
-#tab-palpite .palpite-controls{
-  display:grid;
-  grid-template-columns: 1.2fr .6fr auto auto;
-  gap:10px;
-  margin-top: 12px;
-}
-
-#tab-palpite .palpite-controls .input{
-  width:100%;
-}
-
-#tab-palpite .palpite-winner-row{
-  margin-top: 10px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  flex-wrap:wrap;
-  padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,.10);
+  border: 1px solid var(--p-line);
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-  border-radius: 12px;
+  border-radius: var(--p-r);
+  box-shadow: var(--p-shadow);
+  backdrop-filter: blur(10px);
 }
 
-#tab-palpite .palpite-winner-row strong{
-  font-weight: 900;
-  color: #fff;
-}
-
-#tab-palpite .palpite-winner-row .muted{
-  color: var(--palpite-muted);
-  font-size: .85rem;
-}
-
-#tab-palpite .badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: .75rem;
+#tab-palpite h2{
   letter-spacing: .2px;
-  border: 1px solid rgba(255,255,255,.15);
-  background: rgba(255,255,255,.08);
-  color: #fff;
 }
 
-#tab-palpite .badge--ativo{
-  border-color: rgba(0,255,136,.35);
-  background: rgba(0,255,136,.12);
-  color: #dfffee;
+#tab-palpite .muted{
+  color: var(--p-muted);
 }
 
-#tab-palpite .badge--expirado{
-  border-color: rgba(255,71,87,.35);
-  background: rgba(255,71,87,.12);
-  color: #ffe3e6;
+#tab-palpite code{
+  background: rgba(0,0,0,.25);
+  border: 1px solid rgba(255,255,255,.10);
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: rgba(234,255,246,.86);
 }
 
-
-#tab-palpite .palpite-table-card{
-  padding: 0;
-  overflow: hidden;
+#tab-palpite .palpite-status-row{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
 }
 
-#tab-palpite .table-wrap{
-  overflow:auto;
+#tab-palpite .p-status{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: .78rem;
+  letter-spacing: .5px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--p-text);
 }
 
-#tab-palpite table.table{
-  width:100%;
-  border-collapse: collapse;
-  min-width: 780px; 
+#tab-palpite .p-status::before{
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: rgba(255,255,255,.35);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.08);
 }
 
-#tab-palpite .table thead th{
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: rgba(10,14,28,.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255,255,255,.12);
-  padding: 12px;
-  text-align:left;
-  font-size: .8rem;
-  color: rgba(231,233,243,.85);
-  white-space: nowrap;
+#tab-palpite .p-status.p-open{
+  border-color: rgba(0,255,150,.25);
+  background: rgba(0,255,150,.10);
 }
 
-#tab-palpite .table tbody td{
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  padding: 12px;
-  vertical-align: middle;
-  color: rgba(231,233,243,.92);
+#tab-palpite .p-status.p-open::before{
+  background: rgba(0,255,150,.95);
+  box-shadow: 0 0 0 3px rgba(0,255,150,.12);
+}
+
+#tab-palpite .p-status.p-closed{
+  border-color: rgba(255,90,90,.25);
+  background: rgba(255,90,90,.10);
+}
+
+#tab-palpite .p-status.p-closed::before{
+  background: rgba(255,90,90,.95);
+  box-shadow: 0 0 0 3px rgba(255,90,90,.12);
+}
+
+#tab-palpite .p-status-text{
+  color: rgba(234,255,246,.72);
   font-size: .9rem;
 }
 
-#tab-palpite .table tbody tr:hover{
-  background: rgba(255,255,255,.04);
+#tab-palpite .btn,
+#tab-palpite button.btn{
+  transition: transform .12s ease, filter .12s ease, opacity .12s ease;
 }
 
+#tab-palpite .btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
 
-#tab-palpite .col-acoes{
-  width: 1%;
+#tab-palpite .btn:active{
+  transform: translateY(0);
+  filter: brightness(.98);
+}
+
+#tab-palpite .btn[disabled],
+#tab-palpite button[disabled]{
+  opacity: .45;
+  cursor: not-allowed !important;
+  transform: none !important;
+  filter: grayscale(45%) brightness(.95);
+  pointer-events: none;
+}
+
+#tab-palpite .palpite-log{
+  margin-top: 10px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--p-line2);
+  background: rgba(0,0,0,.22);
+}
+
+#tab-palpite .palpite-log-line{
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  color: rgba(234,255,246,.88);
+  font-size: .92rem;
+}
+
+#tab-palpite .palpite-log-line + .palpite-log-line{
+  margin-top: 8px;
+}
+
+#tab-palpite .palpite-log-line b{
+  color: rgba(234,255,246,.98);
+}
+
+#tab-palpite .palpite-winners{
+  border-radius: 14px;
+  border: 1px solid var(--p-line2);
+  background: rgba(0,0,0,.18);
+  padding: 10px;
+  color: rgba(234,255,246,.86);
+}
+
+#tab-palpite .pw-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+#tab-palpite .pw-list{
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+#tab-palpite .pw-item{
+  display: grid;
+  grid-template-columns: 56px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+}
+
+#tab-palpite .pw-rank{
+  font-weight: 900;
+  color: rgba(120,255,214,.92);
+}
+
+#tab-palpite .pw-name{
+  color: rgba(234,255,246,.92);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-
-#tab-palpite tr.palpite-row-winner{
-  background: linear-gradient(90deg, rgba(255,215,0,.18), rgba(255,170,0,.08));
-}
-
-#tab-palpite tr.palpite-row-winner td{
-  border-bottom-color: rgba(255,215,0,.22);
-}
-
-#tab-palpite tr.palpite-row-winner td:first-child{
-  position: relative;
-}
-
-#tab-palpite tr.palpite-row-winner td:first-child::before{
-  content: "🏆";
-  position: absolute;
-  left: -2px;
-  top: 50%;
-  transform: translate(-100%,-50%);
-  filter: drop-shadow(0 4px 10px rgba(0,0,0,.45));
-}
-
-
-#tab-palpite .btn-soft{
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  color: #e7e9f3;
-  border-radius: 12px;
-  padding: 10px 12px;
+#tab-palpite .pw-val{
   font-weight: 800;
-  cursor: pointer;
-  transition: .15s;
+  color: rgba(234,255,246,.92);
 }
 
-#tab-palpite .btn-soft:hover{
-  transform: translateY(-1px);
-  background: rgba(255,255,255,.10);
+#tab-palpite .pw-diff{
+  color: rgba(234,255,246,.70);
+  font-variant-numeric: tabular-nums;
 }
 
-#tab-palpite .btn-soft.danger{
-  border-color: rgba(255,71,87,.22);
-  background: rgba(255,71,87,.10);
-  color: #ffe3e6;
-}
-
-#tab-palpite .btn-soft.danger:hover{
-  background: rgba(255,71,87,.16);
-}
-
-#tab-palpite .btn-soft-mini{
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: .85rem;
-}
-
-
-#tab-palpite .palpite-total{
-  font-weight: 900;
-  color: rgba(231,233,243,.9);
-}
-
-#tab-palpite .palpite-tip{
-  margin-top: 10px;
-  color: rgba(231,233,243,.7);
-  font-size: .85rem;
-}
-
-
-@media (max-width: 980px){
-  #tab-palpite .palpite-controls{
-    grid-template-columns: 1fr 1fr;
+@media (max-width: 820px){
+  #tab-palpite .pw-item{
+    grid-template-columns: 56px 1fr;
+    grid-auto-rows: auto;
   }
-}
-
-@media (max-width: 560px){
-  #tab-palpite .palpite-controls{
-    grid-template-columns: 1fr;
+  #tab-palpite .pw-val,
+  #tab-palpite .pw-diff{
+    justify-self: start;
   }
-
-  #tab-palpite table.table{
-    min-width: 720px;
-  }
-
-  #tab-palpite .palpite-header{
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  #tab-palpite .palpite-actions{
-    justify-content:flex-start;
-  }
-}
-
-
-#tab-palpite #palpiteLogBox{
-  
-  max-height: 220px;
-
-  overflow-y: auto;
-  overflow-x: hidden;
-
-  padding: 10px 12px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-  border-radius: 12px;
-
- 
-  scroll-behavior: smooth;
-
-
-  display: grid;
-  gap: 6px;
-}
-
-
-#tab-palpite #palpiteLogBox > div{
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.04);
-  line-height: 1.25;
-}
-
-
-#tab-palpite #palpiteLogBox::-webkit-scrollbar{
-  width: 10px;
-}
-#tab-palpite #palpiteLogBox::-webkit-scrollbar-track{
-  background: rgba(255,255,255,.04);
-  border-left: 1px solid rgba(255,255,255,.06);
-  border-radius: 999px;
-}
-#tab-palpite #palpiteLogBox::-webkit-scrollbar-thumb{
-  background: rgba(255,255,255,.14);
-  border: 2px solid rgba(0,0,0,0);
-  background-clip: padding-box;
-  border-radius: 999px;
-}
-#tab-palpite #palpiteLogBox::-webkit-scrollbar-thumb:hover{
-  background: rgba(255,255,255,.22);
-  border: 2px solid rgba(0,0,0,0);
-  background-clip: padding-box;
-}
-
-
-#tab-palpite #palpiteLogBox{
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,.22) rgba(255,255,255,.04);
-}
-
-
-#tab-palpite #palpiteLogBox{
-  scroll-behavior: auto;
-  overscroll-behavior: contain;
 }
