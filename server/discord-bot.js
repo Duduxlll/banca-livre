@@ -231,9 +231,14 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   }
 
   const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
+  const logChannelId = String(process.env.DISCORD_LOG_CHANNEL_ID || '').trim();
+
   const autoCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_AUTO_CLOSE_MINUTES || '3', 10) || 3);
   const waitImageMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_WAIT_IMAGE_MINUTES || '5', 10) || 5);
   const deleteMin = Math.max(0, parseInt(process.env.DISCORD_TICKET_DELETE_MINUTES || '2', 10) || 2);
+
+  const idleCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_IDLE_CLOSE_MINUTES || '8', 10) || 8);
+  const idleWarnBeforeMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_IDLE_WARN_BEFORE_MINUTES || '3', 10) || 3);
 
   const client = new Client({
     intents: [
@@ -247,6 +252,16 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
 
   const warnCooldown = new Map();
   const waitTimers = new Map();
+  const idleTimers = new Map();
+
+  async function logTicket(msg) {
+    if (!logChannelId) return;
+    try {
+      const ch = await client.channels.fetch(String(logChannelId)).catch(() => null);
+      if (!ch || !ch.isTextBased()) return;
+      await ch.send({ content: String(msg).slice(0, 1800) }).catch(() => {});
+    } catch {}
+  }
 
   async function getOpenTicketByUser(userId) {
     const r = await q(
@@ -280,6 +295,40 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
   }
 
+  function clearIdle(ticketId) {
+    const t = idleTimers.get(String(ticketId));
+    if (!t) return;
+    if (t.warn) clearTimeout(t.warn);
+    if (t.close) clearTimeout(t.close);
+    idleTimers.delete(String(ticketId));
+  }
+
+  async function scheduleIdle(ticketId, channelId, userId) {
+    clearIdle(ticketId);
+
+    const warnAtMin = Math.max(1, idleCloseMin - idleWarnBeforeMin);
+
+    const warn = setTimeout(async () => {
+      try {
+        const t = await getOpenTicketById(ticketId);
+        if (!t) return;
+        if (String(t.status) === 'WAIT_IMAGE') return;
+        const ch = await client.channels.fetch(String(channelId)).catch(() => null);
+        if (ch && ch.isTextBased()) {
+          await ch.send({
+            content: `⏳ <@${userId}> Sem atividade. Este ticket vai fechar em **${idleWarnBeforeMin} min** se você não continuar.`
+          }).catch(() => {});
+        }
+      } catch {}
+    }, warnAtMin * 60 * 1000);
+
+    const close = setTimeout(() => {
+      closeTicket(String(ticketId), 'idle');
+    }, idleCloseMin * 60 * 1000);
+
+    idleTimers.set(String(ticketId), { warn, close });
+  }
+
   async function scheduleDeleteChannel(channelId) {
     if (!deleteMin) return;
     setTimeout(async () => {
@@ -297,11 +346,14 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     if (!t) return;
 
     clearWaitTimer(ticketId);
+    clearIdle(ticketId);
 
     await q(
       `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
       [String(ticketId)]
     );
+
+    logTicket(`🔴 Ticket fechado (${reason}) | user=<@${t.user_id}> | channel=${t.channel_id} | ticketId=${t.id} | ${nowIso()}`);
 
     try {
       const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
@@ -461,6 +513,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
         [String(existing.id)]
       );
+      clearWaitTimer(String(existing.id));
+      clearIdle(String(existing.id));
       existing = null;
     }
 
@@ -525,6 +579,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       [String(ticketId), String(userId), String(ticketChannel.id)]
     );
 
+    logTicket(`🟢 Ticket aberto | user=<@${userId}> | channel=<#${ticketChannel.id}> | ticketId=${ticketId} | ${nowIso()}`);
+
     const pingStaff = staffRoleIds.length ? staffRoleIds.map(r => `<@&${r}>`).join(' ') : '';
     await ticketChannel.send({
       content: `${pingStaff} <@${userId}>`,
@@ -534,6 +590,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     await interaction.editReply({
       content: `✅ Ticket criado: <#${ticketChannel.id}>`
     }).catch(() => {});
+
+    await scheduleIdle(ticketId, ticketChannel.id, userId);
   }
 
   async function handlePick(interaction, ticketId) {
@@ -564,6 +622,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       [String(ticketId), String(val)]
     );
 
+    await scheduleIdle(ticketId, t.channel_id, t.user_id);
+
     await interaction.reply({
       flags: 64,
       content: `✅ Tipo Pix selecionado: **${toTitlePixType(val)}**`
@@ -591,6 +651,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
       return;
     }
+
+    await scheduleIdle(ticketId, t.channel_id, t.user_id);
 
     await interaction.showModal(buildModal(ticketId)).catch(() => {});
   }
@@ -666,6 +728,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       [String(ticketId), twitch, pixKey]
     );
 
+    clearIdle(ticketId);
     scheduleWaitImage(ticketId);
 
     await interaction.reply({
@@ -753,6 +816,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       if (!rawUrl) return;
 
       clearWaitTimer(String(t.id));
+      clearIdle(String(t.id));
 
       const uploaded = await tryUploadToCloudinary({ imageUrl: rawUrl, ticketId: t.id, onLog });
       const finalUrl = uploaded || rawUrl;
@@ -766,6 +830,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         scheduleWaitImage(String(t.id));
         return;
       }
+
+      logTicket(`✅ Ticket finalizado | user=<@${t.user_id}> | ticketId=${t.id} | submissionId=${submissionId} | ${nowIso()}`);
 
       await msg.channel.send({
         content:
@@ -837,6 +903,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
             [String(t.id)]
           );
           clearWaitTimer(String(t.id));
+          clearIdle(String(t.id));
           continue;
         }
 
