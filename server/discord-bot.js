@@ -16,6 +16,7 @@ import {
   Events
 } from 'discord.js';
 import crypto from 'node:crypto';
+import { v2 as cloudinary } from 'cloudinary';
 
 function asBool(v, def = false) {
   if (v == null) return def;
@@ -152,16 +153,28 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     return null;
   }
 
-  const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS);
-  const autoCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_AUTO_CLOSE_MINUTES || '3', 10) || 3);
+  const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
+  const autoCloseMin = Math.max(
+    1,
+    parseInt(
+      process.env.DISCORD_TICKET_AUTO_CLOSE_MINUTES ||
+      process.env.DISCORD_TICKET_CLOSE_MINUTES ||
+      '3',
+      10
+    ) || 3
+  );
+
+  const hasCloudinary = Boolean(process.env.CLOUDINARY_URL);
+  if (hasCloudinary) cloudinary.config({ secure: true });
 
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
-      GatewayIntentBits.GuildMessages
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.MessageContent
     ],
-    partials: [Partials.Channel]
+    partials: [Partials.Channel, Partials.Message]
   });
 
   const warnCooldown = new Map();
@@ -337,7 +350,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
       const ch = await client.channels.fetch(String(existing.channel_id)).catch(() => null);
       if (ch) {
         await interaction.reply({
-          ephemeral: true,
+          flags: 64,
           content: `Você já tem um ticket aberto: <#${ch.id}>`
         });
         return;
@@ -359,9 +372,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
 
     overwrites.push({
       id: guild.roles.everyone.id,
-      deny: [
-        PermissionsBitField.Flags.ViewChannel
-      ]
+      deny: [PermissionsBitField.Flags.ViewChannel]
     });
 
     overwrites.push({
@@ -407,6 +418,13 @@ export function initDiscordBot({ q, uid, onLog = console }) {
       topic: `ticketId=${ticketId} userId=${userId} created=${nowIso()}`
     });
 
+    await ticketChannel.permissionOverwrites.edit(userId, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true,
+      AttachFiles: true
+    }).catch(() => {});
+
     await q(
       `INSERT INTO discord_deposit_tickets (id, user_id, channel_id, status, created_at, updated_at)
        VALUES ($1,$2,$3,'OPEN',now(),now())`,
@@ -420,7 +438,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     }).catch(() => {});
 
     await interaction.reply({
-      ephemeral: true,
+      flags: 64,
       content: `✅ Ticket criado: <#${ticketChannel.id}>`
     });
   }
@@ -428,7 +446,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
   async function handlePick(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' });
       return;
     }
 
@@ -438,13 +456,13 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' });
+      await interaction.reply({ flags: 64, content: 'Sem permissão.' });
       return;
     }
 
     const val = interaction.values?.[0] || null;
     if (!['cpf', 'email', 'phone', 'random'].includes(val)) {
-      await interaction.reply({ ephemeral: true, content: 'Tipo Pix inválido.' });
+      await interaction.reply({ flags: 64, content: 'Tipo Pix inválido.' });
       return;
     }
 
@@ -454,7 +472,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     );
 
     await interaction.reply({
-      ephemeral: true,
+      flags: 64,
       content: `✅ Tipo Pix selecionado: **${toTitlePixType(val)}**`
     });
   }
@@ -462,7 +480,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
   async function handleFill(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' });
       return;
     }
 
@@ -472,12 +490,12 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' });
+      await interaction.reply({ flags: 64, content: 'Sem permissão.' });
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' });
+      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' });
       return;
     }
 
@@ -487,12 +505,12 @@ export function initDiscordBot({ q, uid, onLog = console }) {
   async function handleModal(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' });
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' });
+      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' });
       return;
     }
 
@@ -503,7 +521,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     const pixKey = String(pixRaw || '').trim();
 
     if (!isValidTwitchName(twitch)) {
-      await interaction.reply({ ephemeral: true, content: 'Nick da Twitch inválido.' });
+      await interaction.reply({ flags: 64, content: 'Nick da Twitch inválido.' });
       return;
     }
 
@@ -523,7 +541,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
         pixType === 'phone' ? 'Telefone inválido.' :
         pixType === 'random' ? 'Chave aleatória inválida (UUID).' :
         'Chave Pix inválida.';
-      await interaction.reply({ ephemeral: true, content: `❌ ${msg}` });
+      await interaction.reply({ flags: 64, content: `❌ ${msg}` });
       return;
     }
 
@@ -535,8 +553,8 @@ export function initDiscordBot({ q, uid, onLog = console }) {
     );
 
     await interaction.reply({
-      ephemeral: true,
-      content: '✅ Dados recebidos. Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP).'
+      flags: 64,
+      content: '✅ Dados recebidos. Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/JPEG/WEBP).'
     });
 
     const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
@@ -547,22 +565,38 @@ export function initDiscordBot({ q, uid, onLog = console }) {
           `Nick Twitch: **${twitch}**\n` +
           `Tipo Pix: **${pixType}**\n` +
           `Chave Pix: **${pixKey}**\n\n` +
-          `Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP).`
+          `Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/JPEG/WEBP).`
       }).catch(() => {});
     }
   }
 
+  async function uploadImageIfPossible(url, ticketId) {
+    if (!hasCloudinary) return { url, provider: 'discord' };
+    try {
+      const r = await cloudinary.uploader.upload(url, {
+        folder: 'banca-livre/deposit-prints',
+        resource_type: 'image',
+        public_id: `ticket_${String(ticketId)}`,
+        overwrite: false
+      });
+      const secureUrl = String(r?.secure_url || r?.url || '').trim();
+      if (!secureUrl) return { url, provider: 'discord' };
+      return { url: secureUrl, provider: 'cloudinary', publicId: r?.public_id || null };
+    } catch {
+      return { url, provider: 'discord' };
+    }
+  }
+
   async function submitToCashback(t, screenshotUrl) {
-    const id = (typeof uid === 'function' ? uid() : crypto.randomUUID());
     const twitchName = String(t.twitch_name || '').trim();
     const twitchLc = normalizeTwitchName(twitchName);
 
-    await q(
+    const r = await q(
       `INSERT INTO cashback_submissions
-       (id, twitch_name, twitch_name_lc, pix_type, pix_key, screenshot_data_url, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'PENDENTE',now(),now())`,
+       (twitch_name, twitch_name_lc, pix_type, pix_key, screenshot_data_url, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,'PENDENTE',now(),now())
+       RETURNING id`,
       [
-        String(id),
         twitchName,
         twitchLc,
         String(t.pix_type || ''),
@@ -571,14 +605,16 @@ export function initDiscordBot({ q, uid, onLog = console }) {
       ]
     );
 
+    const submissionId = r?.rows?.[0]?.id;
+
     await q(
       `UPDATE discord_deposit_tickets
        SET submission_id=$2, status='DONE', updated_at=now()
        WHERE id=$1`,
-      [String(t.id), String(id)]
+      [String(t.id), String(submissionId)]
     );
 
-    return id;
+    return String(submissionId || '');
   }
 
   client.on(Events.MessageCreate, async (msg) => {
@@ -591,34 +627,25 @@ export function initDiscordBot({ q, uid, onLog = console }) {
       if (!t) return;
 
       if (String(msg.author.id) !== String(t.user_id)) return;
-
       if (String(t.status) !== 'WAIT_IMAGE') return;
 
-      const att = msg.attachments?.first?.() || null;
+      const atts = msg.attachments ? Array.from(msg.attachments.values()) : [];
+      const att = atts.find(likelyImageAttachment) || null;
+
       if (!att) {
         const last = warnCooldown.get(msg.channelId) || 0;
-        if (Date.now() - last < 20000) return;
+        if (Date.now() - last < 12000) return;
         warnCooldown.set(msg.channelId, Date.now());
 
         await msg.channel.send({
-          content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).`
+          content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/JPEG/WEBP).`
         }).catch(() => {});
         return;
       }
 
-      if (!likelyImageAttachment(att)) {
-        const last = warnCooldown.get(msg.channelId) || 0;
-        if (Date.now() - last < 20000) return;
-        warnCooldown.set(msg.channelId, Date.now());
-
-        await msg.channel.send({
-          content: `<@${msg.author.id}> Esse arquivo não parece ser uma imagem. Envie **PNG/JPG/WEBP**.`
-        }).catch(() => {});
-        return;
-      }
-
-      const screenshotUrl = String(att.url || '');
-      const submissionId = await submitToCashback(t, screenshotUrl);
+      const rawUrl = String(att.url || '');
+      const uploaded = await uploadImageIfPossible(rawUrl, t.id);
+      const submissionId = await submitToCashback(t, uploaded.url);
 
       await msg.channel.send({
         content:
@@ -662,10 +689,10 @@ export function initDiscordBot({ q, uid, onLog = console }) {
           return;
         }
       }
-    } catch (e) {
+    } catch {
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ ephemeral: true, content: 'Falha ao processar. Tenta de novo.' });
+          await interaction.reply({ flags: 64, content: 'Falha ao processar. Tenta de novo.' });
         }
       } catch {}
     }
@@ -677,6 +704,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
         `SELECT * FROM discord_deposit_tickets WHERE closed_at IS NULL ORDER BY created_at DESC LIMIT 200`
       );
       const rows = r?.rows || [];
+
       for (const t of rows) {
         const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
         if (!ch) {
@@ -686,6 +714,7 @@ export function initDiscordBot({ q, uid, onLog = console }) {
           );
           continue;
         }
+
         const created = new Date(t.created_at);
         if (Number.isFinite(created.getTime())) {
           const ageMin = (Date.now() - created.getTime()) / 60000;
