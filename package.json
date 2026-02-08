@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "cloudinary": "^2.9.0",
     "qrcode": "^1.5.4",
     "tmi.js": "^1.8.5"
   }
