@@ -136,6 +136,24 @@ app.use((req, res, next) => {
 });
 
 
+const DISABLE_CASHBACK_PUBLIC = process.env.DISABLE_CASHBACK_PUBLIC === '1';
+
+app.use((req, res, next) => {
+  if (!DISABLE_CASHBACK_PUBLIC) return next();
+
+  const p = (req.path || '').toLowerCase();
+
+  
+  if (
+    p === '/cashback-publico.html' ||
+    p === '/cashback-publico' ||
+    p === '/assets/js/cashback-publico.js'
+  ) {
+    return res.status(410).send('Página desativada'); 
+  }
+
+  return next();
+});
 
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
