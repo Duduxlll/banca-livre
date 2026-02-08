@@ -158,6 +158,28 @@ app.use((req, res, next) => {
 });
 
 
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "img-src": [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://res.cloudinary.com",
+          "https://cdn.discordapp.com",
+          "https://media.discordapp.net"
+        ]
+      }
+    }
+  })
+);
+
+
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '8mb' }));
 
