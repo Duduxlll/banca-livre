@@ -1,561 +1,712 @@
 import {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  PermissionsBitField,
+  ChannelType,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ChannelType,
-  Client,
   EmbedBuilder,
-  GatewayIntentBits,
   ModalBuilder,
-  Partials,
-  PermissionFlagsBits,
   TextInputBuilder,
-  TextInputStyle
-} from "discord.js";
+  TextInputStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  Events
+} from 'discord.js';
+import crypto from 'node:crypto';
 
-const ENV = {
-  DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  DISCORD_ENTRY_CHANNEL_ID: process.env.DISCORD_ENTRY_CHANNEL_ID,
-  DISCORD_TICKETS_CATEGORY_ID: process.env.DISCORD_TICKETS_CATEGORY_ID,
-  DISCORD_TICKETS_ARCHIVE_CATEGORY_ID: process.env.DISCORD_TICKETS_ARCHIVE_CATEGORY_ID || "",
-  DISCORD_STAFF_ROLE_ID: process.env.DISCORD_STAFF_ROLE_ID || "",
-  DISCORD_TICKET_CLOSE_MINUTES: Number(process.env.DISCORD_TICKET_CLOSE_MINUTES || "3")
-};
+function asBool(v, def = false) {
+  if (v == null) return def;
+  const s = String(v).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(s)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(s)) return false;
+  return def;
+}
 
-const IDS = {
-  OPEN_TICKET: "dep_open_ticket",
-  FILL_DATA: "dep_fill_data",
-  MODAL: "dep_modal",
-  IN_TWITCH: "dep_twitch",
-  IN_PIX_TYPE: "dep_pix_type",
-  IN_PIX_KEY: "dep_pix_key"
-};
+function onlyDigits(s) {
+  return String(s || '').replace(/\D+/g, '');
+}
+
+function normalizeTwitchName(raw) {
+  const s = String(raw || '').trim().replace(/^@+/, '');
+  const cleaned = s.replace(/[^\w]/g, '');
+  return cleaned.toLowerCase();
+}
+
+function isValidTwitchName(raw) {
+  const s = String(raw || '').trim().replace(/^@+/, '');
+  return /^[a-zA-Z0-9_]{3,25}$/.test(s);
+}
+
+function isValidEmail(s) {
+  const v = String(s || '').trim();
+  if (v.length < 6 || v.length > 160) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+}
+
+function isValidUUID(s) {
+  const v = String(s || '').trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+
+function isValidPhoneBR(s) {
+  const d = onlyDigits(s);
+  if (d.length < 10 || d.length > 13) return false;
+  if (d.length === 13 && !d.startsWith('55')) return false;
+  return true;
+}
+
+function isValidCPF(cpf) {
+  const c = onlyDigits(cpf);
+  if (c.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(c)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(c[i], 10) * (10 - i);
+  let d1 = (sum * 10) % 11;
+  if (d1 === 10) d1 = 0;
+  if (d1 !== parseInt(c[9], 10)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(c[i], 10) * (11 - i);
+  let d2 = (sum * 10) % 11;
+  if (d2 === 10) d2 = 0;
+  if (d2 !== parseInt(c[10], 10)) return false;
+
+  return true;
+}
+
+function safeChannelSlug(name) {
+  const s = String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (s || 'user').slice(0, 10);
+}
+
+function parseIdsCsv(v) {
+  return String(v || '')
+    .split(',')
+    .map(x => x.trim())
+    .filter(Boolean);
+}
 
 function nowIso() {
   return new Date().toISOString();
 }
 
-function onlyDigits(s) {
-  return String(s || "").replace(/\D+/g, "");
-}
-
-function normalizePixType(s) {
-  const v = String(s || "").trim().toLowerCase();
-  if (v === "cpf") return "cpf";
-  if (v === "email" || v === "e-mail") return "email";
-  if (v === "phone" || v === "telefone" || v === "celular" || v === "tel") return "phone";
-  if (v === "random" || v === "aleatoria" || v === "aleatório" || v === "chavealeatoria" || v === "chave_aleatoria") return "random";
-  return "";
-}
-
-function isValidEmail(s) {
-  const v = String(s || "").trim();
-  if (!v) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-}
-
-function isValidPhoneBR(s) {
-  const d = onlyDigits(s);
-  if (d.length === 13 && d.startsWith("55")) {
-    const rest = d.slice(2);
-    return rest.length === 11 || rest.length === 10;
+function toTitlePixType(t) {
+  switch (t) {
+    case 'cpf': return 'CPF';
+    case 'email': return 'Email';
+    case 'phone': return 'Telefone';
+    case 'random': return 'Aleatória';
+    default: return String(t || '');
   }
-  return d.length === 11 || d.length === 10;
 }
 
-function cpfIsValid(cpfRaw) {
-  const cpf = onlyDigits(cpfRaw);
-  if (cpf.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(cpf)) return false;
-
-  const calc = (base, factor) => {
-    let sum = 0;
-    for (let i = 0; i < base.length; i++) sum += Number(base[i]) * (factor - i);
-    const mod = (sum * 10) % 11;
-    return mod === 10 ? 0 : mod;
-  };
-
-  const d1 = calc(cpf.slice(0, 9), 10);
-  const d2 = calc(cpf.slice(0, 10), 11);
-  return d1 === Number(cpf[9]) && d2 === Number(cpf[10]);
-}
-
-function isImageAttachment(att) {
-  const name = String(att?.name || "").toLowerCase();
-  const ct = String(att?.contentType || "").toLowerCase();
-  if (ct.startsWith("image/")) return true;
-  return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp");
-}
-
-function buildEntryEmbed() {
-  return new EmbedBuilder()
-    .setTitle("📩 Enviar print do depósito")
-    .setDescription(
-      [
-        "Clique no botão abaixo para abrir um **ticket privado**.",
-        "",
-        "Dentro do ticket você vai:",
-        "1) Preencher **Nick da Twitch + Tipo Pix + Chave Pix**",
-        "2) Anexar o **print do histórico/comprovante do depósito**"
-      ].join("\n")
-    )
-    .setFooter({ text: "Não envie dados sensíveis em canais públicos." });
-}
-
-function buildEntryRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(IDS.OPEN_TICKET).setLabel("Enviar print do depósito").setStyle(ButtonStyle.Success)
-  );
-}
-
-function buildTicketEmbed() {
-  return new EmbedBuilder()
-    .setTitle("📄 Envio de print do depósito")
-    .setDescription(
-      [
-        "Passo a passo:",
-        "1) Clique em **Preencher dados**",
-        "2) Preencha: Nick da Twitch, Tipo Pix (cpf/email/phone/random) e a Chave Pix",
-        "3) Depois envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP)"
-      ].join("\n")
-    );
-}
-
-function buildTicketRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(IDS.FILL_DATA).setLabel("Preencher dados").setStyle(ButtonStyle.Primary)
-  );
-}
-
-function buildModal(prefill = {}) {
-  const modal = new ModalBuilder().setCustomId(IDS.MODAL).setTitle("Enviar dados do depósito");
-
-  const twitch = new TextInputBuilder()
-    .setCustomId(IDS.IN_TWITCH)
-    .setLabel("Nick da Twitch (sem @)")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setValue(String(prefill.twitch_name || ""));
-
-  const pixType = new TextInputBuilder()
-    .setCustomId(IDS.IN_PIX_TYPE)
-    .setLabel("Tipo Pix: cpf / email / phone / random")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setValue(String(prefill.pix_type || ""));
-
-  const pixKey = new TextInputBuilder()
-    .setCustomId(IDS.IN_PIX_KEY)
-    .setLabel("Chave Pix")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setValue(String(prefill.pix_key || ""));
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(twitch),
-    new ActionRowBuilder().addComponents(pixType),
-    new ActionRowBuilder().addComponents(pixKey)
-  );
-
-  return modal;
+function likelyImageAttachment(att) {
+  if (!att) return false;
+  if (att.contentType && String(att.contentType).startsWith('image/')) return true;
+  if (att.height != null || att.width != null) return true;
+  const name = String(att.name || '');
+  const url = String(att.url || '');
+  const re = /\.(png|jpe?g|webp|gif|jfif)(\?|$)/i;
+  return re.test(name) || re.test(url);
 }
 
 async function ensureTables(q) {
   await q(`
-    CREATE TABLE IF NOT EXISTS discord_tickets (
-      user_id TEXT PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS discord_deposit_tickets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       channel_id TEXT NOT NULL,
-      state TEXT NOT NULL DEFAULT 'OPEN',
-      twitch_name TEXT,
+      status TEXT NOT NULL DEFAULT 'OPEN',
       pix_type TEXT,
+      twitch_name TEXT,
       pix_key TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
+      submission_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      closed_at TIMESTAMPTZ
+    )
   `);
+
+  await q(`CREATE INDEX IF NOT EXISTS discord_deposit_tickets_user_open_idx ON discord_deposit_tickets(user_id) WHERE closed_at IS NULL`);
+  await q(`CREATE INDEX IF NOT EXISTS discord_deposit_tickets_channel_open_idx ON discord_deposit_tickets(channel_id) WHERE closed_at IS NULL`);
 }
 
-async function getTicketByUser(q, userId) {
-  const r = await q(`SELECT * FROM discord_tickets WHERE user_id=$1 LIMIT 1`, [String(userId)]);
-  return r.rows?.[0] || null;
-}
-
-async function getTicketByChannel(q, channelId) {
-  const r = await q(`SELECT * FROM discord_tickets WHERE channel_id=$1 LIMIT 1`, [String(channelId)]);
-  return r.rows?.[0] || null;
-}
-
-async function upsertTicket(q, ticket) {
-  await q(
-    `
-    INSERT INTO discord_tickets (user_id, channel_id, state, twitch_name, pix_type, pix_key, updated_at)
-    VALUES ($1,$2,$3,$4,$5,$6,NOW())
-    ON CONFLICT (user_id)
-    DO UPDATE SET channel_id=EXCLUDED.channel_id, state=EXCLUDED.state, twitch_name=EXCLUDED.twitch_name, pix_type=EXCLUDED.pix_type, pix_key=EXCLUDED.pix_key, updated_at=NOW()
-    `,
-    [
-      String(ticket.user_id),
-      String(ticket.channel_id),
-      String(ticket.state || "OPEN"),
-      ticket.twitch_name || null,
-      ticket.pix_type || null,
-      ticket.pix_key || null
-    ]
-  );
-}
-
-async function deleteTicketByUser(q, userId) {
-  await q(`DELETE FROM discord_tickets WHERE user_id=$1`, [String(userId)]);
-}
-
-async function deleteTicketByChannel(q, channelId) {
-  await q(`DELETE FROM discord_tickets WHERE channel_id=$1`, [String(channelId)]);
-}
-
-async function postOrReuseEntryMessage(client, onLog) {
-  const entryChannel = await client.channels.fetch(ENV.DISCORD_ENTRY_CHANNEL_ID).catch(() => null);
-  if (!entryChannel || entryChannel.type !== ChannelType.GuildText) {
-    onLog?.error?.("❌ DISCORD_ENTRY_CHANNEL_ID inválido ou sem acesso");
-    return;
-  }
-
-  const msgs = await entryChannel.messages.fetch({ limit: 25 }).catch(() => null);
-  const found = msgs
-    ? Array.from(msgs.values()).find((m) => {
-        if (m.author?.id !== client.user?.id) return false;
-        const row = m.components?.[0];
-        const btn = row?.components?.[0];
-        return btn?.customId === IDS.OPEN_TICKET;
-      })
-    : null;
-
-  const payload = { embeds: [buildEntryEmbed()], components: [buildEntryRow()] };
-
-  if (found) {
-    await found.edit(payload).catch(() => null);
-    return;
-  }
-
-  await entryChannel.send(payload).catch(() => null);
-}
-
-async function createTicketChannel(guild, user, onLog) {
-  const parentId = ENV.DISCORD_TICKETS_CATEGORY_ID;
-  const staffRoleId = ENV.DISCORD_STAFF_ROLE_ID;
-
-  const overwrites = [
-    { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-    { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles] },
-    { id: guild.members.me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles] }
-  ];
-
-  if (staffRoleId) {
-    overwrites.push({
-      id: staffRoleId,
-      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ManageMessages]
-    });
-  }
-
-  const safeName = String(user.username || "user").toLowerCase().replace(/[^a-z0-9-_]/g, "").slice(0, 16) || "user";
-  const short = String(user.id).slice(-3);
-  const name = `ticket-${safeName}-${short}`;
-
-  const ch = await guild.channels
-    .create({
-      name,
-      type: ChannelType.GuildText,
-      parent: parentId,
-      permissionOverwrites: overwrites,
-      topic: `Ticket depósito • user=${user.id} • created=${nowIso()}`
-    })
-    .catch((e) => {
-      onLog?.error?.("❌ Falha ao criar canal de ticket:", e?.message || e);
-      return null;
-    });
-
-  return ch;
-}
-
-async function lockAndArchiveTicket(channel, userId, onLog) {
-  const archiveParent = ENV.DISCORD_TICKETS_ARCHIVE_CATEGORY_ID || "";
-  const mins = Number.isFinite(ENV.DISCORD_TICKET_CLOSE_MINUTES) ? ENV.DISCORD_TICKET_CLOSE_MINUTES : 3;
-  const ms = Math.max(30_000, mins * 60_000);
-
-  setTimeout(async () => {
-    try {
-      await channel.permissionOverwrites.edit(userId, { ViewChannel: false, SendMessages: false }).catch(() => null);
-      await channel.setName(channel.name.startsWith("fechado-") ? channel.name : `fechado-${channel.name}`.slice(0, 90)).catch(() => null);
-      if (archiveParent) {
-        await channel.setParent(archiveParent, { lockPermissions: false }).catch(() => null);
-      }
-    } catch (e) {
-      onLog?.error?.("❌ Erro ao arquivar ticket:", e?.message || e);
-    }
-  }, ms);
-}
-
-async function storeSubmission(q, data) {
-  const id = crypto.randomUUID();
-  const twitchName = String(data.twitch_name || "").trim();
-  const pixType = String(data.pix_type || "").trim().toLowerCase();
-  const pixKey = String(data.pix_key || "").trim();
-  const screenshot = data.screenshot_data_url || null;
-
-  await q(
-    `
-    INSERT INTO cashback_submissions
-      (id, twitch_name, pix_type, pix_key, screenshot_data_url, status, reason, payout_window, created_at, updated_at)
-    VALUES
-      ($1,$2,$3,$4,$5,'PENDENTE',NULL,NULL,NOW(),NOW())
-    `,
-    [id, twitchName, pixType, pixKey, screenshot]
-  );
-
-  return id;
-}
-
-async function downloadAsDataUrl(url, fallbackName = "print.png") {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`download_failed_${r.status}`);
-  const ct = r.headers.get("content-type") || "";
-  const buf = Buffer.from(await r.arrayBuffer());
-  const max = 4_500_000;
-  if (buf.length > max) {
-    return { kind: "url", value: url, bytes: buf.length, contentType: ct || "", name: fallbackName };
-  }
-  const b64 = buf.toString("base64");
-  const mime = ct && ct.includes("/") ? ct : "image/png";
-  return { kind: "dataurl", value: `data:${mime};base64,${b64}`, bytes: buf.length, contentType: mime, name: fallbackName };
-}
-
-export async function initDiscordBot({ q, uid, onLog = console, enabled = true } = {}) {
-  if (!enabled) return null;
-  if (!ENV.DISCORD_TOKEN) {
-    onLog?.error?.("❌ DISCORD_TOKEN não definido");
-    return null;
-  }
-  if (!ENV.DISCORD_ENTRY_CHANNEL_ID || !ENV.DISCORD_TICKETS_CATEGORY_ID) {
-    onLog?.error?.("❌ Defina DISCORD_ENTRY_CHANNEL_ID e DISCORD_TICKETS_CATEGORY_ID");
-    return null;
-  }
-  if (!q) {
-    onLog?.error?.("❌ initDiscordBot precisa receber { q }");
+export function initDiscordBot({ q, uid, onLog = console }) {
+  const enabled = asBool(process.env.DISCORD_ENABLED, true);
+  if (!enabled) {
+    onLog.log('🔕 Discord bot desativado (DISCORD_ENABLED=false)');
     return null;
   }
 
-  await ensureTables(q);
+  const token = process.env.DISCORD_TOKEN;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  const entryChannelId = process.env.DISCORD_ENTRY_CHANNEL_ID;
+  const ticketsCategoryId = process.env.DISCORD_TICKETS_CATEGORY_ID;
+
+  if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
+    onLog.error('❌ Variáveis faltando: DISCORD_TOKEN, DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
+    return null;
+  }
+
+  const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS);
+  const autoCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_AUTO_CLOSE_MINUTES || '3', 10) || 3);
 
   const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMembers,
+      GatewayIntentBits.GuildMessages
+    ],
     partials: [Partials.Channel]
   });
 
-  client.once("ready", async () => {
-    onLog?.log?.(`✅ Discord bot online: ${client.user?.tag}`);
-    await postOrReuseEntryMessage(client, onLog);
-  });
+  const warnCooldown = new Map();
 
-  client.on("channelDelete", async (ch) => {
+  async function getOpenTicketByUser(userId) {
+    const r = await q(
+      `SELECT * FROM discord_deposit_tickets WHERE user_id=$1 AND closed_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+      [String(userId)]
+    );
+    return r?.rows?.[0] || null;
+  }
+
+  async function getOpenTicketById(ticketId) {
+    const r = await q(
+      `SELECT * FROM discord_deposit_tickets WHERE id=$1 AND closed_at IS NULL LIMIT 1`,
+      [String(ticketId)]
+    );
+    return r?.rows?.[0] || null;
+  }
+
+  async function getOpenTicketByChannel(channelId) {
+    const r = await q(
+      `SELECT * FROM discord_deposit_tickets WHERE channel_id=$1 AND closed_at IS NULL LIMIT 1`,
+      [String(channelId)]
+    );
+    return r?.rows?.[0] || null;
+  }
+
+  async function closeTicket(ticketId, reason = 'auto') {
+    const t = await getOpenTicketById(ticketId);
+    if (!t) return;
+
+    await q(
+      `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
+      [String(ticketId)]
+    );
+
     try {
-      await deleteTicketByChannel(q, ch.id);
-    } catch (_) {}
+      const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
+      if (!ch) return;
+
+      const guild = await client.guilds.fetch(guildId);
+      const everyoneId = guild.roles.everyone.id;
+
+      await ch.permissionOverwrites.edit(everyoneId, { ViewChannel: false }).catch(() => {});
+      await ch.permissionOverwrites.edit(String(t.user_id), {
+        ViewChannel: false,
+        SendMessages: false,
+        AttachFiles: false
+      }).catch(() => {});
+
+      const newName = String(ch.name || '').startsWith('fechado-')
+        ? String(ch.name)
+        : `fechado-${String(ch.name || '').slice(0, 90)}`;
+
+      await ch.setName(newName).catch(() => {});
+      await ch.send({ content: `✅ Ticket encerrado (${reason}).` }).catch(() => {});
+    } catch {}
+  }
+
+  function hasStaffRole(member) {
+    if (!member) return false;
+    if (!staffRoleIds.length) return false;
+    return staffRoleIds.some(rid => member.roles?.cache?.has(rid));
+  }
+
+  function buildEntryMessage() {
+    const embed = new EmbedBuilder()
+      .setTitle('📩 Enviar print do depósito')
+      .setDescription(
+        'Clique no botão abaixo para abrir um **ticket privado**.\n\n' +
+        'Dentro do ticket você vai:\n' +
+        '1) escolher o **Tipo Pix**\n' +
+        '2) preencher **Nick da Twitch + Chave Pix**\n' +
+        '3) anexar o **print do histórico/comprovante do depósito** (PNG/JPG/WEBP)'
+      );
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('dep:open')
+        .setLabel('Enviar print do depósito')
+        .setStyle(ButtonStyle.Success)
+    );
+
+    return { embeds: [embed], components: [row] };
+  }
+
+  function buildTicketPanel(ticketId) {
+    const embed = new EmbedBuilder()
+      .setTitle('📄 Envio de print do depósito')
+      .setDescription(
+        'Passo a passo:\n' +
+        '1) Escolha o **Tipo Pix** no seletor abaixo\n' +
+        '2) Clique em **Preencher dados** (Nick da Twitch + Chave Pix)\n' +
+        '3) Depois envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP)'
+      );
+
+    const select = new StringSelectMenuBuilder()
+      .setCustomId(`dep:pick:${ticketId}`)
+      .setPlaceholder('Escolha o Tipo Pix')
+      .addOptions(
+        new StringSelectMenuOptionBuilder().setLabel('CPF').setValue('cpf'),
+        new StringSelectMenuOptionBuilder().setLabel('Email').setValue('email'),
+        new StringSelectMenuOptionBuilder().setLabel('Telefone').setValue('phone'),
+        new StringSelectMenuOptionBuilder().setLabel('Aleatória').setValue('random')
+      );
+
+    const row1 = new ActionRowBuilder().addComponents(select);
+
+    const btn = new ButtonBuilder()
+      .setCustomId(`dep:fill:${ticketId}`)
+      .setLabel('Preencher dados')
+      .setStyle(ButtonStyle.Primary);
+
+    const row2 = new ActionRowBuilder().addComponents(btn);
+
+    return { embeds: [embed], components: [row1, row2] };
+  }
+
+  function buildModal(ticketId) {
+    const modal = new ModalBuilder()
+      .setCustomId(`dep:modal:${ticketId}`)
+      .setTitle('Enviar dados do depósito');
+
+    const twitch = new TextInputBuilder()
+      .setCustomId('twitch')
+      .setLabel('Nick da Twitch (sem @)')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMaxLength(25);
+
+    const pix = new TextInputBuilder()
+      .setCustomId('pix')
+      .setLabel('Chave Pix')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMaxLength(160);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(twitch),
+      new ActionRowBuilder().addComponents(pix)
+    );
+
+    return modal;
+  }
+
+  async function ensureEntryMessage() {
+    const ch = await client.channels.fetch(entryChannelId).catch(() => null);
+    if (!ch || !ch.isTextBased()) return;
+
+    const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+    const already = msgs?.find(m => {
+      if (!m.author || m.author.id !== client.user.id) return false;
+      const hasBtn = (m.components || []).some(row =>
+        (row.components || []).some(c => c.customId === 'dep:open')
+      );
+      return hasBtn;
+    });
+
+    if (!already) {
+      await ch.send(buildEntryMessage()).catch(() => {});
+    }
+  }
+
+  async function openTicket(interaction) {
+    const userId = interaction.user.id;
+    const guild = await client.guilds.fetch(guildId);
+    const member = await guild.members.fetch(userId).catch(() => null);
+
+    let existing = await getOpenTicketByUser(userId);
+
+    if (existing) {
+      const ch = await client.channels.fetch(String(existing.channel_id)).catch(() => null);
+      if (ch) {
+        await interaction.reply({
+          ephemeral: true,
+          content: `Você já tem um ticket aberto: <#${ch.id}>`
+        });
+        return;
+      }
+
+      await q(
+        `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
+        [String(existing.id)]
+      );
+      existing = null;
+    }
+
+    const ticketId = (typeof uid === 'function' ? uid() : crypto.randomUUID());
+    const slug = safeChannelSlug(member?.user?.username || interaction.user.username);
+    const rand = Math.floor(100 + Math.random() * 900);
+    const channelName = `ticket-${slug}-${rand}`;
+
+    const overwrites = [];
+
+    overwrites.push({
+      id: guild.roles.everyone.id,
+      deny: [
+        PermissionsBitField.Flags.ViewChannel
+      ]
+    });
+
+    overwrites.push({
+      id: userId,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.AttachFiles
+      ]
+    });
+
+    for (const rid of staffRoleIds) {
+      overwrites.push({
+        id: rid,
+        allow: [
+          PermissionsBitField.Flags.ViewChannel,
+          PermissionsBitField.Flags.SendMessages,
+          PermissionsBitField.Flags.ReadMessageHistory,
+          PermissionsBitField.Flags.ManageMessages,
+          PermissionsBitField.Flags.AttachFiles
+        ]
+      });
+    }
+
+    overwrites.push({
+      id: client.user.id,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.ManageChannels,
+        PermissionsBitField.Flags.ManageMessages,
+        PermissionsBitField.Flags.AttachFiles
+      ]
+    });
+
+    const ticketChannel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: ticketsCategoryId,
+      permissionOverwrites: overwrites,
+      topic: `ticketId=${ticketId} userId=${userId} created=${nowIso()}`
+    });
+
+    await q(
+      `INSERT INTO discord_deposit_tickets (id, user_id, channel_id, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'OPEN',now(),now())`,
+      [String(ticketId), String(userId), String(ticketChannel.id)]
+    );
+
+    const pingStaff = staffRoleIds.length ? staffRoleIds.map(r => `<@&${r}>`).join(' ') : '';
+    await ticketChannel.send({
+      content: `${pingStaff} <@${userId}>`,
+      ...buildTicketPanel(ticketId)
+    }).catch(() => {});
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `✅ Ticket criado: <#${ticketChannel.id}>`
+    });
+  }
+
+  async function handlePick(interaction, ticketId) {
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      return;
+    }
+
+    const guild = await client.guilds.fetch(guildId);
+    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+    const isOwner = String(interaction.user.id) === String(t.user_id);
+    const staff = hasStaffRole(member);
+
+    if (!isOwner && !staff) {
+      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' });
+      return;
+    }
+
+    const val = interaction.values?.[0] || null;
+    if (!['cpf', 'email', 'phone', 'random'].includes(val)) {
+      await interaction.reply({ ephemeral: true, content: 'Tipo Pix inválido.' });
+      return;
+    }
+
+    await q(
+      `UPDATE discord_deposit_tickets SET pix_type=$2, updated_at=now() WHERE id=$1`,
+      [String(ticketId), String(val)]
+    );
+
+    await interaction.reply({
+      ephemeral: true,
+      content: `✅ Tipo Pix selecionado: **${toTitlePixType(val)}**`
+    });
+  }
+
+  async function handleFill(interaction, ticketId) {
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      return;
+    }
+
+    const guild = await client.guilds.fetch(guildId);
+    const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+    const isOwner = String(interaction.user.id) === String(t.user_id);
+    const staff = hasStaffRole(member);
+
+    if (!isOwner && !staff) {
+      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' });
+      return;
+    }
+
+    if (!t.pix_type) {
+      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' });
+      return;
+    }
+
+    await interaction.showModal(buildModal(ticketId));
+  }
+
+  async function handleModal(interaction, ticketId) {
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' });
+      return;
+    }
+
+    if (!t.pix_type) {
+      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' });
+      return;
+    }
+
+    const twitchRaw = interaction.fields.getTextInputValue('twitch');
+    const pixRaw = interaction.fields.getTextInputValue('pix');
+
+    const twitch = String(twitchRaw || '').trim().replace(/^@+/, '');
+    const pixKey = String(pixRaw || '').trim();
+
+    if (!isValidTwitchName(twitch)) {
+      await interaction.reply({ ephemeral: true, content: 'Nick da Twitch inválido.' });
+      return;
+    }
+
+    const pixType = String(t.pix_type);
+    let ok = true;
+
+    if (pixType === 'cpf') ok = isValidCPF(pixKey);
+    else if (pixType === 'email') ok = isValidEmail(pixKey);
+    else if (pixType === 'phone') ok = isValidPhoneBR(pixKey);
+    else if (pixType === 'random') ok = isValidUUID(pixKey);
+    else ok = false;
+
+    if (!ok) {
+      const msg =
+        pixType === 'cpf' ? 'CPF inválido. Confira os 11 dígitos.' :
+        pixType === 'email' ? 'Email inválido.' :
+        pixType === 'phone' ? 'Telefone inválido.' :
+        pixType === 'random' ? 'Chave aleatória inválida (UUID).' :
+        'Chave Pix inválida.';
+      await interaction.reply({ ephemeral: true, content: `❌ ${msg}` });
+      return;
+    }
+
+    await q(
+      `UPDATE discord_deposit_tickets
+       SET twitch_name=$2, pix_key=$3, status='WAIT_IMAGE', updated_at=now()
+       WHERE id=$1`,
+      [String(ticketId), twitch, pixKey]
+    );
+
+    await interaction.reply({
+      ephemeral: true,
+      content: '✅ Dados recebidos. Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP).'
+    });
+
+    const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
+    if (ch && ch.isTextBased()) {
+      await ch.send({
+        content:
+          `✅ **Dados recebidos**\n` +
+          `Nick Twitch: **${twitch}**\n` +
+          `Tipo Pix: **${pixType}**\n` +
+          `Chave Pix: **${pixKey}**\n\n` +
+          `Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP).`
+      }).catch(() => {});
+    }
+  }
+
+  async function submitToCashback(t, screenshotUrl) {
+    const id = (typeof uid === 'function' ? uid() : crypto.randomUUID());
+    const twitchName = String(t.twitch_name || '').trim();
+    const twitchLc = normalizeTwitchName(twitchName);
+
+    await q(
+      `INSERT INTO cashback_submissions
+       (id, twitch_name, twitch_name_lc, pix_type, pix_key, screenshot_data_url, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,'PENDENTE',now(),now())`,
+      [
+        String(id),
+        twitchName,
+        twitchLc,
+        String(t.pix_type || ''),
+        String(t.pix_key || ''),
+        String(screenshotUrl || '')
+      ]
+    );
+
+    await q(
+      `UPDATE discord_deposit_tickets
+       SET submission_id=$2, status='DONE', updated_at=now()
+       WHERE id=$1`,
+      [String(t.id), String(id)]
+    );
+
+    return id;
+  }
+
+  client.on(Events.MessageCreate, async (msg) => {
+    try {
+      if (!msg || !msg.guildId) return;
+      if (String(msg.guildId) !== String(guildId)) return;
+      if (msg.author?.bot) return;
+
+      const t = await getOpenTicketByChannel(msg.channelId);
+      if (!t) return;
+
+      if (String(msg.author.id) !== String(t.user_id)) return;
+
+      if (String(t.status) !== 'WAIT_IMAGE') return;
+
+      const att = msg.attachments?.first?.() || null;
+      if (!att) {
+        const last = warnCooldown.get(msg.channelId) || 0;
+        if (Date.now() - last < 20000) return;
+        warnCooldown.set(msg.channelId, Date.now());
+
+        await msg.channel.send({
+          content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).`
+        }).catch(() => {});
+        return;
+      }
+
+      if (!likelyImageAttachment(att)) {
+        const last = warnCooldown.get(msg.channelId) || 0;
+        if (Date.now() - last < 20000) return;
+        warnCooldown.set(msg.channelId, Date.now());
+
+        await msg.channel.send({
+          content: `<@${msg.author.id}> Esse arquivo não parece ser uma imagem. Envie **PNG/JPG/WEBP**.`
+        }).catch(() => {});
+        return;
+      }
+
+      const screenshotUrl = String(att.url || '');
+      const submissionId = await submitToCashback(t, screenshotUrl);
+
+      await msg.channel.send({
+        content:
+          `✅ **Print recebido!** (ID: \`${submissionId}\`)\n` +
+          `Esse ticket vai fechar automaticamente em **${autoCloseMin} min**.`
+      }).catch(() => {});
+
+      setTimeout(() => {
+        closeTicket(String(t.id), 'auto');
+      }, autoCloseMin * 60 * 1000);
+    } catch {}
   });
 
-  client.on("interactionCreate", async (interaction) => {
+  client.on(Events.InteractionCreate, async (interaction) => {
     try {
       if (interaction.isButton()) {
-        if (interaction.customId === IDS.OPEN_TICKET) {
-          const guild = interaction.guild;
-          const user = interaction.user;
-          if (!guild || !user) return;
-
-          const existing = await getTicketByUser(q, user.id);
-          if (existing) {
-            const ch = await guild.channels.fetch(existing.channel_id).catch(() => null);
-            if (ch) {
-              await interaction.reply({ content: `Você já tem um ticket aberto: <#${ch.id}>`, ephemeral: true }).catch(() => null);
-              return;
-            }
-            await deleteTicketByUser(q, user.id);
-          }
-
-          const ticketCh = await createTicketChannel(guild, user, onLog);
-          if (!ticketCh) {
-            await interaction.reply({ content: "Não consegui criar seu ticket. Fala com um moderador.", ephemeral: true }).catch(() => null);
-            return;
-          }
-
-          await upsertTicket(q, {
-            user_id: user.id,
-            channel_id: ticketCh.id,
-            state: "WAITING_DATA",
-            twitch_name: null,
-            pix_type: null,
-            pix_key: null
-          });
-
-          await ticketCh.send({ content: `<@${user.id}>`, embeds: [buildTicketEmbed()], components: [buildTicketRow()] }).catch(() => null);
-          await interaction.reply({ content: `Ticket criado: <#${ticketCh.id}>`, ephemeral: true }).catch(() => null);
+        if (interaction.customId === 'dep:open') {
+          await openTicket(interaction);
           return;
         }
 
-        if (interaction.customId === IDS.FILL_DATA) {
-          const guild = interaction.guild;
-          const user = interaction.user;
-          const channel = interaction.channel;
-          if (!guild || !user || !channel) return;
+        if (interaction.customId.startsWith('dep:fill:')) {
+          const ticketId = interaction.customId.split(':').slice(2).join(':');
+          await handleFill(interaction, ticketId);
+          return;
+        }
+      }
 
-          const ticket = await getTicketByChannel(q, channel.id);
-          if (!ticket || String(ticket.user_id) !== String(user.id)) {
-            await interaction.reply({ content: "Esse botão é só para o dono do ticket.", ephemeral: true }).catch(() => null);
-            return;
-          }
-
-          const modal = buildModal({
-            twitch_name: ticket.twitch_name || "",
-            pix_type: ticket.pix_type || "",
-            pix_key: ticket.pix_key || ""
-          });
-
-          await interaction.showModal(modal).catch(() => null);
+      if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('dep:pick:')) {
+          const ticketId = interaction.customId.split(':').slice(2).join(':');
+          await handlePick(interaction, ticketId);
           return;
         }
       }
 
       if (interaction.isModalSubmit()) {
-        if (interaction.customId !== IDS.MODAL) return;
-
-        const guild = interaction.guild;
-        const user = interaction.user;
-        const channel = interaction.channel;
-        if (!guild || !user || !channel) return;
-
-        const ticket = await getTicketByChannel(q, channel.id);
-        if (!ticket || String(ticket.user_id) !== String(user.id)) {
-          await interaction.reply({ content: "Esse formulário é só para o dono do ticket.", ephemeral: true }).catch(() => null);
+        if (interaction.customId.startsWith('dep:modal:')) {
+          const ticketId = interaction.customId.split(':').slice(2).join(':');
+          await handleModal(interaction, ticketId);
           return;
         }
-
-        const twitchName = String(interaction.fields.getTextInputValue(IDS.IN_TWITCH) || "").trim().replace(/^@/, "");
-        const pixTypeRaw = String(interaction.fields.getTextInputValue(IDS.IN_PIX_TYPE) || "").trim();
-        const pixKeyRaw = String(interaction.fields.getTextInputValue(IDS.IN_PIX_KEY) || "").trim();
-
-        if (!twitchName || twitchName.length > 32) {
-          await interaction.reply({ content: "Nick da Twitch inválido.", ephemeral: true }).catch(() => null);
-          return;
-        }
-
-        const pixType = normalizePixType(pixTypeRaw);
-        if (!pixType) {
-          await interaction.reply({ content: "Tipo Pix inválido. Use: cpf / email / phone / random", ephemeral: true }).catch(() => null);
-          return;
-        }
-
-        let pixKeyOk = false;
-
-        if (pixType === "cpf") pixKeyOk = cpfIsValid(pixKeyRaw);
-        if (pixType === "email") pixKeyOk = isValidEmail(pixKeyRaw);
-        if (pixType === "phone") pixKeyOk = isValidPhoneBR(pixKeyRaw);
-        if (pixType === "random") pixKeyOk = onlyDigits(pixKeyRaw).length >= 8 || String(pixKeyRaw).length >= 8;
-
-        if (!pixKeyOk) {
-          const msg =
-            pixType === "cpf"
-              ? "CPF inválido. Confira os 11 dígitos."
-              : pixType === "email"
-              ? "Email inválido."
-              : pixType === "phone"
-              ? "Telefone inválido (use DDD + número)."
-              : "Chave aleatória inválida.";
-          await interaction.reply({ content: msg, ephemeral: true }).catch(() => null);
-          return;
-        }
-
-        await upsertTicket(q, {
-          user_id: user.id,
-          channel_id: channel.id,
-          state: "WAITING_IMAGE",
-          twitch_name: twitchName,
-          pix_type: pixType,
-          pix_key: pixKeyRaw
-        });
-
-        const emb = new EmbedBuilder()
-          .setTitle("✅ Dados recebidos")
-          .setDescription(
-            [
-              `Nick Twitch: **${twitchName}**`,
-              `Tipo Pix: **${pixType}**`,
-              `Chave Pix: **${pixKeyRaw}**`,
-              "",
-              "Agora anexe **APENAS a imagem do print** aqui no ticket (PNG/JPG/WEBP)."
-            ].join("\n")
-          );
-
-        await interaction.reply({ embeds: [emb], ephemeral: false }).catch(() => null);
-        return;
       }
     } catch (e) {
-      onLog?.error?.("❌ interactionCreate erro:", e?.message || e);
       try {
-        if (interaction && !interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: "Erro interno. Tenta de novo.", ephemeral: true }).catch(() => null);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ ephemeral: true, content: 'Falha ao processar. Tenta de novo.' });
         }
-      } catch (_) {}
+      } catch {}
     }
   });
 
-  client.on("messageCreate", async (msg) => {
+  async function periodicCleanup() {
     try {
-      if (!msg.guild) return;
-      if (msg.author?.bot) return;
-
-      const ticket = await getTicketByChannel(q, msg.channel.id);
-      if (!ticket) return;
-
-      if (String(ticket.user_id) !== String(msg.author.id)) return;
-      if (String(ticket.state) !== "WAITING_IMAGE") return;
-
-      const atts = Array.from(msg.attachments?.values?.() || []);
-      const img = atts.find(isImageAttachment);
-
-      if (!img) {
-        const warn = await msg.channel.send({ content: `<@${msg.author.id}> Manda **somente a imagem do print** (PNG/JPG/WEBP).` }).catch(() => null);
-        await msg.delete().catch(() => null);
-        if (warn) setTimeout(() => warn.delete().catch(() => null), 12_000);
-        return;
+      const r = await q(
+        `SELECT * FROM discord_deposit_tickets WHERE closed_at IS NULL ORDER BY created_at DESC LIMIT 200`
+      );
+      const rows = r?.rows || [];
+      for (const t of rows) {
+        const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
+        if (!ch) {
+          await q(
+            `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
+            [String(t.id)]
+          );
+          continue;
+        }
+        const created = new Date(t.created_at);
+        if (Number.isFinite(created.getTime())) {
+          const ageMin = (Date.now() - created.getTime()) / 60000;
+          if (ageMin > 180) {
+            await closeTicket(String(t.id), 'timeout');
+          }
+        }
       }
+    } catch {}
+  }
 
-      const dl = await downloadAsDataUrl(img.url, img.name || "print.png");
-      const screenshotVal = dl.kind === "dataurl" ? dl.value : dl.value;
-
-      const subId = await storeSubmission(q, {
-        twitch_name: ticket.twitch_name,
-        pix_type: ticket.pix_type,
-        pix_key: ticket.pix_key,
-        screenshot_data_url: screenshotVal
-      });
-
-      await deleteTicketByUser(q, msg.author.id);
-
-      const done = new EmbedBuilder()
-        .setTitle("✅ Print recebido")
-        .setDescription(
-          [
-            `ID: **${subId}**`,
-            "",
-            "Seu envio foi registrado e vai ser analisado pela staff.",
-            `Este ticket será fechado/arquivado em ~${ENV.DISCORD_TICKET_CLOSE_MINUTES} minuto(s).`
-          ].join("\n")
-        );
-
-      await msg.channel.send({ embeds: [done] }).catch(() => null);
-      await lockAndArchiveTicket(msg.channel, msg.author.id, onLog);
-    } catch (e) {
-      onLog?.error?.("❌ messageCreate erro:", e?.message || e);
-    }
+  client.once(Events.ClientReady, async () => {
+    onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
+    await ensureTables(q);
+    await ensureEntryMessage();
+    setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  await client.login(ENV.DISCORD_TOKEN);
-  return client;
+  client.login(token).catch((e) => {
+    onLog.error('❌ Discord login falhou:', e?.message || e);
+  });
+
+  return { client };
 }
