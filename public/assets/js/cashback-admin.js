@@ -214,6 +214,11 @@
           <img id="cbPImg" alt="" />
         </div>
 
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px">
+          <a class="btn ghost" id="cbPOpen" target="_blank" rel="noopener noreferrer">Abrir em nova guia</a>
+          <button class="btn ghost" id="cbPCopy" type="button">Copiar link</button>
+        </div>
+
         <div class="muted cb-proof-hint">Clique na imagem para dar zoom.</div>
       </div>
     `;
@@ -224,12 +229,29 @@
     });
 
     const img = dlg.querySelector('#cbPImg');
+    img.referrerPolicy = 'no-referrer';
+
     img.addEventListener('click', () => {
       dlg.classList.toggle('is-zoom');
     });
 
     dlg.addEventListener('close', () => {
       dlg.classList.remove('is-zoom');
+      dlg.dataset.url = '';
+      const a = dlg.querySelector('#cbPOpen');
+      if (a) a.removeAttribute('href');
+    });
+
+    const copyBtn = dlg.querySelector('#cbPCopy');
+    copyBtn.addEventListener('click', async () => {
+      const url = String(dlg.dataset.url || '');
+      if (!url) return notify('Sem link de imagem.', 'error');
+      try {
+        await navigator.clipboard.writeText(url);
+        notify('Link copiado!', 'ok');
+      } catch {
+        notify('Não consegui copiar automaticamente.', 'error');
+      }
     });
 
     proofDlg = dlg;
@@ -270,51 +292,49 @@
     }
 
     tbody.innerHTML = arr.map(x => {
-  const st = String(x.status || '').toUpperCase();
+      const st = String(x.status || '').toUpperCase();
 
-  const statusNote = (() => {
-    if (st === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : '';
-    if (st === 'PENDENTE')  return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '';
-    return '';
-  })();
+      const statusNote = (() => {
+        if (st === 'REPROVADO') return x.reason ? `Motivo: <strong>${esc(x.reason)}</strong>` : '';
+        if (st === 'PENDENTE')  return x.reason ? `Obs: <strong>${esc(x.reason)}</strong>` : '';
+        return '';
+      })();
 
-  const statusHtml = `
-    <div class="cb-status-cell">
-      ${statusBadge(x.status)}
-      ${statusNote ? `<div class="cb-status-note">${statusNote}</div>` : ``}
-    </div>
-  `;
-
-  const pixHtml = `
-    <div class="cb-pix">
-      <div class="cb-pix-key">${esc(maskPixKey(x.pixKey || ''))}</div>
-      <div class="cb-pix-type">${x.pixType ? `(${esc(x.pixType)})` : ''}</div>
-    </div>
-  `;
-
-  const proofHtml = x.hasScreenshot
-    ? `<button class="btn ghost cb-proof-btn" data-act="proof" data-id="${esc(x.id)}">Abrir</button>`
-    : `<span class="muted">—</span>`;
-
-  return `
-    <tr>
-      <td>${esc(fmtDT(x.createdAt))}</td>
-      <td><strong>${esc(x.twitchName || '')}</strong></td>
-      <td>${pixHtml}</td>
-      <td>${statusHtml}</td>
-      <td class="cb-proof-td">${proofHtml}</td>
-      <td>
-        <div class="cb-actions-grid">
-          <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
-          <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
-          <button class="btn ghost cb-action-full" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
+      const statusHtml = `
+        <div class="cb-status-cell">
+          ${statusBadge(x.status)}
+          ${statusNote ? `<div class="cb-status-note">${statusNote}</div>` : ``}
         </div>
-      </td>
-    </tr>
-  `;
-}).join('');
+      `;
 
+      const pixHtml = `
+        <div class="cb-pix">
+          <div class="cb-pix-key">${esc(maskPixKey(x.pixKey || ''))}</div>
+          <div class="cb-pix-type">${x.pixType ? `(${esc(x.pixType)})` : ''}</div>
+        </div>
+      `;
 
+      const proofHtml = x.hasScreenshot
+        ? `<button class="btn ghost cb-proof-btn" data-act="proof" data-id="${esc(x.id)}">Abrir</button>`
+        : `<span class="muted">—</span>`;
+
+      return `
+        <tr>
+          <td>${esc(fmtDT(x.createdAt))}</td>
+          <td><strong>${esc(x.twitchName || '')}</strong></td>
+          <td>${pixHtml}</td>
+          <td>${statusHtml}</td>
+          <td class="cb-proof-td">${proofHtml}</td>
+          <td>
+            <div class="cb-actions-grid">
+              <button class="btn" data-act="approve" data-id="${esc(x.id)}">Aprovar</button>
+              <button class="btn ghost" data-act="reject" data-id="${esc(x.id)}">Reprovar</button>
+              <button class="btn ghost cb-action-full" data-act="copy" data-id="${esc(x.id)}">Copiar PIX</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   async function loadList() {
@@ -379,6 +399,17 @@
     }
   }
 
+  function pickScreenshotUrl(row) {
+    const u =
+      row?.screenshotDataUrl ||
+      row?.screenshotUrl ||
+      row?.screenshot_data_url ||
+      row?.screenshot_url ||
+      row?.screenshot ||
+      '';
+    return String(u || '').trim();
+  }
+
   async function openProof(id) {
     const dlg = ensureProofModal();
     dlg.classList.remove('is-zoom');
@@ -386,11 +417,39 @@
     try {
       const data = await apiFetch(`/api/cashback/admin/${encodeURIComponent(id)}`, { method: 'GET' });
       const row = data?.row;
+
       const img = dlg.querySelector('#cbPImg');
       const sub = dlg.querySelector('#cbPSub');
+      const openA = dlg.querySelector('#cbPOpen');
+
+      const url = pickScreenshotUrl(row);
 
       sub.textContent = `${row?.twitchName || '—'} • ${row?.id || ''}`;
-      img.src = row?.screenshotDataUrl || '';
+
+      dlg.dataset.url = url;
+
+      if (openA) {
+        if (url) {
+          openA.href = url;
+          openA.style.display = '';
+        } else {
+          openA.removeAttribute('href');
+          openA.style.display = 'none';
+        }
+      }
+
+      img.referrerPolicy = 'no-referrer';
+      img.style.display = url ? 'block' : 'none';
+
+      img.onerror = () => {
+        try { img.removeAttribute('src'); } catch {}
+        img.style.display = 'none';
+        notify('Não consegui carregar a imagem aqui. Use "Abrir em nova guia".', 'error');
+      };
+
+      img.onload = () => {};
+
+      img.src = url || '';
 
       if (typeof dlg.showModal === 'function') dlg.showModal();
       else dlg.setAttribute('open', '');
