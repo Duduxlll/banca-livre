@@ -14,6 +14,8 @@ import crypto from 'crypto';
 import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
+import { initDiscordBot } from "./discord-bot.js";
+
 import { ensureTorneioTables, registerTorneioRoutes } from "./torneio-routes.js";
 
 import { ensureCashbackTables, registerCashbackRoutes } from './cashback-routes.js';
@@ -2239,6 +2241,7 @@ app.listen(PORT, async () => {
     await ensureCashbackTables(q);
     await ensureTorneioTables(q);
     await ensureExtratosOrigemColumn();
+    initDiscordBot({ q, uid, onLog: console });
 
 
 

@@ -88,8 +88,7 @@ export function initTwitchBot({
     let m = text.match(/^!palpite\b\s*(.+)$/i) || text.match(/^!p\b\s*(.+)$/i);
     if (m && m[1]) return { type: "guess", payload: m[1].trim() };
 
-    if (/^!(cashback|print)\b/i.test(text)) return { type: "cashback" };
-    if (/^!status\b/i.test(text)) return { type: "status" };
+    
 
     const t = text.match(/^!time\b\s*(.+)$/i);
     if (t) {
@@ -450,37 +449,7 @@ export function initTwitchBot({
         return;
       }
 
-      if (cmd.type === "cashback") {
-        const mention = userTag ? `@${userTag}` : `@${user}`;
-        await say(`${mention} Cadastre-se na !borawin ou !melbet e envie o print do depósito realizado hoje 👉 ${publicUrl}`);
-        return;
-      }
-
-      if (cmd.type === "status") {
-        const mention = userTag ? `@${userTag}` : `@${user}`;
-        const st = await getCashbackStatus(userTag || user);
-        if (st.notFound) {
-          await say(`${mention} Você ainda não pediu seu cashback. Use !cashback`);
-          return;
-        }
-        if (st.error) {
-          await say(`${mention} não consegui consultar agora. Tenta de novo já já.`);
-          return;
-        }
-
-        const s = String(st.data?.status || "").toUpperCase();
-        const reason = String(st.data?.reason || "").trim();
-        const prazo = String(st.data?.payoutWindow || "").trim();
-
-        if (s === "APROVADO") {
-          await say(`${mention} APROVADO ✅${prazo ? ` • ${prazo}` : ""}`.trim());
-        } else if (s === "REPROVADO") {
-          await say(`${mention} REPROVADO ❌${reason ? ` • ${reason}` : ""}`.trim());
-        } else {
-          await say(`${mention} PENDENTE ⏳ aguarde a análise.`);
-        }
-        return;
-      }
+      
     });
   });
 
