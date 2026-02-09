@@ -72,6 +72,7 @@
 
   let palpiteState = null;
   let torneioState = null;
+  let palpiteCleared = false;
   let modeNow = "idle";
 
   const FEED_TTL = 60_000;
@@ -143,17 +144,14 @@
   }
 
   function palpiteShouldShow(st) {
-    if (!st?.roundId) return false;
-    if (st?.isOpen) return true;
-    return palpiteHasResult(st);
-  }
+  return !!st?.roundId && !palpiteCleared;
+}
 
   function pickMode() {
-    if (torneioState?.active) return "torneio";
-    if (palpiteShouldShow(palpiteState)) return "palpite";
-    return "idle";
-  }
-
+  if (torneioState?.active) return "torneio";
+  if (palpiteShouldShow(palpiteState)) return "palpite";
+  return "idle";
+}
   function applyMode() {
     const m = pickMode();
     if (m !== modeNow) {
@@ -244,32 +242,37 @@
   }
 
   function renderPalpite() {
-    const st = palpiteState || {};
+  const st = palpiteState || {};
 
-    if (el.pBuy) el.pBuy.textContent = st.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
-    if (el.pTotal) el.pTotal.textContent = String(st.total ?? 0);
+  if (el.pBuy) el.pBuy.textContent = st.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
+  if (el.pTotal) el.pTotal.textContent = String(st.total ?? 0);
 
-    if (st.isOpen) {
-      setPalpiteStatus(true, true);
-      if (el.pSub) el.pSub.textContent = "Rodada aberta — mande o valor no chat!";
-      showPalpitePanel("last");
-      renderPalpiteLast(st);
-      return;
-    }
-
-    const hasW = palpiteHasResult(st);
-    setPalpiteStatus(false, false);
-
-    if (hasW) {
-      if (el.pSub) el.pSub.textContent = "Rodada fechada — resultado!";
-      showPalpitePanel("winners");
-      renderPalpiteWinners(st);
-      return;
-    }
-
-    setView("idle");
-    modeNow = "idle";
+  if (st.isOpen) {
+    setPalpiteStatus(true, true);
+    if (el.pSub) el.pSub.textContent = "Rodada aberta — mande o valor no chat!";
+    showPalpitePanel("last");
+    renderPalpiteLast(st);
+    return;
   }
+
+  const hasW = palpiteHasResult(st);
+
+  if (hasW) {
+    setPalpiteStatus(false, false);
+    if (el.pSub) el.pSub.textContent = "Rodada fechada — resultado!";
+    showPalpitePanel("winners");
+    renderPalpiteWinners(st);
+    return;
+  }
+
+  setPalpiteStatus(false, true);
+  if (el.pSub) el.pSub.textContent = "Rodada fechada — aguardando resultado…";
+  showPalpitePanel("info");
+  if (el.pRotateTitle) el.pRotateTitle.textContent = "⌛ Fechado";
+  if (el.pRotateHint) el.pRotateHint.textContent = "Aguardando…";
+  if (el.pInfoText) el.pInfoText.textContent = "Palpite fechado. Aguarde o resultado ou use LIMPAR para voltar ao modo aguardando.";
+}
+
 
   function renderTorneio() {
     const data = torneioState || {};
@@ -412,13 +415,16 @@
       es = new EventSource(url);
 
       const onState = (raw) => {
-        let st = null;
-        try { st = JSON.parse(raw || "{}"); } catch { st = null; }
-        if (!st) return;
-        palpiteState = st;
-        applyMode();
-        if (modeNow === "palpite") renderPalpite();
-      };
+  let st = null;
+  try { st = JSON.parse(raw || "{}"); } catch { st = null; }
+  if (!st) return;
+
+  if (st.roundId) palpiteCleared = false;
+
+  palpiteState = st;
+  applyMode();
+  if (modeNow === "palpite") renderPalpite();
+};
 
       es.addEventListener("palpite-init", (e) => onState(e.data));
       es.addEventListener("palpite-open", (e) => onState(e.data));
@@ -448,6 +454,14 @@
         applyMode();
         if (modeNow === "palpite") renderPalpite();
       });
+
+      es.addEventListener("palpite-clear", () => {
+  palpiteCleared = true;
+  palpiteState = null;
+  applyMode();
+  if (modeNow === "idle") setView("idle");
+});
+
 
       es.onerror = () => {
         try { es.close(); } catch {}
