@@ -1,0 +1,347 @@
+/* public/assets/css/overlay.css */
+:root{
+  --bg: rgba(7,19,12,.72);
+  --bg2: rgba(255,255,255,.05);
+  --line: rgba(0,255,150,.18);
+  --line2: rgba(0,255,150,.10);
+  --txt: rgba(234,255,246,.92);
+  --muted: rgba(234,255,246,.62);
+  --shadow: 0 18px 60px rgba(0,0,0,.35);
+  --r: 16px;
+}
+
+html,body{
+  margin:0;
+  padding:0;
+  background:transparent;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color:var(--txt);
+}
+
+.ov-body{ background: transparent; }
+.ov-wrap{
+  position: fixed;
+  left: 20px;
+  top: 20px;
+  width: 560px;
+  max-width: calc(100vw - 40px);
+}
+
+.ov-card{
+  border:1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg), rgba(0,0,0,.20));
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px) saturate(1.1);
+  padding: 12px;
+}
+
+.ov-view{ display:block; }
+.ov-idle .ov-title{ font-weight: 900; letter-spacing:.2px; }
+
+.ov-title{
+  font-weight: 900;
+  font-size: 16px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.ov-sub{
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ov-error{
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(231,76,60,.35);
+  background: rgba(231,76,60,.16);
+  font-weight: 800;
+}
+
+.ov-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.ov-head-left{ min-width:0; }
+
+.ov-meta{
+  margin-top: 8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.ov-chip{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.ov-chip-label{
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.ov-chip-val{
+  font-size: 12px;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-status{
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 950;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.08);
+}
+
+.ov-status--open{
+  background: rgba(46,204,113,.18);
+  border-color: rgba(46,204,113,.35);
+}
+
+.ov-status--closed{
+  background: rgba(231,76,60,.18);
+  border-color: rgba(231,76,60,.35);
+}
+
+.ov-badge{
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 950;
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.08);
+}
+
+.ov-grid{
+  margin-top: 10px;
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+
+@media (max-width: 640px){
+  .ov-wrap{ width: calc(100vw - 40px); }
+  .ov-grid{ grid-template-columns: 1fr; }
+}
+
+.ov-rotate{
+  margin-top: 10px;
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.ov-rotate-top{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.ov-rotate-title{ font-weight: 950; }
+.ov-rotate-hint{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 850;
+  text-align:right;
+}
+
+.ov-panel{ padding-top: 10px; }
+
+.ov-winners-grid{
+  display:grid;
+  gap:8px;
+}
+
+.ov-win{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding: 10px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.ov-win .nm{
+  font-weight: 950;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ov-win .vl{
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-list{
+  display:grid;
+  gap:8px;
+}
+
+.ov-row{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.ov-row .nm{
+  font-weight: 950;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.ov-row .vl{
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-info{
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(0,255,150,.08);
+  border: 1px solid rgba(0,255,150,.18);
+}
+
+.ov-info-title{
+  font-weight: 950;
+  margin-bottom: 6px;
+}
+
+.ov-info-text{
+  color: var(--txt);
+  opacity: .92;
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.ov-feed-title{
+  font-weight: 950;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+}
+
+.tr-grid{
+  margin-top: 10px;
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+
+@media (max-width: 640px){
+  .tr-grid{ grid-template-columns: 1fr; }
+}
+
+.tr-team{
+  border:1px solid var(--line2);
+  background: rgba(255,255,255,.03);
+  border-radius: 16px;
+  padding: 10px;
+}
+
+.tr-top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+
+.tr-name{ font-weight: 950; }
+.tr-meta{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 900;
+  text-align:right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tr-feed{
+  margin-top: 8px;
+  display:grid;
+  gap:6px;
+  max-height: 126px;
+  overflow: hidden;
+}
+
+.tr-pill{
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(0,255,150,.08);
+  border: 1px solid rgba(0,255,150,.18);
+  font-weight: 950;
+  font-size: 12px;
+  opacity: 1;
+  animation: fadeOut 60s linear forwards;
+}
+
+@keyframes fadeOut{
+  0%{ opacity:1; transform:none; }
+  85%{ opacity:1; }
+  100%{ opacity:0; transform: translateY(6px); }
+}
+
+.ov-scroll{
+  margin-top: 10px;
+  max-height: 190px;
+  overflow:auto;
+  padding-right: 6px;
+}
+
+.ov-scroll::-webkit-scrollbar{ width: 8px; }
+.ov-scroll::-webkit-scrollbar-thumb{
+  background: rgba(0,255,150,.18);
+  border-radius: 999px;
+  border: 1px solid rgba(0,255,150,.12);
+}
+
+.alv{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  margin-bottom: 8px;
+}
+
+.alv .nm{
+  font-weight: 950;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.mini{
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 850;
+}

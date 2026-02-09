@@ -473,40 +473,84 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
     legacyHeaders: false
   });
 
-  app.get("/api/torneio/state", requireAppKey, async (req, res) => {
-    try {
-      await ensureReady();
+ app.get("/api/torneio/state", requireAppKey, async (req, res) => {
+  try {
+    await ensureReady();
 
-      const tor = await getActiveTorneio(q);
-      if (!tor) return res.json({ ok: true, active: false });
+    const tor = await getActiveTorneio(q);
+    if (!tor) return res.json({ ok: true, active: false });
 
-      const ph = await getPhase(q, tor.id, tor.currentPhase);
-      if (!ph) return res.json({ ok: true, active: true, torneio: tor, phase: null });
+    const ph = await getPhase(q, tor.id, tor.currentPhase);
+    if (!ph) return res.json({ ok: true, active: true, torneio: tor, phase: null });
 
-      const countsByKey = await getCountsByKey(q, tor.id, ph.phaseNumber);
-      const teamsList = buildTeamsList(ph, countsByKey);
+    const countsByKey = await getCountsByKey(q, tor.id, ph.phaseNumber);
+    const teamsList = buildTeamsList(ph, countsByKey);
 
-      return res.json({
-        ok: true,
-        active: true,
-        torneio: tor,
-        phase: {
-          number: ph.phaseNumber,
-          status: ph.status,
-          winnerTeam: ph.winnerTeam || null,
-          teamsList,
-          teamsAll: teamsList.map((t) => ({ key: t.key, name: t.name })),
-          teams: teamsToLegacyMap(ph.teams),
-          countsByKey,
-          counts: countsToLegacyABC(ph.teams, countsByKey),
-          points: ph.points || {}
-        }
-      });
-    } catch (e) {
-      console.error("torneio/state:", e?.message || e);
-      return res.status(500).json({ error: "falha_state" });
+    const include = String(req.query?.include || "");
+    const wantLists = include.includes("lists");
+    const wantAlive = include.includes("alive");
+
+    let listsByKey = null;
+
+    if (wantLists) {
+      const lim = Math.min(Math.max(parseInt(req.query?.listsLimit, 10) || 60, 1), 2000);
+      const full = await getTeamListsByKey(q, tor.id, ph.phaseNumber);
+      listsByKey = {};
+      for (const k of Object.keys(full || {})) {
+        listsByKey[k] = (full[k] || []).slice(0, lim);
+      }
     }
-  });
+
+    let aliveCount = 0;
+    {
+      const { rows } = await q(
+        `SELECT COUNT(*)::int AS c
+         FROM torneio_participants
+         WHERE torneio_id = $1 AND alive = true`,
+        [tor.id]
+      );
+      aliveCount = rows?.[0]?.c ?? 0;
+    }
+
+    let alivePreview = null;
+    if (wantAlive) {
+      const lim = Math.min(Math.max(parseInt(req.query?.aliveLimit, 10) || 24, 1), 2000);
+      const { rows } = await q(
+        `SELECT COALESCE(display_name, twitch_name) AS name, twitch_name AS "twitchName"
+         FROM torneio_participants
+         WHERE torneio_id = $1 AND alive = true
+         ORDER BY updated_at DESC
+         LIMIT $2`,
+        [tor.id, lim]
+      );
+      alivePreview = rows || [];
+    }
+
+    return res.json({
+      ok: true,
+      active: true,
+      torneio: tor,
+      phase: {
+        number: ph.phaseNumber,
+        status: ph.status,
+        winnerTeam: ph.winnerTeam || null,
+        teamsList,
+        teamsAll: teamsList.map((t) => ({ key: t.key, name: t.name })),
+        teams: teamsToLegacyMap(ph.teams),
+        countsByKey,
+        counts: countsToLegacyABC(ph.teams, countsByKey),
+        points: ph.points || {},
+        listsByKey,
+        aliveCount,
+        alivePreview
+      }
+    });
+  } catch (e) {
+    console.error("torneio/state:", e?.message || e);
+    return res.status(500).json({ error: "falha_state" });
+  }
+});
+
 
   app.post("/api/torneio/join", requireAppKey, joinLimiter, async (req, res) => {
     try {

@@ -1,0 +1,96 @@
+<!-- private/overlay.html -->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Overlay</title>
+  <link rel="stylesheet" href="/assets/css/overlay.css?v=1">
+</head>
+<body class="ov-body">
+  <div class="ov-wrap">
+    <div id="ovError" class="ov-error" style="display:none"></div>
+
+    <section id="viewIdle" class="ov-card ov-idle">
+      <div class="ov-title">✨ Overlay</div>
+      <div class="ov-sub">Aguardando Palpite ou Torneio…</div>
+    </section>
+
+    <section id="viewPalpite" class="ov-view" style="display:none">
+      <section class="ov-card ov-head">
+        <div class="ov-head-left">
+          <div class="ov-title">💰 <span>Palpite</span></div>
+
+          <div class="ov-meta">
+            <div class="ov-chip">
+              <span class="ov-chip-label">Compra</span>
+              <span id="pBuy" class="ov-chip-val">—</span>
+            </div>
+
+            <div class="ov-chip">
+              <span class="ov-chip-label">Total</span>
+              <span id="pTotal" class="ov-chip-val">0</span>
+            </div>
+          </div>
+
+          <div id="pSub" class="ov-sub">Aguardando…</div>
+        </div>
+
+        <div id="pStatus" class="ov-status ov-status--closed">FECHADO</div>
+      </section>
+
+      <section class="ov-card ov-rotate">
+        <div class="ov-rotate-top">
+          <div id="pRotateTitle" class="ov-rotate-title">🏆 Top 3</div>
+          <div id="pRotateHint" class="ov-rotate-hint">—</div>
+        </div>
+
+        <div id="pPanelWinners" class="ov-panel">
+          <div id="pWinners" class="ov-winners-grid"></div>
+        </div>
+
+        <div id="pPanelLast" class="ov-panel" style="display:none">
+          <div id="pLast" class="ov-list"></div>
+        </div>
+
+        <div id="pPanelInfo" class="ov-panel" style="display:none">
+          <div class="ov-info">
+            <div class="ov-info-title">⌨️ Como participar</div>
+            <div id="pInfoText" class="ov-info-text">—</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="viewTorneio" class="ov-view" style="display:none">
+      <section class="ov-card ov-head">
+        <div class="ov-head-left">
+          <div class="ov-title">🏆 <span id="tName">Torneio</span></div>
+          <div id="tSub" class="ov-sub">Aguardando…</div>
+        </div>
+        <div id="tBadge" class="ov-badge">—</div>
+      </section>
+
+      <div id="tTeams" class="tr-grid"></div>
+
+      <div class="ov-grid">
+        <section class="ov-card tr-alive">
+          <div class="ov-feed-title">
+            ✅ Classificados
+            <span class="mini">(<span id="tAliveCount">0</span>)</span>
+          </div>
+          <div id="tAlive" class="ov-scroll"></div>
+        </section>
+
+        <section class="ov-card tr-hint">
+          <div class="ov-feed-title">⌨️ Entrar no time</div>
+          <div class="ov-sub">Digite no chat: <b>!time</b> <span class="mini">(nome do time)</span></div>
+          <div class="ov-sub mini">Quando a fase estiver aberta, aparece quem entrou em cada time.</div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script src="/assets/js/overlay.js?v=1" defer></script>
+</body>
+</html>

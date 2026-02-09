@@ -32,6 +32,7 @@ const {
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
   APP_PUBLIC_KEY,
+  OVERLAY_PUBLIC_KEY,
   EFI_CLIENT_ID,
   EFI_CLIENT_SECRET,
   EFI_CERT_PATH,
@@ -274,6 +275,14 @@ function requireAppKey(req, res, next){
   if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
   next();
 }
+
+function requireOverlayPageKey(req, res, next){
+  if (!OVERLAY_PUBLIC_KEY) return res.status(403).send('overlay_off');
+  const k = String(req.query?.key || req.get('X-OVERLAY-KEY') || '');
+  if (!k || k !== OVERLAY_PUBLIC_KEY) return res.status(401).send('unauthorized');
+  next();
+}
+
 
 function parseMoneyToCents(v){
   if (v == null) return null;
@@ -891,178 +900,9 @@ app.post('/api/palpite/winners', requireAdmin, async (req, res) => {
   }
 });
 
-app.get('/palpite-overlay.html', (req, res) => {
-  if (!APP_PUBLIC_KEY) {
-    return res.status(403).send('public_off');
-  }
-  const key = String(req.query?.key || '');
-  if (!key || key !== APP_PUBLIC_KEY) {
-    return res.status(401).send('unauthorized');
-  }
-
+app.get(['/overlay', '/overlay.html'], requireOverlayPageKey, (req, res) => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(`<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Palpite Overlay</title>
-<style>
-  html,body{ margin:0; padding:0; background:transparent; font-family:Inter,system-ui,Arial; }
-  .wrap{
-    position:fixed; left:20px; top:20px;
-    width: 460px; max-width: calc(100vw - 40px);
-    color:#fff;
-  }
-  .card{
-    background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.25));
-    border: 1px solid rgba(255,255,255,.18);
-    border-radius: 14px;
-    box-shadow: 0 18px 60px rgba(0,0,0,.45);
-    padding: 12px 12px 10px;
-    backdrop-filter: blur(6px) saturate(1.1);
-  }
-  .head{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .title{ font-weight:800; font-size:16px; letter-spacing:.2px; }
-  .pill{
-    font-size:12px; font-weight:800;
-    padding:6px 10px; border-radius:999px;
-    background: rgba(255,255,255,.10);
-    border:1px solid rgba(255,255,255,.18);
-  }
-  .pill.on{ background: rgba(46, 204, 113, .18); border-color: rgba(46,204,113,.35); }
-  .pill.off{ background: rgba(231,76,60,.18); border-color: rgba(231,76,60,.35); }
-  .sub{ margin:8px 0 0; font-size:12px; opacity:.9; }
-  .log{ margin-top:10px; display:grid; gap:8px; }
-  .item{
-    display:flex; justify-content:space-between; gap:10px; align-items:center;
-    padding:10px 10px;
-    border-radius: 12px;
-    background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.14);
-    animation: in .18s ease-out;
-  }
-  @keyframes in{ from{ opacity:0; transform: translateY(6px) scale(.98);} to{opacity:1; transform:none;} }
-  .name{ font-weight:800; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .val{ font-weight:800; font-variant-numeric: tabular-nums; }
-  .foot{ margin-top:8px; font-size:12px; opacity:.85; display:flex; justify-content:space-between; }
-  .muted{ opacity:.75; }
-  .hide{ opacity:0; transform: translateY(6px); transition: .35s ease; }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="card">
-    <div class="head">
-      <div class="title">💰 Palpite Exato</div>
-      <div id="statusPill" class="pill off">FECHADO</div>
-    </div>
-    <div class="sub">
-      Compra (Bonus Buy): <span id="buyVal" class="muted">—</span>
-    </div>
-
-    <div id="log" class="log"></div>
-
-    <div class="foot">
-      <div>Total: <span id="total">0</span></div>
-      <div class="muted">Atualiza ao vivo</div>
-    </div>
-  </div>
-</div>
-
-<script>
-  const fmtBRL = (c)=> (c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-  const params = new URLSearchParams(location.search);
-  const key = params.get('key');
-
-  const elLog = document.getElementById('log');
-  const elTotal = document.getElementById('total');
-  const elBuy = document.getElementById('buyVal');
-  const pill = document.getElementById('statusPill');
-
-  const MAX = 18;
-  const TTL = 12000;
-
-  function setStatus(isOpen){
-    pill.classList.toggle('on', !!isOpen);
-    pill.classList.toggle('off', !isOpen);
-    pill.textContent = isOpen ? 'ABERTO' : 'FECHADO';
-  }
-
-  function renderInit(state){
-    setStatus(state.isOpen);
-    elBuy.textContent = state.buyValueCents ? fmtBRL(state.buyValueCents) : '—';
-    elTotal.textContent = state.total || 0;
-
-    elLog.innerHTML = '';
-    (state.entries || []).slice(0, MAX).forEach(e => addItem(e.user, e.guessCents, false));
-  }
-
-  function addItem(user, cents, animate=true){
-    const div = document.createElement('div');
-    div.className = 'item';
-    div.innerHTML = \`
-      <div class="name">\${escapeHtml(user || '')}</div>
-      <div class="val">\${fmtBRL(cents||0)}</div>
-    \`;
-    if (!animate) div.style.animation = 'none';
-
-    elLog.prepend(div);
-    while (elLog.children.length > MAX) elLog.removeChild(elLog.lastChild);
-
-    setTimeout(() => {
-      div.classList.add('hide');
-      setTimeout(()=> div.remove(), 380);
-    }, TTL);
-  }
-
-  function escapeHtml(s){
-    return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
-
-  const es = new EventSource('/api/palpite/stream?key=' + encodeURIComponent(key));
-
-  es.addEventListener('palpite-init', (ev)=>{
-    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{}
-  });
-
-  es.addEventListener('palpite-open', (ev)=>{
-    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{}
-  });
-
-  es.addEventListener('palpite-close', (ev)=>{
-    try{
-      const st = JSON.parse(ev.data||'{}');
-      setStatus(false);
-      elTotal.textContent = st.total || elTotal.textContent;
-    }catch{
-      setStatus(false);
-    }
-  });
-
-  es.addEventListener('palpite-clear', (ev)=>{
-    try{ renderInit(JSON.parse(ev.data||'{}')); }catch{
-      elLog.innerHTML = '';
-      elTotal.textContent = '0';
-    }
-  });
-
-  es.addEventListener('palpite-guess', (ev)=>{
-    try{
-      const data = JSON.parse(ev.data||'{}');
-      const entry = data.entry || {};
-      if (entry.user) addItem(entry.user, entry.guessCents, true);
-      if (data.total != null) elTotal.textContent = String(data.total);
-      else elTotal.textContent = String(Number(elTotal.textContent||0) + 1);
-    }catch{}
-  });
-
-  es.addEventListener('palpite-winners', ()=>{});
-
-  es.onerror = ()=>{};
-</script>
-</body>
-</html>`);
+  return res.sendFile(path.join(PRIVATE_ROOT, 'overlay.html'));
 });
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
