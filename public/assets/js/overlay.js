@@ -70,24 +70,26 @@
     return;
   }
 
-  let palpiteState = null;
-  let torneioState = null;
-  let palpiteCleared = false;
-  let modeNow = "idle";
-
-  const FEED_TTL = 60_000;
-  const FEED_MAX = 6;
-  const MAX_TEAMS_SHOW = 6;
-  const MAX_ALIVE_SHOW = 18;
-
   const PALPITE_SHOW_MAX = 3;
   const PALPITE_TTL_MS = 2 * 60 * 1000;
 
-  const seenUserTeam = new Map();
-  const feedByTeam = new Map();
+  const TORNEIO_TEAMS_MAX = 6;
+  const ALIVE_MAX = 18;
+
+  let palpiteState = null;
+  let torneioState = null;
+  let modeNow = "idle";
+  let palpiteCleared = false;
 
   function nowMs() {
     return Date.now();
+  }
+
+  function normalizeUserKey(v) {
+    return String(v || "")
+      .trim()
+      .replace(/^@+/, "")
+      .toLowerCase();
   }
 
   function getTsFromEntry(e) {
@@ -107,51 +109,21 @@
     return Number.isFinite(ms) ? ms : null;
   }
 
-  function normalizeUserKey(v) {
-    return String(v || "")
-      .trim()
-      .replace(/^@+/, "")
-      .toLowerCase();
-  }
-
-  function pushFeed(teamKey, userKey, displayName) {
-    const ts = nowMs();
-
-    const prevTeam = seenUserTeam.get(userKey);
-    if (prevTeam && prevTeam !== teamKey) {
-      const arrPrev = feedByTeam.get(prevTeam) || [];
-      feedByTeam.set(prevTeam, arrPrev.filter((x) => x.userKey !== userKey));
-    }
-    seenUserTeam.set(userKey, teamKey);
-
-    const arr = feedByTeam.get(teamKey) || [];
-    if (arr.some((x) => x.userKey === userKey)) return;
-
-    arr.unshift({ userKey, displayName, ts });
-    feedByTeam.set(teamKey, arr.slice(0, FEED_MAX));
-  }
-
-  function cleanupFeed() {
-    const ts = nowMs();
-    for (const [k, arr] of feedByTeam.entries()) {
-      feedByTeam.set(k, (arr || []).filter((x) => (ts - x.ts) < FEED_TTL));
-    }
-  }
-
   function palpiteHasResult(st) {
     const winners = Array.isArray(st?.winners) ? st.winners : [];
     return winners.length > 0 && st?.actualResultCents != null;
   }
 
   function palpiteShouldShow(st) {
-  return !!st?.roundId && !palpiteCleared;
-}
+    return !!st?.roundId && !palpiteCleared;
+  }
 
   function pickMode() {
-  if (torneioState?.active) return "torneio";
-  if (palpiteShouldShow(palpiteState)) return "palpite";
-  return "idle";
-}
+    if (torneioState?.active) return "torneio";
+    if (palpiteShouldShow(palpiteState)) return "palpite";
+    return "idle";
+  }
+
   function applyMode() {
     const m = pickMode();
     if (m !== modeNow) {
@@ -178,34 +150,6 @@
     if (el.pPanelInfo) el.pPanelInfo.style.display = which === "info" ? "" : "none";
   }
 
-  function renderPalpiteWinners(st) {
-    const winners = Array.isArray(st.winners) ? st.winners : [];
-    const hasW = palpiteHasResult(st);
-
-    if (el.pRotateTitle) el.pRotateTitle.textContent = `🏆 Top ${Math.min(3, winners.length || 3)}`;
-    if (el.pRotateHint) {
-      el.pRotateHint.textContent = hasW ? `Resultado: ${fmtBRL(st.actualResultCents)}` : "Aguardando resultado…";
-    }
-
-    if (!el.pWinners) return;
-
-    if (!hasW) {
-      el.pWinners.innerHTML = `<div class="mini">Aguardando resultado…</div>`;
-      return;
-    }
-
-    el.pWinners.innerHTML = winners.slice(0, 3).map((w, i) => {
-      const nm = w?.name ?? w?.user ?? "—";
-      const val = w?.valueCents != null ? fmtBRL(w.valueCents) : "—";
-      return `
-        <div class="ov-win">
-          <div class="nm">#${i + 1} ${esc(nm)}</div>
-          <div class="vl">${esc(val)}</div>
-        </div>
-      `;
-    }).join("");
-  }
-
   function renderPalpiteLast(st) {
     const entries = Array.isArray(st.entries) ? st.entries : [];
     const tsNow = nowMs();
@@ -229,56 +173,83 @@
       return;
     }
 
-    el.pLast.innerHTML = last.map((e) => {
-      const nm = e?.user ?? e?.user_name ?? "—";
-      const cents = Number(e?.guessCents ?? e?.guess_cents ?? 0);
+    el.pLast.innerHTML = last
+      .map((e) => {
+        const nm = e?.user ?? e?.user_name ?? "—";
+        const cents = Number(e?.guessCents ?? e?.guess_cents ?? 0);
+        return `
+          <div class="ov-row">
+            <span class="nm">${esc(nm)}</span>
+            <span class="vl">${esc(fmtBRL(cents))}</span>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  function renderPalpiteWinnersOrPlaceholder(st) {
+    const winners = Array.isArray(st.winners) ? st.winners : [];
+    const topN = Math.min(3, Math.max(1, Number(st.winnersCount || 3) || 3));
+    const hasW = palpiteHasResult(st);
+
+    if (el.pRotateTitle) el.pRotateTitle.textContent = `🏆 Top ${topN}`;
+    if (el.pRotateHint) {
+      el.pRotateHint.textContent =
+        st.actualResultCents != null ? `Resultado: ${fmtBRL(st.actualResultCents)}` : "Aguardando resultado…";
+    }
+
+    if (!el.pWinners) return;
+
+    if (hasW) {
+      el.pWinners.innerHTML = winners.slice(0, topN).map((w, i) => {
+        const nm = w?.name ?? w?.user ?? "—";
+        const val = w?.valueCents != null ? fmtBRL(w.valueCents) : "—";
+        return `
+          <div class="ov-win">
+            <div class="nm">#${i + 1} ${esc(nm)}</div>
+            <div class="vl">${esc(val)}</div>
+          </div>
+        `;
+      }).join("");
+      return;
+    }
+
+    el.pWinners.innerHTML = Array.from({ length: topN }).map((_, i) => {
       return `
-        <div class="ov-row">
-          <span class="nm">${esc(nm)}</span>
-          <span class="vl">${esc(fmtBRL(cents))}</span>
+        <div class="ov-win">
+          <div class="nm">#${i + 1} ${esc("Aguardando…")}</div>
+          <div class="vl">${esc("—")}</div>
         </div>
       `;
     }).join("");
   }
 
   function renderPalpite() {
-  const st = palpiteState || {};
+    const st = palpiteState || {};
 
-  if (el.pBuy) el.pBuy.textContent = st.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
-  if (el.pTotal) el.pTotal.textContent = String(st.total ?? 0);
+    if (el.pBuy) el.pBuy.textContent = st.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
+    if (el.pTotal) el.pTotal.textContent = String(st.total ?? 0);
 
-  if (st.isOpen) {
-    setPalpiteStatus(true, true);
-    if (el.pSub) el.pSub.textContent = "Rodada aberta — mande o valor no chat!";
-    showPalpitePanel("last");
-    renderPalpiteLast(st);
-    return;
-  }
+    if (st.isOpen) {
+      palpiteCleared = false;
+      setPalpiteStatus(true, true);
+      if (el.pSub) el.pSub.textContent = "Rodada aberta";
+      showPalpitePanel("last");
+      renderPalpiteLast(st);
+      return;
+    }
 
-  const hasW = palpiteHasResult(st);
-
-  if (hasW) {
     setPalpiteStatus(false, false);
-    if (el.pSub) el.pSub.textContent = "Rodada fechada — resultado!";
+    if (el.pSub) el.pSub.textContent = "Rodada fechada";
     showPalpitePanel("winners");
-    renderPalpiteWinners(st);
-    return;
+    renderPalpiteWinnersOrPlaceholder(st);
   }
-
-  setPalpiteStatus(false, true);
-  if (el.pSub) el.pSub.textContent = "Rodada fechada — aguardando resultado…";
-  showPalpitePanel("info");
-  if (el.pRotateTitle) el.pRotateTitle.textContent = "⌛ Fechado";
-  if (el.pRotateHint) el.pRotateHint.textContent = "Aguardando…";
-  if (el.pInfoText) el.pInfoText.textContent = "Palpite fechado. Aguarde o resultado ou use LIMPAR para voltar ao modo aguardando.";
-}
-
 
   function renderTorneio() {
     const data = torneioState || {};
     if (!data.active) {
       if (el.tName) el.tName.textContent = "Torneio";
-      if (el.tSub) el.tSub.textContent = "Nenhum torneio ativo…";
+      if (el.tSub) el.tSub.textContent = "Aguardando…";
       if (el.tBadge) el.tBadge.textContent = "—";
       if (el.tTeams) el.tTeams.innerHTML = "";
       if (el.tAlive) el.tAlive.innerHTML = `<div class="mini">—</div>`;
@@ -297,7 +268,7 @@
       teamsAll = teamsAll.filter((t) => String(t?.key || "") === winnerKey);
     }
 
-    const teamsShown = teamsAll.slice(0, MAX_TEAMS_SHOW);
+    const teamsShown = teamsAll.slice(0, TORNEIO_TEAMS_MAX);
     const teamsHidden = Math.max(0, teamsAll.length - teamsShown.length);
 
     if (el.tName) el.tName.textContent = tor.name || "Torneio";
@@ -308,39 +279,17 @@
     }
 
     if (el.tSub) {
-      if (status === "ABERTA") el.tSub.textContent = "Fase ativa — entradas abertas!";
-      else if (status === "FECHADA") el.tSub.textContent = "Fase fechada — aguardando decisão…";
-      else if (status === "DECIDIDA") el.tSub.textContent = "Vencedor decidido!";
-      else el.tSub.textContent = "Torneio ativo.";
+      if (status === "ABERTA") el.tSub.textContent = "Fase ativa";
+      else if (status === "FECHADA") el.tSub.textContent = "Fase fechada";
+      else if (status === "DECIDIDA") el.tSub.textContent = "Vencedor decidido";
+      else el.tSub.textContent = "Torneio ativo";
     }
-
-    const listsByKey = ph.listsByKey || ph.lists || {};
-
-    if (teamsShown.length) {
-      for (const t of teamsShown) {
-        const k = String(t.key || "");
-        const arr = Array.isArray(listsByKey?.[k]) ? listsByKey[k] : [];
-        for (const u of arr.slice(0, 12)) {
-          const userKey = normalizeUserKey(u?.twitchName || u?.displayName || u?.name || "");
-          if (!userKey) continue;
-          pushFeed(k, userKey, String(u?.displayName || u?.twitchName || u?.name || "—"));
-        }
-      }
-    }
-
-    cleanupFeed();
 
     if (el.tTeams) {
       const htmlTeams = teamsShown.map((t) => {
-        const k = String(t.key || "");
-        const name = String(t.name || k || "Time");
+        const name = String(t.name || t.key || "Time");
         const count = Number(t.count || 0) | 0;
         const valor = Number(t.points || 0) | 0;
-
-        const feed = (feedByTeam.get(k) || []).slice(0, FEED_MAX);
-        const feedHtml = feed.length
-          ? feed.map((x) => `<div class="tr-pill">${esc(x.displayName)}</div>`).join("")
-          : `<div class="mini">—</div>`;
 
         return `
           <div class="tr-team">
@@ -348,7 +297,6 @@
               <div class="tr-name">${esc(name)}</div>
               <div class="tr-meta">${count} entradas<br>${valor} valor</div>
             </div>
-            <div class="tr-feed">${feedHtml}</div>
           </div>
         `;
       }).join("");
@@ -361,7 +309,7 @@
     if (el.tAliveCount) el.tAliveCount.textContent = String(aliveCount);
 
     const alive = Array.isArray(ph.alivePreview) ? ph.alivePreview : [];
-    const aliveShown = alive.slice(0, MAX_ALIVE_SHOW);
+    const aliveShown = alive.slice(0, ALIVE_MAX);
     const aliveHidden = Math.max(0, aliveCount - aliveShown.length);
 
     if (el.tAlive) {
@@ -389,7 +337,7 @@
 
   async function tickTorneio() {
     try {
-      const url = `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}&include=lists,alive&listsLimit=60&aliveLimit=24`;
+      const url = `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}&include=alive&aliveLimit=${ALIVE_MAX}`;
       torneioState = await fetchJSON(url);
     } catch {
       torneioState = torneioState || { active: false };
@@ -401,7 +349,9 @@
   async function tickPalpiteOnce() {
     try {
       const url = `${API}/api/palpite/state-public?key=${encodeURIComponent(KEY)}`;
-      palpiteState = await fetchJSON(url);
+      const st = await fetchJSON(url);
+      palpiteState = st?.roundId ? st : null;
+      if (palpiteState?.roundId) palpiteCleared = false;
     } catch {}
     applyMode();
     if (modeNow === "palpite") renderPalpite();
@@ -415,22 +365,28 @@
       es = new EventSource(url);
 
       const onState = (raw) => {
-  let st = null;
-  try { st = JSON.parse(raw || "{}"); } catch { st = null; }
-  if (!st) return;
+        let st = null;
+        try { st = JSON.parse(raw || "{}"); } catch { st = null; }
+        if (!st) return;
 
-  if (st.roundId) palpiteCleared = false;
+        palpiteState = st?.roundId ? st : null;
+        if (palpiteState?.roundId) palpiteCleared = false;
 
-  palpiteState = st;
-  applyMode();
-  if (modeNow === "palpite") renderPalpite();
-};
+        applyMode();
+        if (modeNow === "palpite") renderPalpite();
+      };
 
       es.addEventListener("palpite-init", (e) => onState(e.data));
       es.addEventListener("palpite-open", (e) => onState(e.data));
       es.addEventListener("palpite-close", (e) => onState(e.data));
-      es.addEventListener("palpite-clear", (e) => onState(e.data));
       es.addEventListener("palpite-winners", (e) => onState(e.data));
+
+      es.addEventListener("palpite-clear", () => {
+        palpiteCleared = true;
+        palpiteState = null;
+        applyMode();
+        if (modeNow === "idle") setView("idle");
+      });
 
       es.addEventListener("palpite-guess", (e) => {
         let payload = null;
@@ -440,7 +396,9 @@
         const entry = payload.entry || {};
         const withTs = { ...entry, __ts: nowMs() };
 
-        const cur = Array.isArray(palpiteState?.entries) ? palpiteState.entries : [];
+        if (!palpiteState) return;
+
+        const cur = Array.isArray(palpiteState.entries) ? palpiteState.entries : [];
         const userKey = normalizeUserKey(withTs.user || withTs.user_name || "");
         const next = userKey ? cur.filter((x) => normalizeUserKey(x?.user || x?.user_name) !== userKey) : cur;
         const merged = [withTs, ...next].slice(0, 500);
@@ -454,14 +412,6 @@
         applyMode();
         if (modeNow === "palpite") renderPalpite();
       });
-
-      es.addEventListener("palpite-clear", () => {
-  palpiteCleared = true;
-  palpiteState = null;
-  applyMode();
-  if (modeNow === "idle") setView("idle");
-});
-
 
       es.onerror = () => {
         try { es.close(); } catch {}
@@ -487,9 +437,8 @@
       });
     }
 
-    cleanupFeed();
+    applyMode();
     if (modeNow === "palpite") renderPalpite();
     if (modeNow === "torneio") renderTorneio();
-    applyMode();
   }, 1000);
 })();
