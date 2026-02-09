@@ -330,9 +330,9 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           { name: 'Canal', value: channelText, inline: true },
           { name: 'Ticket ID', value: ticketId ? `\`${ticketId}\`` : '—', inline: false }
         )
-        .setFooter({ text: `⏱ ${new Date().toLocaleString('pt-BR')} • <t:${ts}:R>` })
 
-        
+        .setTimestamp(new Date())
+
 
       if (submissionId) {
         embed.addFields({ name: 'Submission ID', value: `\`${submissionId}\``, inline: true });
