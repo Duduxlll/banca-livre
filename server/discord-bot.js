@@ -330,8 +330,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           { name: 'Canal', value: channelText, inline: true },
           { name: 'Ticket ID', value: ticketId ? `\`${ticketId}\`` : '—', inline: false }
         )
-        .setFooter({ text: `⏱ ${new Date().toLocaleString('pt-BR')} • <t:${ts}:R>` })
-        .setTimestamp(new Date());
+        const br = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' });
+const today = br.format(new Date());
+const when = (event?.dateBR === today) ? 'Hoje' : 'Ontem';
+
+embed.setFooter({ text: when });
+
+        
 
       if (submissionId) {
         embed.addFields({ name: 'Submission ID', value: `\`${submissionId}\``, inline: true });
