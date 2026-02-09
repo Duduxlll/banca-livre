@@ -7,13 +7,6 @@
     return (u.searchParams.get("key") || "").trim();
   })();
 
-  const LIMITS = {
-    palpiteLast: 6,
-    torneioTeams: 5,
-    teamFeed: 6,
-    aliveMax: 18
-  };
-
   const esc = (s = "") =>
     String(s).replace(/[&<>"']/g, (m) => ({
       "&": "&amp;",
@@ -81,13 +74,47 @@
   let torneioState = null;
   let modeNow = "idle";
 
+  const FEED_TTL = 60_000;
+  const FEED_MAX = 6;
+  const MAX_TEAMS_SHOW = 6;
+  const MAX_ALIVE_SHOW = 18;
+
+  const PALPITE_SHOW_MAX = 3;
+  const PALPITE_TTL_MS = 2 * 60 * 1000;
+
   const seenUserTeam = new Map();
   const feedByTeam = new Map();
-  const FEED_TTL = 60_000;
-  const FEED_MAX = LIMITS.teamFeed;
+
+  function nowMs() {
+    return Date.now();
+  }
+
+  function getTsFromEntry(e) {
+    const t =
+      e?.updatedAt ??
+      e?.createdAt ??
+      e?.updated_at ??
+      e?.created_at ??
+      e?._ts ??
+      e?.__ts;
+
+    if (!t) return null;
+
+    if (typeof t === "number" && Number.isFinite(t)) return t;
+
+    const ms = Date.parse(String(t));
+    return Number.isFinite(ms) ? ms : null;
+  }
+
+  function normalizeUserKey(v) {
+    return String(v || "")
+      .trim()
+      .replace(/^@+/, "")
+      .toLowerCase();
+  }
 
   function pushFeed(teamKey, userKey, displayName) {
-    const now = Date.now();
+    const ts = nowMs();
 
     const prevTeam = seenUserTeam.get(userKey);
     if (prevTeam && prevTeam !== teamKey) {
@@ -99,20 +126,31 @@
     const arr = feedByTeam.get(teamKey) || [];
     if (arr.some((x) => x.userKey === userKey)) return;
 
-    arr.unshift({ userKey, displayName, ts: now });
+    arr.unshift({ userKey, displayName, ts });
     feedByTeam.set(teamKey, arr.slice(0, FEED_MAX));
   }
 
   function cleanupFeed() {
-    const now = Date.now();
+    const ts = nowMs();
     for (const [k, arr] of feedByTeam.entries()) {
-      feedByTeam.set(k, (arr || []).filter((x) => (now - x.ts) < FEED_TTL));
+      feedByTeam.set(k, (arr || []).filter((x) => (ts - x.ts) < FEED_TTL));
     }
+  }
+
+  function palpiteHasResult(st) {
+    const winners = Array.isArray(st?.winners) ? st.winners : [];
+    return winners.length > 0 && st?.actualResultCents != null;
+  }
+
+  function palpiteShouldShow(st) {
+    if (!st?.roundId) return false;
+    if (st?.isOpen) return true;
+    return palpiteHasResult(st);
   }
 
   function pickMode() {
     if (torneioState?.active) return "torneio";
-    if (palpiteState?.roundId) return "palpite";
+    if (palpiteShouldShow(palpiteState)) return "palpite";
     return "idle";
   }
 
@@ -124,18 +162,29 @@
     }
   }
 
-  function setPalpiteStatus(open) {
+  function setPalpiteStatus(open, show) {
     if (!el.pStatus) return;
+    if (!show) {
+      el.pStatus.style.display = "none";
+      return;
+    }
+    el.pStatus.style.display = "";
     el.pStatus.textContent = open ? "ABERTO" : "FECHADO";
     el.pStatus.classList.toggle("ov-status--open", !!open);
     el.pStatus.classList.toggle("ov-status--closed", !open);
   }
 
+  function showPalpitePanel(which) {
+    if (el.pPanelWinners) el.pPanelWinners.style.display = which === "winners" ? "" : "none";
+    if (el.pPanelLast) el.pPanelLast.style.display = which === "last" ? "" : "none";
+    if (el.pPanelInfo) el.pPanelInfo.style.display = which === "info" ? "" : "none";
+  }
+
   function renderPalpiteWinners(st) {
     const winners = Array.isArray(st.winners) ? st.winners : [];
-    const hasW = winners.length > 0 && st.actualResultCents != null;
+    const hasW = palpiteHasResult(st);
 
-    if (el.pRotateTitle) el.pRotateTitle.textContent = "🏆 Top 3";
+    if (el.pRotateTitle) el.pRotateTitle.textContent = `🏆 Top ${Math.min(3, winners.length || 3)}`;
     if (el.pRotateHint) {
       el.pRotateHint.textContent = hasW ? `Resultado: ${fmtBRL(st.actualResultCents)}` : "Aguardando resultado…";
     }
@@ -143,7 +192,7 @@
     if (!el.pWinners) return;
 
     if (!hasW) {
-      el.pWinners.innerHTML = `<div class="mini">Sem vencedores ainda.</div>`;
+      el.pWinners.innerHTML = `<div class="mini">Aguardando resultado…</div>`;
       return;
     }
 
@@ -161,22 +210,30 @@
 
   function renderPalpiteLast(st) {
     const entries = Array.isArray(st.entries) ? st.entries : [];
-    const shown = entries.slice(0, LIMITS.palpiteLast);
-    const hidden = Math.max(0, entries.length - shown.length);
+    const tsNow = nowMs();
+
+    const cleaned = entries
+      .map((e) => {
+        const ts = getTsFromEntry(e) ?? tsNow;
+        return { ...e, __ts: ts };
+      })
+      .filter((e) => (tsNow - (e.__ts || tsNow)) < PALPITE_TTL_MS);
+
+    const last = cleaned.slice(0, PALPITE_SHOW_MAX);
 
     if (el.pRotateTitle) el.pRotateTitle.textContent = "🔥 Últimos palpites";
-    if (el.pRotateHint) el.pRotateHint.textContent = shown.length ? "Ao vivo" : "—";
+    if (el.pRotateHint) el.pRotateHint.textContent = last.length ? "Ao vivo" : "—";
 
     if (!el.pLast) return;
 
-    if (!shown.length) {
+    if (!last.length) {
       el.pLast.innerHTML = `<div class="mini">—</div>`;
       return;
     }
 
-    const listHtml = shown.map((e) => {
-      const nm = e?.user ?? "—";
-      const cents = Number(e?.guessCents || 0);
+    el.pLast.innerHTML = last.map((e) => {
+      const nm = e?.user ?? e?.user_name ?? "—";
+      const cents = Number(e?.guessCents ?? e?.guess_cents ?? 0);
       return `
         <div class="ov-row">
           <span class="nm">${esc(nm)}</span>
@@ -184,70 +241,38 @@
         </div>
       `;
     }).join("");
-
-    const moreHtml = hidden > 0 ? `<div class="mini">+${hidden} palpites</div>` : "";
-
-    el.pLast.innerHTML = listHtml + moreHtml;
-  }
-
-  function renderPalpiteInfo(st) {
-    const open = !!st.isOpen;
-    if (el.pRotateTitle) el.pRotateTitle.textContent = "⌨️ Status";
-    if (el.pRotateHint) el.pRotateHint.textContent = open ? "Rodada aberta" : "Rodada fechada";
-
-    if (!el.pInfoText) return;
-
-    if (!st.roundId) {
-      el.pInfoText.textContent = "Nenhuma rodada ativa no momento.";
-    } else if (open) {
-      el.pInfoText.textContent = "Envie seu valor no chat. Um palpite por pessoa (atualiza se mandar de novo).";
-    } else {
-      el.pInfoText.textContent = "A rodada está fechada. Aguarde abrir ou o resultado.";
-    }
-  }
-
-  let palpiteRotateIdx = 0;
-
-  function showPalpitePanel(which) {
-    if (el.pPanelWinners) el.pPanelWinners.style.display = which === "winners" ? "" : "none";
-    if (el.pPanelLast) el.pPanelLast.style.display = which === "last" ? "" : "none";
-    if (el.pPanelInfo) el.pPanelInfo.style.display = which === "info" ? "" : "none";
   }
 
   function renderPalpite() {
     const st = palpiteState || {};
-    setPalpiteStatus(!!st.isOpen);
 
     if (el.pBuy) el.pBuy.textContent = st.buyValueCents ? fmtBRL(st.buyValueCents) : "—";
     if (el.pTotal) el.pTotal.textContent = String(st.total ?? 0);
 
-    if (!st.roundId) {
-      if (el.pSub) el.pSub.textContent = "Nenhuma rodada ativa…";
-    } else if (st.isOpen) {
+    if (st.isOpen) {
+      setPalpiteStatus(true, true);
       if (el.pSub) el.pSub.textContent = "Rodada aberta — mande o valor no chat!";
-    } else {
-      if (el.pSub) el.pSub.textContent = "Rodada fechada — aguardando…";
-    }
-
-    const hasW = Array.isArray(st.winners) && st.winners.length > 0 && st.actualResultCents != null;
-    const seq = hasW ? ["winners", "last", "info"] : ["last", "info", "winners"];
-    const current = seq[palpiteRotateIdx % seq.length];
-
-    if (current === "winners") {
-      showPalpitePanel("winners");
-      renderPalpiteWinners(st);
-    } else if (current === "last") {
       showPalpitePanel("last");
       renderPalpiteLast(st);
-    } else {
-      showPalpitePanel("info");
-      renderPalpiteInfo(st);
+      return;
     }
+
+    const hasW = palpiteHasResult(st);
+    setPalpiteStatus(false, false);
+
+    if (hasW) {
+      if (el.pSub) el.pSub.textContent = "Rodada fechada — resultado!";
+      showPalpitePanel("winners");
+      renderPalpiteWinners(st);
+      return;
+    }
+
+    setView("idle");
+    modeNow = "idle";
   }
 
   function renderTorneio() {
     const data = torneioState || {};
-
     if (!data.active) {
       if (el.tName) el.tName.textContent = "Torneio";
       if (el.tSub) el.tSub.textContent = "Nenhum torneio ativo…";
@@ -260,11 +285,17 @@
 
     const tor = data.torneio || {};
     const ph = data.phase || {};
-    const teamsAll = Array.isArray(ph.teamsList) ? ph.teamsList : [];
     const status = String(ph.status || "").trim();
+    const winnerKey = String(ph.winnerTeam || ph.winner || "").trim();
 
-    const teams = teamsAll.slice(0, LIMITS.torneioTeams);
-    const teamsHidden = Math.max(0, teamsAll.length - teams.length);
+    let teamsAll = Array.isArray(ph.teamsList) ? ph.teamsList : [];
+
+    if (status === "DECIDIDA" && winnerKey) {
+      teamsAll = teamsAll.filter((t) => String(t?.key || "") === winnerKey);
+    }
+
+    const teamsShown = teamsAll.slice(0, MAX_TEAMS_SHOW);
+    const teamsHidden = Math.max(0, teamsAll.length - teamsShown.length);
 
     if (el.tName) el.tName.textContent = tor.name || "Torneio";
 
@@ -274,22 +305,22 @@
     }
 
     if (el.tSub) {
-      if (status === "ABERTA") el.tSub.textContent = "Primeira fase ativa — entradas abertas!";
-      else if (status === "FECHADA") el.tSub.textContent = "Primeira fase fechada — aguardando decisão…";
-      else if (status === "DECIDIDA") el.tSub.textContent = "Fase decidida — aguardando próxima fase…";
+      if (status === "ABERTA") el.tSub.textContent = "Fase ativa — entradas abertas!";
+      else if (status === "FECHADA") el.tSub.textContent = "Fase fechada — aguardando decisão…";
+      else if (status === "DECIDIDA") el.tSub.textContent = "Vencedor decidido!";
       else el.tSub.textContent = "Torneio ativo.";
     }
 
-    const listsByKey = ph.listsByKey || {};
+    const listsByKey = ph.listsByKey || ph.lists || {};
 
-    if (teams.length) {
-      for (const t of teams) {
+    if (teamsShown.length) {
+      for (const t of teamsShown) {
         const k = String(t.key || "");
-        const arr = Array.isArray(listsByKey[k]) ? listsByKey[k] : [];
-        for (const u of arr.slice(0, 10)) {
-          const userKey = String(u?.twitchName || u?.displayName || "").toLowerCase();
+        const arr = Array.isArray(listsByKey?.[k]) ? listsByKey[k] : [];
+        for (const u of arr.slice(0, 12)) {
+          const userKey = normalizeUserKey(u?.twitchName || u?.displayName || u?.name || "");
           if (!userKey) continue;
-          pushFeed(k, userKey, String(u?.displayName || u?.twitchName || "—"));
+          pushFeed(k, userKey, String(u?.displayName || u?.twitchName || u?.name || "—"));
         }
       }
     }
@@ -297,13 +328,13 @@
     cleanupFeed();
 
     if (el.tTeams) {
-      const teamsHtml = teams.map((t) => {
+      const htmlTeams = teamsShown.map((t) => {
         const k = String(t.key || "");
         const name = String(t.name || k || "Time");
         const count = Number(t.count || 0) | 0;
-        const pts = Number(t.points || 0) | 0;
-        const feed = (feedByTeam.get(k) || []).slice(0, FEED_MAX);
+        const valor = Number(t.points || 0) | 0;
 
+        const feed = (feedByTeam.get(k) || []).slice(0, FEED_MAX);
         const feedHtml = feed.length
           ? feed.map((x) => `<div class="tr-pill">${esc(x.displayName)}</div>`).join("")
           : `<div class="mini">—</div>`;
@@ -312,7 +343,7 @@
           <div class="tr-team">
             <div class="tr-top">
               <div class="tr-name">${esc(name)}</div>
-              <div class="tr-meta">${count} entradas<br>${pts} pts</div>
+              <div class="tr-meta">${count} entradas<br>${valor} valor</div>
             </div>
             <div class="tr-feed">${feedHtml}</div>
           </div>
@@ -320,15 +351,14 @@
       }).join("");
 
       const moreTeamsHtml = teamsHidden > 0 ? `<div class="mini">+${teamsHidden} times</div>` : "";
-
-      el.tTeams.innerHTML = teamsHtml + moreTeamsHtml;
+      el.tTeams.innerHTML = htmlTeams + moreTeamsHtml;
     }
 
     const aliveCount = Number(ph.aliveCount || 0) | 0;
     if (el.tAliveCount) el.tAliveCount.textContent = String(aliveCount);
 
     const alive = Array.isArray(ph.alivePreview) ? ph.alivePreview : [];
-    const aliveShown = alive.slice(0, LIMITS.aliveMax);
+    const aliveShown = alive.slice(0, MAX_ALIVE_SHOW);
     const aliveHidden = Math.max(0, aliveCount - aliveShown.length);
 
     if (el.tAlive) {
@@ -341,7 +371,6 @@
         }).join("");
 
         const moreHtml = aliveHidden > 0 ? `<div class="mini">+${aliveHidden} classificados</div>` : "";
-
         el.tAlive.innerHTML = listHtml + moreHtml;
       }
     }
@@ -357,9 +386,7 @@
 
   async function tickTorneio() {
     try {
-      const url =
-        `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}` +
-        `&include=lists,alive&listsLimit=36&aliveLimit=${LIMITS.aliveMax}`;
+      const url = `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}&include=lists,alive&listsLimit=60&aliveLimit=24`;
       torneioState = await fetchJSON(url);
     } catch {
       torneioState = torneioState || { active: false };
@@ -403,16 +430,19 @@
         let payload = null;
         try { payload = JSON.parse(e.data || "{}"); } catch {}
         if (!payload?.entry) return;
-        if (!palpiteState) return;
 
-        const entry = payload.entry;
-        const cur = Array.isArray(palpiteState.entries) ? palpiteState.entries : [];
-        const next = [entry, ...cur].slice(0, 500);
+        const entry = payload.entry || {};
+        const withTs = { ...entry, __ts: nowMs() };
+
+        const cur = Array.isArray(palpiteState?.entries) ? palpiteState.entries : [];
+        const userKey = normalizeUserKey(withTs.user || withTs.user_name || "");
+        const next = userKey ? cur.filter((x) => normalizeUserKey(x?.user || x?.user_name) !== userKey) : cur;
+        const merged = [withTs, ...next].slice(0, 500);
 
         palpiteState = {
-          ...palpiteState,
-          total: payload.total ?? palpiteState.total,
-          entries: next
+          ...(palpiteState || {}),
+          total: payload.total ?? palpiteState?.total,
+          entries: merged
         };
 
         applyMode();
@@ -434,14 +464,18 @@
   setInterval(tickTorneio, 1500);
 
   setInterval(() => {
-    if (modeNow === "palpite") {
-      palpiteRotateIdx++;
-      renderPalpite();
-    }
-  }, 6500);
+    const tsNow = nowMs();
 
-  setInterval(() => {
+    if (palpiteState?.isOpen && Array.isArray(palpiteState.entries)) {
+      palpiteState.entries = palpiteState.entries.filter((e) => {
+        const ts = getTsFromEntry(e) ?? tsNow;
+        return (tsNow - ts) < PALPITE_TTL_MS;
+      });
+    }
+
     cleanupFeed();
+    if (modeNow === "palpite") renderPalpite();
     if (modeNow === "torneio") renderTorneio();
+    applyMode();
   }, 1000);
 })();
