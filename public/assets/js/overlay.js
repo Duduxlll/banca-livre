@@ -58,11 +58,14 @@
     el.err.innerHTML = esc(msg);
   }
 
-  function setView(mode) {
-    if (el.idle) el.idle.style.display = mode === "idle" ? "" : "none";
-    if (el.palpite) el.palpite.style.display = mode === "palpite" ? "" : "none";
-    if (el.torneio) el.torneio.style.display = mode === "torneio" ? "" : "none";
-  }
+  function setView(mode){
+  if (el.idle) el.idle.style.display = mode === "idle" ? "" : "none";
+  if (el.palpite) el.palpite.style.display = mode === "palpite" ? "" : "none";
+  if (el.torneio) el.torneio.style.display = mode === "torneio" ? "" : "none";
+
+  document.documentElement.dataset.ovMode = mode; 
+}
+
 
   if (!KEY) {
     showError("Faltou a key na URL. Use: /overlay.html?key=SUA_OVERLAY_PUBLIC_KEY");

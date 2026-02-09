@@ -19,15 +19,29 @@ html,body{
 }
 
 .ov-body{ background: transparent; }
+
 .ov-wrap{
   position: fixed;
   left: 20px;
   top: 20px;
   width: 560px;
   max-width: calc(100vw - 40px);
+  transform: none;
 }
 
+/* Centraliza (vertical) PALPITE e AGUARDANDO */
+html[data-ov-mode="palpite"] .ov-wrap,
+html[data-ov-mode="idle"] .ov-wrap{
+  top: 50%;
+  transform: translateY(-50%);
+}
 
+/* Torneio continua no topo/esquerda */
+html[data-ov-mode="torneio"] .ov-wrap{
+  top: 20px;
+  left: 20px;
+  transform: none;
+}
 
 .ov-card{
   border:1px solid var(--line);
