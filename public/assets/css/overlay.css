@@ -346,31 +346,33 @@ html,body{
   font-weight: 850;
 }
 
-:root{
-  --ov-w: 1920px;
-  --ov-h: 1080px;
-}
-
 html, body{
+  width: 644px;
+  height: 500px;
   margin: 0;
-  padding: 0;
-  width: var(--ov-w);
-  height: var(--ov-h);
   overflow: hidden;
   background: transparent;
-}
-
-body{
-  position: relative;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;
 }
 
-#viewIdle,
-#viewPalpite,
-#viewTorneio{
+#app{
+  width: 644px;
+  height: 500px;
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+}
+
+#panel{
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.no-scroll{
   overflow: hidden;
 }
