@@ -345,3 +345,34 @@ html,body{
   color: var(--muted);
   font-weight: 850;
 }
+
+html, body{
+  width: 644px;
+  height: 500px;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+#app{
+  width: 644px;
+  height: 500px;
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+}
+
+#panel{
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.no-scroll{
+  overflow: hidden;
+}

@@ -1,20 +1,31 @@
-/* public/assets/js/overlay.js */
 (() => {
   const API = window.location.origin;
-  const qs = (s, r=document) => r.querySelector(s);
+  const qs = (s, r = document) => r.querySelector(s);
 
   const KEY = (() => {
     const u = new URL(window.location.href);
     return (u.searchParams.get("key") || "").trim();
   })();
 
-  const esc = (s="") => String(s).replace(/[&<>"']/g, (m) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  }[m]));
+  const LIMITS = {
+    palpiteLast: 6,
+    torneioTeams: 5,
+    teamFeed: 6,
+    aliveMax: 18
+  };
+
+  const esc = (s = "") =>
+    String(s).replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[m]);
 
   const fmtBRL = (cents) => {
     const n = Number(cents || 0);
-    return (n / 100).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+    return (n / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
   const el = {
@@ -48,13 +59,13 @@
     tAliveCount: qs("#tAliveCount")
   };
 
-  function showError(msg){
+  function showError(msg) {
     if (!el.err) return;
     el.err.style.display = "block";
     el.err.innerHTML = esc(msg);
   }
 
-  function setView(mode){
+  function setView(mode) {
     if (el.idle) el.idle.style.display = mode === "idle" ? "" : "none";
     if (el.palpite) el.palpite.style.display = mode === "palpite" ? "" : "none";
     if (el.torneio) el.torneio.style.display = mode === "torneio" ? "" : "none";
@@ -73,38 +84,39 @@
   const seenUserTeam = new Map();
   const feedByTeam = new Map();
   const FEED_TTL = 60_000;
-  const FEED_MAX = 10;
+  const FEED_MAX = LIMITS.teamFeed;
 
-  function pushFeed(teamKey, userKey, displayName){
+  function pushFeed(teamKey, userKey, displayName) {
     const now = Date.now();
+
     const prevTeam = seenUserTeam.get(userKey);
     if (prevTeam && prevTeam !== teamKey) {
       const arrPrev = feedByTeam.get(prevTeam) || [];
-      feedByTeam.set(prevTeam, arrPrev.filter(x => x.userKey !== userKey));
+      feedByTeam.set(prevTeam, arrPrev.filter((x) => x.userKey !== userKey));
     }
     seenUserTeam.set(userKey, teamKey);
 
     const arr = feedByTeam.get(teamKey) || [];
-    if (arr.some(x => x.userKey === userKey)) return;
+    if (arr.some((x) => x.userKey === userKey)) return;
 
     arr.unshift({ userKey, displayName, ts: now });
     feedByTeam.set(teamKey, arr.slice(0, FEED_MAX));
   }
 
-  function cleanupFeed(){
+  function cleanupFeed() {
     const now = Date.now();
     for (const [k, arr] of feedByTeam.entries()) {
-      feedByTeam.set(k, (arr || []).filter(x => (now - x.ts) < FEED_TTL));
+      feedByTeam.set(k, (arr || []).filter((x) => (now - x.ts) < FEED_TTL));
     }
   }
 
-  function pickMode(){
+  function pickMode() {
     if (torneioState?.active) return "torneio";
     if (palpiteState?.roundId) return "palpite";
     return "idle";
   }
 
-  function applyMode(){
+  function applyMode() {
     const m = pickMode();
     if (m !== modeNow) {
       modeNow = m;
@@ -112,14 +124,14 @@
     }
   }
 
-  function setPalpiteStatus(open){
+  function setPalpiteStatus(open) {
     if (!el.pStatus) return;
     el.pStatus.textContent = open ? "ABERTO" : "FECHADO";
     el.pStatus.classList.toggle("ov-status--open", !!open);
     el.pStatus.classList.toggle("ov-status--closed", !open);
   }
 
-  function renderPalpiteWinners(st){
+  function renderPalpiteWinners(st) {
     const winners = Array.isArray(st.winners) ? st.winners : [];
     const hasW = winners.length > 0 && st.actualResultCents != null;
 
@@ -128,74 +140,81 @@
       el.pRotateHint.textContent = hasW ? `Resultado: ${fmtBRL(st.actualResultCents)}` : "Aguardando resultado…";
     }
 
-    if (el.pWinners) {
-      if (!hasW) {
-        el.pWinners.innerHTML = `<div class="mini">Sem vencedores ainda.</div>`;
-      } else {
-        el.pWinners.innerHTML = winners.slice(0, 3).map((w, i) => {
-          const nm = w?.name ?? w?.user ?? "—";
-          const val = w?.valueCents != null ? fmtBRL(w.valueCents) : "—";
-          return `
-            <div class="ov-win">
-              <div class="nm">#${i+1} ${esc(nm)}</div>
-              <div class="vl">${esc(val)}</div>
-            </div>
-          `;
-        }).join("");
-      }
+    if (!el.pWinners) return;
+
+    if (!hasW) {
+      el.pWinners.innerHTML = `<div class="mini">Sem vencedores ainda.</div>`;
+      return;
     }
+
+    el.pWinners.innerHTML = winners.slice(0, 3).map((w, i) => {
+      const nm = w?.name ?? w?.user ?? "—";
+      const val = w?.valueCents != null ? fmtBRL(w.valueCents) : "—";
+      return `
+        <div class="ov-win">
+          <div class="nm">#${i + 1} ${esc(nm)}</div>
+          <div class="vl">${esc(val)}</div>
+        </div>
+      `;
+    }).join("");
   }
 
-  function renderPalpiteLast(st){
+  function renderPalpiteLast(st) {
     const entries = Array.isArray(st.entries) ? st.entries : [];
-    const last = entries.slice(0, 10);
+    const shown = entries.slice(0, LIMITS.palpiteLast);
+    const hidden = Math.max(0, entries.length - shown.length);
 
     if (el.pRotateTitle) el.pRotateTitle.textContent = "🔥 Últimos palpites";
-    if (el.pRotateHint) el.pRotateHint.textContent = last.length ? "Ao vivo" : "—";
+    if (el.pRotateHint) el.pRotateHint.textContent = shown.length ? "Ao vivo" : "—";
 
-    if (el.pLast) {
-      if (!last.length) {
-        el.pLast.innerHTML = `<div class="mini">—</div>`;
-      } else {
-        el.pLast.innerHTML = last.map((e) => {
-          const nm = e?.user ?? "—";
-          const cents = Number(e?.guessCents || 0);
-          return `
-            <div class="ov-row">
-              <span class="nm">${esc(nm)}</span>
-              <span class="vl">${esc(fmtBRL(cents))}</span>
-            </div>
-          `;
-        }).join("");
-      }
+    if (!el.pLast) return;
+
+    if (!shown.length) {
+      el.pLast.innerHTML = `<div class="mini">—</div>`;
+      return;
     }
+
+    const listHtml = shown.map((e) => {
+      const nm = e?.user ?? "—";
+      const cents = Number(e?.guessCents || 0);
+      return `
+        <div class="ov-row">
+          <span class="nm">${esc(nm)}</span>
+          <span class="vl">${esc(fmtBRL(cents))}</span>
+        </div>
+      `;
+    }).join("");
+
+    const moreHtml = hidden > 0 ? `<div class="mini">+${hidden} palpites</div>` : "";
+
+    el.pLast.innerHTML = listHtml + moreHtml;
   }
 
-  function renderPalpiteInfo(st){
+  function renderPalpiteInfo(st) {
     const open = !!st.isOpen;
     if (el.pRotateTitle) el.pRotateTitle.textContent = "⌨️ Status";
     if (el.pRotateHint) el.pRotateHint.textContent = open ? "Rodada aberta" : "Rodada fechada";
 
-    if (el.pInfoText) {
-      if (!st.roundId) {
-        el.pInfoText.textContent = "Nenhuma rodada ativa no momento.";
-      } else if (open) {
-        el.pInfoText.textContent = "Envie seu valor no chat. Um palpite por pessoa (atualiza se mandar de novo).";
-      } else {
-        el.pInfoText.textContent = "A rodada está fechada. Aguarde abrir ou o resultado.";
-      }
+    if (!el.pInfoText) return;
+
+    if (!st.roundId) {
+      el.pInfoText.textContent = "Nenhuma rodada ativa no momento.";
+    } else if (open) {
+      el.pInfoText.textContent = "Envie seu valor no chat. Um palpite por pessoa (atualiza se mandar de novo).";
+    } else {
+      el.pInfoText.textContent = "A rodada está fechada. Aguarde abrir ou o resultado.";
     }
   }
 
   let palpiteRotateIdx = 0;
 
-  function showPalpitePanel(which){
+  function showPalpitePanel(which) {
     if (el.pPanelWinners) el.pPanelWinners.style.display = which === "winners" ? "" : "none";
     if (el.pPanelLast) el.pPanelLast.style.display = which === "last" ? "" : "none";
     if (el.pPanelInfo) el.pPanelInfo.style.display = which === "info" ? "" : "none";
   }
 
-  function renderPalpite(){
+  function renderPalpite() {
     const st = palpiteState || {};
     setPalpiteStatus(!!st.isOpen);
 
@@ -211,7 +230,7 @@
     }
 
     const hasW = Array.isArray(st.winners) && st.winners.length > 0 && st.actualResultCents != null;
-    const seq = hasW ? ["winners","last","info"] : ["last","info","winners"];
+    const seq = hasW ? ["winners", "last", "info"] : ["last", "info", "winners"];
     const current = seq[palpiteRotateIdx % seq.length];
 
     if (current === "winners") {
@@ -226,8 +245,9 @@
     }
   }
 
-  function renderTorneio(){
+  function renderTorneio() {
     const data = torneioState || {};
+
     if (!data.active) {
       if (el.tName) el.tName.textContent = "Torneio";
       if (el.tSub) el.tSub.textContent = "Nenhum torneio ativo…";
@@ -240,8 +260,11 @@
 
     const tor = data.torneio || {};
     const ph = data.phase || {};
-    const teams = Array.isArray(ph.teamsList) ? ph.teamsList : [];
+    const teamsAll = Array.isArray(ph.teamsList) ? ph.teamsList : [];
     const status = String(ph.status || "").trim();
+
+    const teams = teamsAll.slice(0, LIMITS.torneioTeams);
+    const teamsHidden = Math.max(0, teamsAll.length - teams.length);
 
     if (el.tName) el.tName.textContent = tor.name || "Torneio";
 
@@ -258,11 +281,12 @@
     }
 
     const listsByKey = ph.listsByKey || {};
+
     if (teams.length) {
       for (const t of teams) {
         const k = String(t.key || "");
         const arr = Array.isArray(listsByKey[k]) ? listsByKey[k] : [];
-        for (const u of arr.slice(0, 14)) {
+        for (const u of arr.slice(0, 10)) {
           const userKey = String(u?.twitchName || u?.displayName || "").toLowerCase();
           if (!userKey) continue;
           pushFeed(k, userKey, String(u?.displayName || u?.twitchName || "—"));
@@ -273,7 +297,7 @@
     cleanupFeed();
 
     if (el.tTeams) {
-      el.tTeams.innerHTML = teams.map((t) => {
+      const teamsHtml = teams.map((t) => {
         const k = String(t.key || "");
         const name = String(t.name || k || "Time");
         const count = Number(t.count || 0) | 0;
@@ -294,44 +318,57 @@
           </div>
         `;
       }).join("");
+
+      const moreTeamsHtml = teamsHidden > 0 ? `<div class="mini">+${teamsHidden} times</div>` : "";
+
+      el.tTeams.innerHTML = teamsHtml + moreTeamsHtml;
     }
 
     const aliveCount = Number(ph.aliveCount || 0) | 0;
     if (el.tAliveCount) el.tAliveCount.textContent = String(aliveCount);
 
     const alive = Array.isArray(ph.alivePreview) ? ph.alivePreview : [];
+    const aliveShown = alive.slice(0, LIMITS.aliveMax);
+    const aliveHidden = Math.max(0, aliveCount - aliveShown.length);
+
     if (el.tAlive) {
-      if (!alive.length) {
+      if (!aliveShown.length) {
         el.tAlive.innerHTML = `<div class="mini">—</div>`;
       } else {
-        el.tAlive.innerHTML = alive.slice(0, 80).map((u, i) => {
+        const listHtml = aliveShown.map((u, i) => {
           const nm = u?.name || u?.twitchName || "—";
-          return `<div class="alv"><span class="nm">#${i+1} ${esc(nm)}</span></div>`;
+          return `<div class="alv"><span class="nm">#${i + 1} ${esc(nm)}</span></div>`;
         }).join("");
+
+        const moreHtml = aliveHidden > 0 ? `<div class="mini">+${aliveHidden} classificados</div>` : "";
+
+        el.tAlive.innerHTML = listHtml + moreHtml;
       }
     }
   }
 
-  async function fetchJSON(url){
-    const r = await fetch(url, { method:"GET", headers:{ Accept:"application/json" }, cache:"no-store" });
+  async function fetchJSON(url) {
+    const r = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
     let data = null;
     try { data = await r.json(); } catch {}
     if (!r.ok) throw new Error(data?.error || `http_${r.status}`);
     return data;
   }
 
-  async function tickTorneio(){
+  async function tickTorneio() {
     try {
-      const url = `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}&include=lists,alive&listsLimit=60&aliveLimit=24`;
+      const url =
+        `${API}/api/torneio/state?key=${encodeURIComponent(KEY)}` +
+        `&include=lists,alive&listsLimit=36&aliveLimit=${LIMITS.aliveMax}`;
       torneioState = await fetchJSON(url);
     } catch {
-      torneioState = torneioState || { active:false };
+      torneioState = torneioState || { active: false };
     }
     applyMode();
     if (modeNow === "torneio") renderTorneio();
   }
 
-  async function tickPalpiteOnce(){
+  async function tickPalpiteOnce() {
     try {
       const url = `${API}/api/palpite/state-public?key=${encodeURIComponent(KEY)}`;
       palpiteState = await fetchJSON(url);
@@ -340,7 +377,7 @@
     if (modeNow === "palpite") renderPalpite();
   }
 
-  function startPalpiteSSE(){
+  function startPalpiteSSE() {
     const url = `${API}/api/palpite/stream?key=${encodeURIComponent(KEY)}`;
     let es = null;
 
