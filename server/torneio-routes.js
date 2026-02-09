@@ -450,7 +450,14 @@ function splitTwitchMessages(text, maxLen = 430) {
   return out.slice(0, 5);
 }
 
-export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin, sseSendAll, announce }) {
+export function registerTorneioRoutes({
+  app, q, uid,
+  requireAppKey,
+  requireOverlayKey,
+  requireAdmin,
+  sseSendAll,
+  announce
+})  {
   let ensured = false;
   async function ensureReady() {
     if (ensured) return;
@@ -473,7 +480,7 @@ export function registerTorneioRoutes({ app, q, uid, requireAppKey, requireAdmin
     legacyHeaders: false
   });
 
- app.get("/api/torneio/state", requireAppKey, async (req, res) => {
+ app.get("/api/torneio/state", requireOverlayKey, async (req, res) => {
   try {
     await ensureReady();
 

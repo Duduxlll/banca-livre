@@ -31,8 +31,6 @@ const {
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
-  APP_PUBLIC_KEY,
-  OVERLAY_PUBLIC_KEY,
   EFI_CLIENT_ID,
   EFI_CLIENT_SECRET,
   EFI_CERT_PATH,
@@ -44,6 +42,9 @@ const {
 } = process.env;
 
 const PROD = process.env.NODE_ENV === 'production';
+
+const APP_PUBLIC_KEY     = (process.env.APP_PUBLIC_KEY || "").trim();
+const OVERLAY_PUBLIC_KEY = (process.env.OVERLAY_PUBLIC_KEY || "").trim();
 
 ['ADMIN_USER','ADMIN_PASSWORD_HASH','JWT_SECRET'].forEach(k=>{
   if(!process.env[k]) {
@@ -276,12 +277,19 @@ function requireAppKey(req, res, next){
   next();
 }
 
-function requireOverlayPageKey(req, res, next){
-  if (!OVERLAY_PUBLIC_KEY) return res.status(403).send('overlay_off');
-  const k = String(req.query?.key || req.get('X-OVERLAY-KEY') || '');
-  if (!k || k !== OVERLAY_PUBLIC_KEY) return res.status(401).send('unauthorized');
-  next();
+function requireOverlayKey(req, res, next){
+  if (!OVERLAY_PUBLIC_KEY) {
+    return res.status(403).json({ error: "overlay_off" });
+  }
+
+  const key = String(req.query?.key || req.get("X-OVERLAY-KEY") || "").trim();
+  if (!key || key !== OVERLAY_PUBLIC_KEY) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  return next();
 }
+
+
 
 
 function parseMoneyToCents(v){
@@ -531,7 +539,7 @@ app.get('/api/stream', requireAuth, (req, res) => {
   });
 });
 
-app.get('/api/palpite/stream', requireAppKey, async (req, res) => {
+app.get("/api/palpite/stream", requireOverlayKey, async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -555,7 +563,7 @@ app.get('/api/palpite/stream', requireAppKey, async (req, res) => {
   });
 });
 
-app.get('/api/palpite/state-public', requireAppKey, async (req, res) => {
+app.get("/api/palpite/state-public", requireOverlayKey, async (req, res) => {
   const state = await palpiteStatePayload();
   res.json(state);
 });
@@ -900,10 +908,15 @@ app.post('/api/palpite/winners', requireAdmin, async (req, res) => {
   }
 });
 
-app.get(['/overlay', '/overlay.html'], requireOverlayPageKey, (req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  return res.sendFile(path.join(PRIVATE_ROOT, 'overlay.html'));
+app.get(["/overlay", "/overlay.html"], (req, res) => {
+  const key = String(req.query?.key || "").trim();
+  if (!OVERLAY_PUBLIC_KEY || key !== OVERLAY_PUBLIC_KEY) {
+    return res.status(401).send("Unauthorized");
+  }
+  return res.sendFile("overlay.html", { root: ROOT });
 });
+
+
 
 app.post('/api/auth/login', loginLimiter, async (req, res) => {
   try {
@@ -1267,10 +1280,9 @@ app.patch('/api/cashbacks/:id', requireAdmin, async (req, res) => {
 });
 
 registerTorneioRoutes({
-  app,
-  q,
-  uid,
+  app, q, uid,
   requireAppKey,
+  requireOverlayKey,
   requireAdmin,
   sseSendAll,
   announce: async (msg) => {
