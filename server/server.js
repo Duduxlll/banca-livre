@@ -909,12 +909,14 @@ app.post('/api/palpite/winners', requireAdmin, async (req, res) => {
 });
 
 app.get(["/overlay", "/overlay.html"], (req, res) => {
+  if (!OVERLAY_PUBLIC_KEY) return res.status(403).send("overlay_off");
+
   const key = String(req.query?.key || "").trim();
-  if (!OVERLAY_PUBLIC_KEY || key !== OVERLAY_PUBLIC_KEY) {
-    return res.status(401).send("Unauthorized");
-  }
-  return res.sendFile("overlay.html", { root: ROOT });
+  if (!key || key !== OVERLAY_PUBLIC_KEY) return res.status(401).send("unauthorized");
+
+  return res.sendFile(path.join(PRIVATE_ROOT, "overlay.html"));
 });
+
 
 
 
