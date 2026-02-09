@@ -213,6 +213,15 @@ async function tryUploadToCloudinary({ imageUrl, ticketId, onLog }) {
   }
 }
 
+function reasonLabel(reason) {
+  const r = String(reason || '').toLowerCase();
+  if (r === 'ok') return 'OK (finalizado)';
+  if (r === 'timeout') return 'Timeout (sem imagem)';
+  if (r === 'idle') return 'Inativo (sem continuar)';
+  if (r === 'auto') return 'Auto';
+  return reason ? String(reason) : '—';
+}
+
 export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const enabled = asBool(process.env.DISCORD_ENABLED, true);
   if (!enabled) {
@@ -233,7 +242,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
   const logChannelId = String(process.env.DISCORD_LOG_CHANNEL_ID || '').trim();
 
-  const autoCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_AUTO_CLOSE_MINUTES || '3', 10) || 3);
   const waitImageMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_WAIT_IMAGE_MINUTES || '5', 10) || 5);
   const deleteMin = Math.max(0, parseInt(process.env.DISCORD_TICKET_DELETE_MINUTES || '2', 10) || 2);
 
@@ -254,12 +262,89 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const waitTimers = new Map();
   const idleTimers = new Map();
 
-  async function logTicket(msg) {
+  async function logTicket(event) {
     if (!logChannelId) return;
+
     try {
       const ch = await client.channels.fetch(String(logChannelId)).catch(() => null);
       if (!ch || !ch.isTextBased()) return;
-      await ch.send({ content: String(msg).slice(0, 1800) }).catch(() => {});
+
+      const kind = String(event?.kind || '').toUpperCase();
+      const userId = String(event?.userId || '');
+      const channelId = String(event?.channelId || '');
+      const ticketId = String(event?.ticketId || '');
+      const submissionId = event?.submissionId ? String(event.submissionId) : '';
+      const reason = event?.reason ? String(event.reason) : '';
+      const ts = Math.floor(Date.now() / 1000);
+
+      const guild = await client.guilds.fetch(String(guildId)).catch(() => null);
+
+      let username = '';
+      try {
+        if (guild && userId) {
+          const m = await guild.members.fetch(userId).catch(() => null);
+          username = m?.user?.username ? String(m.user.username) : '';
+        }
+      } catch {}
+
+      let channelName = '';
+      try {
+        if (channelId) {
+          const c = await client.channels.fetch(channelId).catch(() => null);
+          channelName = c?.name ? String(c.name) : '';
+        }
+      } catch {}
+
+      const userLabel = username ? `@${username}` : '—';
+      const userText = userId ? `${userLabel} (\`${userId}\`)` : '—';
+      const channelText =
+        channelId
+          ? (channelName ? `#${channelName} (\`${channelId}\`)` : `\`${channelId}\``)
+          : '—';
+
+      let title = '📌 Log';
+      let color = 0x95a5a6;
+      let desc = '';
+
+      if (kind === 'OPEN') {
+        title = '🟢 Ticket aberto';
+        color = 0x2ecc71;
+        desc = 'Um novo ticket de depósito foi criado.';
+      } else if (kind === 'FINAL') {
+        title = '✅ Ticket finalizado';
+        color = 0x3498db;
+        desc = 'Print recebido e registrado no sistema (status **PENDENTE**).';
+      } else if (kind === 'CLOSE') {
+        title = '🔴 Ticket fechado';
+        const r = String(reason || '').toLowerCase();
+        color = (r === 'ok') ? 0xe74c3c : (r === 'timeout' ? 0xf39c12 : (r === 'idle' ? 0xf1c40f : 0xe67e22));
+        desc = `Encerrado: **${reasonLabel(reason)}**.`;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(title)
+        .setDescription(desc)
+        .setColor(color)
+        .addFields(
+          { name: 'Usuário', value: userText, inline: true },
+          { name: 'Canal', value: channelText, inline: true },
+          { name: 'Ticket ID', value: ticketId ? `\`${ticketId}\`` : '—', inline: false }
+        )
+        .setFooter({ text: `⏱ ${new Date().toLocaleString('pt-BR')} • <t:${ts}:R>` })
+        .setTimestamp(new Date());
+
+      if (submissionId) {
+        embed.addFields({ name: 'Submission ID', value: `\`${submissionId}\``, inline: true });
+      }
+
+      if (kind === 'CLOSE') {
+        embed.addFields({ name: 'Motivo', value: reasonLabel(reason), inline: true });
+      }
+
+      await ch.send({
+        embeds: [embed],
+        allowedMentions: { parse: [] }
+      }).catch(() => {});
     } catch {}
   }
 
@@ -353,7 +438,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       [String(ticketId)]
     );
 
-    logTicket(`🔴 Ticket fechado (${reason}) | user=<@${t.user_id}> | channel=${t.channel_id} | ticketId=${t.id} | ${nowIso()}`);
+    await logTicket({
+      kind: 'CLOSE',
+      userId: t.user_id,
+      channelId: t.channel_id,
+      ticketId: t.id,
+      reason
+    });
 
     try {
       const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
@@ -579,7 +670,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       [String(ticketId), String(userId), String(ticketChannel.id)]
     );
 
-    logTicket(`🟢 Ticket aberto | user=<@${userId}> | channel=<#${ticketChannel.id}> | ticketId=${ticketId} | ${nowIso()}`);
+    await logTicket({
+      kind: 'OPEN',
+      userId,
+      channelId: ticketChannel.id,
+      ticketId
+    });
 
     const pingStaff = staffRoleIds.length ? staffRoleIds.map(r => `<@&${r}>`).join(' ') : '';
     await ticketChannel.send({
@@ -831,7 +927,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         return;
       }
 
-      logTicket(`✅ Ticket finalizado | user=<@${t.user_id}> | ticketId=${t.id} | submissionId=${submissionId} | ${nowIso()}`);
+      await logTicket({
+        kind: 'FINAL',
+        userId: t.user_id,
+        channelId: t.channel_id,
+        ticketId: t.id,
+        submissionId
+      });
 
       await msg.channel.send({
         content:
