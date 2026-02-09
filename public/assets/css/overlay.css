@@ -21,11 +21,13 @@ html,body{
 .ov-body{ background: transparent; }
 .ov-wrap{
   position: fixed;
-  left: 20px;
-  top: 20px;
-  width: 560px;
-  max-width: calc(100vw - 40px);
+  left: 14px;
+  top: 14px;
+  width: calc(644px - 28px); 
+  max-width: calc(100vw - 28px);
+  box-sizing: border-box;
 }
+
 
 .ov-card{
   border:1px solid var(--line);
