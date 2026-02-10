@@ -32,6 +32,8 @@ export function initTwitchBot({
   const chan = channel.startsWith("#") ? channel : `#${channel}`;
   const pass = oauthToken.startsWith("oauth:") ? oauthToken : `oauth:${oauthToken}`;
 
+  const OVERLAY_PUBLIC_KEY = (process.env.OVERLAY_PUBLIC_KEY || "").trim();
+
   const publicUrl =
     cashbackPublicUrl ||
     process.env.CASHBACK_PUBLIC_URL ||
@@ -88,8 +90,6 @@ export function initTwitchBot({
     let m = text.match(/^!palpite\b\s*(.+)$/i) || text.match(/^!p\b\s*(.+)$/i);
     if (m && m[1]) return { type: "guess", payload: m[1].trim() };
 
-    
-
     const t = text.match(/^!time\b\s*(.+)$/i);
     if (t) {
       const payload = String(t[1] || "").trim();
@@ -111,13 +111,17 @@ export function initTwitchBot({
   }
 
   async function getTorneioState() {
-     const k = overlayKey || apiKey;
+    const k = OVERLAY_PUBLIC_KEY || "";
+    if (!k) return { error: "missing_overlay_key" };
+
     const url = `http://127.0.0.1:${port}/api/torneio/state?key=${encodeURIComponent(k)}`;
     const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
+
     let data = null;
     try {
       data = await res.json();
     } catch {}
+
     if (!res.ok) return { error: data?.error || `http_${res.status}` };
     return { ok: true, data };
   }
@@ -154,22 +158,21 @@ export function initTwitchBot({
   }
 
   function resolveTeamKey(input, teams) {
-  const raw = String(input || "").trim();
-  if (!raw) return null;
+    const raw = String(input || "").trim();
+    if (!raw) return null;
 
-  const k = normalizeTeamKey(raw);
-  if (!k) return null;
+    const k = normalizeTeamKey(raw);
+    if (!k) return null;
 
-  for (const t of teams || []) {
-    const tk = String(t.key || "");
-    const tn = String(t.name || "");
-    if (tk && normalizeTeamKey(tk) === k) return tk;
-    if (tn && normalizeTeamKey(tn) === k) return tk || k;
+    for (const t of teams || []) {
+      const tk = String(t.key || "");
+      const tn = String(t.name || "");
+      if (tk && normalizeTeamKey(tk) === k) return tk;
+      if (tn && normalizeTeamKey(tn) === k) return tk || k;
+    }
+
+    return null;
   }
-
-  return null;
-}
-
 
   function formatTeamsHint(teams, max = 6) {
     const arr = (teams || []).map((t) => String(t.name || t.key || "").trim()).filter(Boolean);
@@ -306,7 +309,11 @@ export function initTwitchBot({
     }
 
     if (phStatus === "ABERTA") {
-      await say(`🏟️ ${torName} • Fase ${phaseNum} ABERTA ✅ ${teamsText ? `• Times: ${teamsText} • use !time <nome>` : "• use !time <nome do time>"}`);
+      await say(
+        `🏟️ ${torName} • Fase ${phaseNum} ABERTA ✅ ${
+          teamsText ? `• Times: ${teamsText} • use !time <nome>` : "• use !time <nome do time>"
+        }`
+      );
       return;
     }
 
@@ -449,8 +456,6 @@ export function initTwitchBot({
         }
         return;
       }
-
-      
     });
   });
 
