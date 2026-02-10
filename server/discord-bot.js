@@ -491,7 +491,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         'Dentro do ticket você vai:\n' +
         '1) escolher o **Tipo Pix**\n' +
         '2) preencher **Nick da Twitch + Chave Pix**\n' +
-        '3) anexar o **print do histórico/comprovante do depósito** (PNG/JPG/WEBP)'
+        '3) anexar o **print do histórico de depósito** (PNG/JPG/WEBP)'
       );
 
     const row = new ActionRowBuilder().addComponents(
