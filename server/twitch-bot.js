@@ -111,7 +111,8 @@ export function initTwitchBot({
   }
 
   async function getTorneioState() {
-    const url = `http://127.0.0.1:${port}/api/torneio/state?key=${encodeURIComponent(apiKey)}`;
+     const k = overlayKey || apiKey;
+    const url = `http://127.0.0.1:${port}/api/torneio/state?key=${encodeURIComponent(k)}`;
     const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
     let data = null;
     try {

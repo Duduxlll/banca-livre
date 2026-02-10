@@ -2128,14 +2128,15 @@ app.listen(PORT, async () => {
   }
 
   twitchBot = initTwitchBot({
-    port: PORT,
-    apiKey: APP_PUBLIC_KEY,
-    botUsername: process.env.TWITCH_BOT_USERNAME,
-    oauthToken: process.env.TWITCH_OAUTH_TOKEN,
-    channel: process.env.TWITCH_CHANNEL,
-    enabled: true,
-    onLog: console,
-  });
+  port: PORT,
+  apiKey: APP_PUBLIC_KEY,
+  overlayKey: OVERLAY_PUBLIC_KEY,
+  botUsername: process.env.TWITCH_BOT_USERNAME,
+  oauthToken: process.env.TWITCH_OAUTH_TOKEN,
+  channel: process.env.TWITCH_CHANNEL,
+  enabled: true,
+  onLog: console,
+});
 
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
