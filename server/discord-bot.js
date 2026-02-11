@@ -306,7 +306,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       '3) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
       '⚠️ **Para receber o prêmio é obrigatório:**\n' +
       '✅ ter feito **DEPÓSITO HOJE**\n' +
-      '✅ ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **Enviar print do depósito**)\n\n' +
+      '✅ ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
       (open ? '🟢 **INSCRIÇÕES ABERTAS!**' : '🔴 **INSCRIÇÕES FECHADAS** — aguarde o streamer abrir.');
 
     const embed = new EmbedBuilder()
@@ -483,7 +483,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
 if (!okPrint) {
   await interaction.reply({
     flags: 64,
-    content: 'Para participar, é obrigatório ter enviado **hoje** o print do **histórico de depósito** no sistema (Enviar print).'
+    content: 'Para participar, é obrigatório ter enviado **hoje** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
   }).catch(() => {});
   return;
 }
