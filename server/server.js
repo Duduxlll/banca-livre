@@ -2222,6 +2222,30 @@ async function ensureCashbacksTable(){
   }
 }
 
+async function ensureSorteioStateTable(){
+  try{
+    await q(`
+      CREATE TABLE IF NOT EXISTS sorteio_state (
+        id INTEGER PRIMARY KEY,
+        is_open BOOLEAN NOT NULL DEFAULT false,
+        discord_channel_id TEXT,
+        discord_message_id TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+
+    
+    await q(`
+      INSERT INTO sorteio_state (id, is_open)
+      VALUES (1, false)
+      ON CONFLICT (id) DO NOTHING
+    `);
+  }catch(e){
+    console.error('ensureSorteioStateTable:', e.message);
+  }
+}
+
+
 async function ensureSorteioTables(){
   try{
     await q(`
