@@ -479,16 +479,15 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
 
     const okPrint = await hasPrintHoje(nome);
-    const okDep = await hasDepositoHoje(nome);
 
-    if (!okPrint || !okDep) {
-      await interaction.reply({
-        flags: 64,
-        content:
-          'Para participar, você precisa ter feito **DEPÓSITO HOJE** e enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **Enviar print do depósito**).'
-      }).catch(() => {});
-      return;
-    }
+if (!okPrint) {
+  await interaction.reply({
+    flags: 64,
+    content: 'Para participar, é obrigatório ter enviado **hoje** o print do **histórico de depósito** no sistema (Enviar print).'
+  }).catch(() => {});
+  return;
+}
+
 
     try{
       await inserirSorteio(nome);

@@ -1661,13 +1661,37 @@ app.get('/api/sorteio/state-public', async (req, res) => {
 
 
 app.get('/api/sorteio/state', areaAuth, async (req, res) => {
-  try {
-    const r = await q('SELECT is_open FROM sorteio_state WHERE id=1', []);
-    res.json({ open: !!r?.rows?.[0]?.is_open });
-  } catch (e) {
-    res.status(200).json({ open: false });
-  }
+  const r = await q(`SELECT is_open, discord_channel_id, discord_message_id FROM sorteio_state WHERE id=1`);
+  const row = r?.rows?.[0];
+
+  res.json({
+    open: !!row?.is_open,
+    channelId: row?.discord_channel_id || null,
+    messageId: row?.discord_message_id || null
+  });
 });
+
+app.patch('/api/sorteio/state', areaAuth, async (req, res) => {
+  const open = !!req.body?.open;
+
+  await q(
+    `INSERT INTO sorteio_state (id, is_open, updated_at)
+     VALUES (1, $1, now())
+     ON CONFLICT (id) DO UPDATE
+     SET is_open = EXCLUDED.is_open,
+         updated_at = now()`,
+    [open]
+  );
+
+  
+  try { await discordBot?.updateSorteioMessage?.(open); } catch {}
+
+  
+  try { sseSendAll('sorteio-state', { open }); } catch {}
+
+  res.json({ ok: true, open });
+});
+
 
 
 
@@ -2305,6 +2329,7 @@ app.listen(PORT, async () => {
     await ensureCuponsTable();
     await ensureCashbacksTable();
     await ensureSorteioTables();
+    await ensureSorteioStateTable();
     await ensurePalpiteTables();
     await palpiteLoadFromDB();
     await ensureCashbackTables(q);
