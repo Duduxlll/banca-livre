@@ -1651,38 +1651,24 @@ async function hasPrintHoje(nick){
 }
 
 app.get('/api/sorteio/state-public', async (req, res) => {
-  try{
-    const { rows } = await pool.query(`SELECT is_open FROM sorteio_state WHERE id = 1`);
-    res.json({ open: !!rows?.[0]?.is_open });
-  }catch(e){
-    console.error('GET /api/sorteio/state-public', e);
-    res.status(500).json({ open: false });
+  try {
+    const r = await q('SELECT is_open FROM sorteio_state WHERE id=1', []);
+    res.json({ open: !!r?.rows?.[0]?.is_open });
+  } catch (e) {
+    res.status(200).json({ open: false });
   }
 });
 
-app.patch('/api/sorteio/state', requireAdmin, async (req, res) => {
-  const open = !!req.body?.open;
 
-  try{
-    await pool.query(
-      `UPDATE sorteio_state
-          SET is_open = $1,
-              updated_at = now()
-        WHERE id = 1`,
-      [open]
-    );
-
-   
-    try { await discordBot?.updateSorteioMessage?.(open); } catch (e) {
-      console.error('discordBot.updateSorteioMessage:', e?.message || e);
-    }
-
-    return res.json({ ok:true, open });
-  }catch(e){
-    console.error('PATCH /api/sorteio/state', e);
-    return res.status(500).json({ ok:false, error:'falha_estado_sorteio' });
+app.get('/api/sorteio/state', areaAuth, async (req, res) => {
+  try {
+    const r = await q('SELECT is_open FROM sorteio_state WHERE id=1', []);
+    res.json({ open: !!r?.rows?.[0]?.is_open });
+  } catch (e) {
+    res.status(200).json({ open: false });
   }
 });
+
 
 
 
