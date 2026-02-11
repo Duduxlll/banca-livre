@@ -300,13 +300,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
 
     const desc =
-      '📌 **Como participar:**\n' +
-      '1) Aguarde o streamer liberar o sorteio na live.\n' +
-      '2) Quando estiver liberado, clique no botão abaixo.\n' +
-      '3) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
-      '⚠️ **Para receber o prêmio é obrigatório:**\n' +
-      '✅ ter feito **DEPÓSITO HOJE**\n' +
-      '✅ ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
+      '📌 **Para participar do sorteio é obrigatório:**\n' +
+      '1) ter feito **DEPÓSITO HOJE**\n' +
+      '2) ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
+      '3) Aguarde o streamer liberar o sorteio na live.\n' +
+      '4) Quando estiver liberado, clique no botão abaixo.\n' +
+      '5) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
       (open ? '🟢 **INSCRIÇÕES ABERTAS!**' : '🔴 **INSCRIÇÕES FECHADAS** — aguarde o streamer abrir.');
 
     const embed = new EmbedBuilder()
