@@ -394,9 +394,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     try{
       const r = await q(
         `SELECT 1 FROM cashback_submissions
-         WHERE lower(twitch_name)=$1 AND ${dayEqTodaySql('created_at')}
-         ORDER BY created_at DESC
-         LIMIT 1`,
+WHERE lower(twitch_name)=$1
+  AND ${dayEqTodaySql('created_at')}
+  AND upper(status)='APROVADO'
+ORDER BY created_at DESC
+LIMIT 1
+`,
         [nn]
       );
       if ((r?.rows?.length || 0) > 0) return true;
