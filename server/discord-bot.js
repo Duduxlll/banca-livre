@@ -460,6 +460,33 @@ LIMIT 1
     });
   }
 
+  async function getPrintHojeInfo(twitchName){
+  const nn = normalizeTwitchName(twitchName);
+
+  try{
+    const r = await q(
+      `SELECT status, reason
+       FROM cashback_submissions
+       WHERE lower(twitch_name)=$1
+         AND ${dayEqTodaySql('created_at')}
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [nn]
+    );
+
+    const row = r?.rows?.[0] || null;
+    if (!row) return { found:false, status:null, reason:null };
+
+    const status = row.status ? String(row.status).toUpperCase() : null;
+    const reason = row.reason ? String(row.reason) : null;
+
+    return { found:true, status, reason };
+  }catch(e){
+    return { found:false, status:null, reason:null };
+  }
+}
+
+
   async function handleSorteioModal(interaction){
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
     const nome = raw.trim().replace(/^@+/, '');
@@ -480,15 +507,41 @@ LIMIT 1
       return;
     }
 
-    const okPrint = await hasPrintHoje(nome);
+    const info = await getPrintHojeInfo(nome);
 
-if (!okPrint) {
+if (!info.found) {
   await interaction.reply({
     flags: 64,
-    content: 'Para participar, é obrigatório ter enviado **hoje** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
-  }).catch(() => {});
+    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (Enviar print).'
+  }).catch(()=>{});
   return;
 }
+
+if (info.status === 'PENDENTE') {
+  await interaction.reply({
+    flags: 64,
+    content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
+  }).catch(()=>{});
+  return;
+}
+
+if (info.status === 'REPROVADO') {
+  const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
+  await interaction.reply({
+    flags: 64,
+    content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
+  }).catch(()=>{});
+  return;
+}
+
+if (info.status !== 'APROVADO') {
+  await interaction.reply({
+    flags: 64,
+    content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
+  }).catch(()=>{});
+  return;
+}
+
 
 
     try{
