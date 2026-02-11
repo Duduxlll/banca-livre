@@ -274,9 +274,16 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       const open = !!row?.is_open;
       const channelId = String(row?.discord_channel_id || sorteioChannelId || entryChannelId || '').trim();
       const messageId = row?.discord_message_id ? String(row.discord_message_id) : null;
+
       if (!row) {
-        await q(`INSERT INTO sorteio_state (id, is_open, discord_channel_id) VALUES (1, false, $1) ON CONFLICT (id) DO NOTHING`, [channelId || null]);
+        await q(
+          `INSERT INTO sorteio_state (id, is_open, discord_channel_id)
+           VALUES (1, false, $1)
+           ON CONFLICT (id) DO NOTHING`,
+          [channelId || null]
+        );
       }
+
       return { open, channelId: channelId || null, messageId };
     }catch(e){
       return { open:false, channelId: sorteioChannelId || entryChannelId, messageId:null };
@@ -290,25 +297,50 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   }
 
   function sorteioPayload(open){
-    const title = open ? '🎉 Sorteio ABERTO' : '⛔ Sorteio FECHADO';
+    const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
+
     const desc =
-      open
-        ? 'Clique no botão abaixo para se inscrever. Você precisa ter enviado o print do depósito de **hoje** no sistema.'
-        : 'Aguarde o streamer abrir o sorteio.';
+      '📌 **Como participar:**\n' +
+      '1) Aguarde o streamer liberar o sorteio na live.\n' +
+      '2) Quando estiver liberado, clique no botão abaixo.\n' +
+      '3) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
+      '⚠️ **Para receber o prêmio é obrigatório:**\n' +
+      '✅ ter feito **DEPÓSITO HOJE**\n' +
+      '✅ ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **Enviar print do depósito**)\n\n' +
+      (open ? '🟢 **INSCRIÇÕES ABERTAS!**' : '🔴 **INSCRIÇÕES FECHADAS** — aguarde o streamer abrir.');
 
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(desc)
-      .setColor(open ? 0x2ecc71 : 0xe74c3c);
+      .setColor(open ? 0x00ff99 : 0xff3333);
 
     const btn = new ButtonBuilder()
       .setCustomId('sorteio:join')
-      .setLabel(open ? 'Entrar no sorteio' : 'Sorteio fechado')
+      .setLabel(open ? 'Inscrever no Sorteio' : 'Sorteio Fechado')
       .setStyle(open ? ButtonStyle.Success : ButtonStyle.Secondary)
       .setDisabled(!open);
 
     const row = new ActionRowBuilder().addComponents(btn);
     return { embeds:[embed], components:[row] };
+  }
+
+  async function findExistingSorteioMessage(ch){
+    try{
+      const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+      if (!msgs) return null;
+
+      const found = msgs.find(m => {
+        if (!m.author || m.author.id !== client.user.id) return false;
+        const hasBtn = (m.components || []).some(row =>
+          (row.components || []).some(c => c?.customId === 'sorteio:join')
+        );
+        return hasBtn;
+      });
+
+      return found || null;
+    }catch{
+      return null;
+    }
   }
 
   async function updateSorteioMessage(open){
@@ -327,6 +359,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         await msg.edit(payload).catch(() => {});
         return;
       }
+    }
+
+    const existing = await findExistingSorteioMessage(ch);
+    if (existing?.id) {
+      await setSorteioMessageIds(String(channelId), String(existing.id));
+      await existing.edit(payload).catch(() => {});
+      return;
     }
 
     const sent = await ch.send(payload).catch(() => null);
@@ -402,11 +441,11 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
 
     const modal = new ModalBuilder()
       .setCustomId('sorteio:modal')
-      .setTitle('Entrar no sorteio');
+      .setTitle('Inscrever no sorteio');
 
     const inp = new TextInputBuilder()
       .setCustomId('twitch_name')
-      .setLabel('Seu nick da Twitch')
+      .setLabel('Seu nick da Twitch (sem @)')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMaxLength(25)
@@ -445,7 +484,8 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     if (!okPrint || !okDep) {
       await interaction.reply({
         flags: 64,
-        content: 'Para participar, você precisa ter feito o depósito **hoje** e enviado o print **hoje** no sistema.'
+        content:
+          'Para participar, você precisa ter feito **DEPÓSITO HOJE** e enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **Enviar print do depósito**).'
       }).catch(() => {});
       return;
     }
@@ -455,7 +495,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       if (typeof sseSendAll === 'function') {
         sseSendAll('sorteio-changed', { action:'join', nome_twitch: nome });
       }
-      await interaction.reply({ flags: 64, content: `Inscrição confirmada: @${nome}. Boa sorte!` }).catch(() => {});
+      await interaction.reply({ flags: 64, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
     }catch(e){
       if (e?.code === '23505') {
         await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
@@ -464,7 +504,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       }
     }
   }
-
 
   async function logTicket(event) {
     if (!logChannelId) return;
@@ -479,7 +518,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       const ticketId = String(event?.ticketId || '');
       const submissionId = event?.submissionId ? String(event.submissionId) : '';
       const reason = event?.reason ? String(event.reason) : '';
-      const ts = Math.floor(Date.now() / 1000);
 
       const guild = await client.guilds.fetch(String(guildId)).catch(() => null);
 
@@ -534,9 +572,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           { name: 'Canal', value: channelText, inline: true },
           { name: 'Ticket ID', value: ticketId ? `\`${ticketId}\`` : '—', inline: false }
         )
-
-        .setTimestamp(new Date())
-
+        .setTimestamp(new Date());
 
       if (submissionId) {
         embed.addFields({ name: 'Submission ID', value: `\`${submissionId}\``, inline: true });
@@ -1169,12 +1205,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           await handleFill(interaction, ticketId);
           return;
         }
-      }
+
         if (interaction.customId === 'sorteio:join') {
           await openSorteioModal(interaction);
           return;
         }
-
+      }
 
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId.startsWith('dep:pick:')) {
@@ -1241,7 +1277,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
     await ensureTables(q);
     await ensureEntryMessage();
-    try { const st = await getSorteioState(); await updateSorteioMessage(st.open); } catch {}
+
+    try {
+      const st = await getSorteioState();
+      await updateSorteioMessage(st.open);
+    } catch {}
+
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
