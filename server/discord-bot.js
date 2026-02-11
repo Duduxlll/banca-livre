@@ -512,7 +512,7 @@ LIMIT 1
 if (!info.found) {
   await interaction.reply({
     flags: 64,
-    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (Enviar print).'
+    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
   }).catch(()=>{});
   return;
 }
