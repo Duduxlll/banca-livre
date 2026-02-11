@@ -258,9 +258,15 @@
           <div class="sorteio-header-admin">
             <div>
               <h2>Sorteio da Live</h2>
-              <p>Inscrições vindas do formulário público.</p>
+              <div class="palpite-status-row">
+                <span id="sorteioStatusBadge" class="p-status p-closed">FECHADO</span>
+                <span id="sorteioStatusText" class="p-status-text">Inscrições fechadas (Discord)</span>
+              </div>
+              <p class="muted" style="margin:6px 0 0">Inscrições pelo Discord (bot).</p>
             </div>
             <div class="sorteio-actions">
+              <button class="btn btn--primary" id="btnSorteioOpen">🟢 Abrir Sorteio</button>
+              <button class="btn btn--ghost" id="btnSorteioClose">🔴 Fechar Sorteio</button>
               <button id="btnSorteioAtualizar" class="btn-soft">Atualizar lista</button>
               <button id="btnSorteioLimpar" class="btn-soft danger">Limpar todos</button>
             </div>
@@ -300,11 +306,6 @@
             </div>
           </div>
         </div>
-
-        <p class="sorteio-tip">
-          Formulário público:
-          <code>guigz.com.br/sorteio-publico</code>
-        </p>
       </div>
 
       <div class="tab tab-view" id="tab-palpite">

@@ -159,6 +159,25 @@ app.use((req, res, next) => {
   return next();
 });
 
+const DISABLE_SORTEIO_PUBLIC = process.env.DISABLE_SORTEIO_PUBLIC === '1';
+
+app.use((req, res, next) => {
+  if (!DISABLE_SORTEIO_PUBLIC) return next();
+
+  const p = (req.path || '').toLowerCase();
+
+  if (
+    p === '/sorteio-publico.html' ||
+    p === '/sorteio-publico' ||
+    p === '/assets/js/sorteio-publico.js'
+  ) {
+    return res.status(410).send('Página desativada');
+  }
+
+  return next();
+});
+
+
 
 app.use(
   helmet({
@@ -499,7 +518,9 @@ app.use('/api', (req, res, next) => {
     '/api/cashback/status',
     '/api/cashback/ranking',
     '/api/torneio/state',
-    '/api/torneio/join'
+    '/api/torneio/join',
+    '/api/sorteio/state-public',
+
 
   ];
 
@@ -1566,6 +1587,105 @@ app.get('/qr', async (req, res) => {
   }
 });
 
+
+function dayRangeSQL(){
+ 
+  return {
+    start: "date_trunc('day', now())",
+    end: "date_trunc('day', now()) + interval '1 day'"
+  };
+}
+
+async function sorteioIsOpen(){
+  const { rows } = await pool.query(`SELECT is_open FROM sorteio_state WHERE id = 1`);
+  return !!rows?.[0]?.is_open;
+}
+
+async function hasDepositoHoje(nick){
+  const { start, end } = dayRangeSQL();
+  const { rows } = await pool.query(
+    `SELECT 1
+       FROM extratos
+      WHERE tipo = 'deposito'
+        AND lower(nome) = lower($1)
+        AND created_at >= ${start}
+        AND created_at <  ${end}
+      LIMIT 1`,
+    [nick]
+  );
+  return rows.length > 0;
+}
+
+async function hasPrintHoje(nick){
+  const { start, end } = dayRangeSQL();
+
+  
+  try{
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM cashback_submissions
+        WHERE lower(twitch_name) = lower($1)
+          AND created_at >= ${start}
+          AND created_at <  ${end}
+        LIMIT 1`,
+      [nick]
+    );
+    if (rows.length) return true;
+  } catch {}
+
+  
+  try{
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM cashbacks
+        WHERE lower(twitch_nick) = lower($1)
+          AND created_at >= ${start}
+          AND created_at <  ${end}
+        LIMIT 1`,
+      [nick]
+    );
+    if (rows.length) return true;
+  } catch {}
+
+  return false;
+}
+
+app.get('/api/sorteio/state-public', async (req, res) => {
+  try{
+    const { rows } = await pool.query(`SELECT is_open FROM sorteio_state WHERE id = 1`);
+    res.json({ open: !!rows?.[0]?.is_open });
+  }catch(e){
+    console.error('GET /api/sorteio/state-public', e);
+    res.status(500).json({ open: false });
+  }
+});
+
+app.patch('/api/sorteio/state', requireAdmin, async (req, res) => {
+  const open = !!req.body?.open;
+
+  try{
+    await pool.query(
+      `UPDATE sorteio_state
+          SET is_open = $1,
+              updated_at = now()
+        WHERE id = 1`,
+      [open]
+    );
+
+   
+    try { await discordBot?.updateSorteioMessage?.(open); } catch (e) {
+      console.error('discordBot.updateSorteioMessage:', e?.message || e);
+    }
+
+    return res.json({ ok:true, open });
+  }catch(e){
+    console.error('PATCH /api/sorteio/state', e);
+    return res.status(500).json({ ok:false, error:'falha_estado_sorteio' });
+  }
+});
+
+
+
 app.get('/api/sorteio/inscricoes', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -1579,33 +1699,54 @@ app.get('/api/sorteio/inscricoes', async (req, res) => {
 });
 
 app.post('/api/sorteio/inscrever', async (req, res) => {
-  const { nome_twitch, mensagem } = req.body;
+  const nick = normalizeNick(req.body?.nome_twitch || req.body?.nick || req.body?.twitchName);
 
-  if (!nome_twitch || !mensagem) {
-    return res.status(400).json({ ok: false, error: 'nome_twitch e mensagem (ID) são obrigatórios.' });
+  if (!nick) {
+    return res.status(400).json({ ok:false, code:'NOME_OBRIGATORIO', error:'Informe seu nome da Twitch.' });
   }
 
-  try {
+  try{
+    const open = await sorteioIsOpen();
+    if (!open) {
+      return res.status(403).json({ ok:false, code:'SORTEIO_FECHADO', error:'O sorteio está fechado no momento.' });
+    }
+
+    const temDeposito = await hasDepositoHoje(nick);
+    if (!temDeposito) {
+      return res.status(403).json({ ok:false, code:'SEM_DEPOSITO_HOJE', error:'Para entrar, você precisa ter feito depósito HOJE.' });
+    }
+
+    const temPrint = await hasPrintHoje(nick);
+    if (!temPrint) {
+      return res.status(403).json({ ok:false, code:'SEM_PRINT_HOJE', error:'Para entrar, você precisa ter enviado o print HOJE.' });
+    }
+
+    
+    const dup = await pool.query(
+      `SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=lower($1) LIMIT 1`,
+      [nick]
+    );
+    if (dup.rows.length) {
+      return res.status(409).json({ ok:false, code:'NICK_DUPLICADO', error:'Esse nick já está inscrito no sorteio.' });
+    }
+
     await pool.query(
       `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem)
-       VALUES ($1, $2)`,
-      [nome_twitch, mensagem]
+       VALUES ($1, NULL)`,
+      [nick]
     );
 
-    return res.status(201).json({ ok: true });
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({
-        ok: false,
-        code: 'ID_DUPLICADO',
-        error: 'Esse ID já está cadastrado.'
-      });
+    return res.status(201).json({ ok:true });
+  }catch(err){
+    if (err?.code === '23505') {
+      return res.status(409).json({ ok:false, code:'NICK_DUPLICADO', error:'Esse nick já está inscrito no sorteio.' });
     }
 
     console.error('Erro ao inserir inscrição do sorteio', err);
-    return res.status(500).json({ ok: false, error: 'Erro interno ao salvar inscrição.' });
+    return res.status(500).json({ ok:false, error:'Erro interno ao salvar inscrição.' });
   }
 });
+
 
 app.delete('/api/sorteio/inscricoes/:id', async (req, res) => {
   try {
@@ -2095,7 +2236,47 @@ async function ensureCashbacksTable(){
   }
 }
 
+async function ensureSorteioTables(){
+  try{
+    await q(`
+      CREATE TABLE IF NOT EXISTS sorteio_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        is_open BOOLEAN NOT NULL DEFAULT false,
+        discord_channel_id TEXT,
+        discord_message_id TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+
+    await q(`INSERT INTO sorteio_state (id, is_open) VALUES (1, false)
+             ON CONFLICT (id) DO NOTHING`);
+
+    await q(`
+      CREATE TABLE IF NOT EXISTS sorteio_inscricoes (
+        id BIGSERIAL PRIMARY KEY,
+        nome_twitch TEXT NOT NULL,
+        mensagem TEXT,
+        criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+
+    
+    try { await q(`ALTER TABLE sorteio_inscricoes ALTER COLUMN mensagem DROP NOT NULL`); } catch {}
+
+    
+    await q(`
+      CREATE UNIQUE INDEX IF NOT EXISTS sorteio_inscricoes_nome_unique
+      ON sorteio_inscricoes (lower(nome_twitch))
+    `);
+  }catch(e){
+    console.error('ensureSorteioTables:', e.message);
+  }
+}
+
+
 let twitchBot = { enabled: false, say: async () => {} };
+let discordBot = null;
+
 
 app.listen(PORT, async () => {
 
@@ -2113,12 +2294,14 @@ app.listen(PORT, async () => {
     await ensureMessageColumns();
     await ensureCuponsTable();
     await ensureCashbacksTable();
+    await ensureSorteioTables();
     await ensurePalpiteTables();
     await palpiteLoadFromDB();
     await ensureCashbackTables(q);
     await ensureTorneioTables(q);
     await ensureExtratosOrigemColumn();
-    initDiscordBot({ q, uid, onLog: console });
+    discordBot = initDiscordBot({ q, uid, onLog: console, sseSendAll });
+
 
 
 

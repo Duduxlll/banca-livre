@@ -12,6 +12,48 @@
 
   const ctx = canvas.getContext('2d');
 
+  const stBadge = document.getElementById('sorteioStatusBadge');
+  const stText  = document.getElementById('sorteioStatusText');
+  const btnOpen = document.getElementById('btnSorteioOpen');
+  const btnClose= document.getElementById('btnSorteioClose');
+
+  function setSorteioStatus(open){
+    if (stBadge) {
+      stBadge.textContent = open ? 'ABERTO' : 'FECHADO';
+      stBadge.classList.toggle('p-open', !!open);
+      stBadge.classList.toggle('p-closed', !open);
+    }
+    if (stText) {
+      stText.textContent = open ? 'Inscrições abertas (Discord)' : 'Inscrições fechadas (Discord)';
+    }
+    if (btnOpen) btnOpen.disabled = !!open;
+    if (btnClose) btnClose.disabled = !open;
+  }
+
+  async function carregarEstadoSorteio(silent){
+    try{
+      const r = await (typeof apiFetch === 'function'
+        ? apiFetch('/api/sorteio/state')
+        : fetch(`${API}/api/sorteio/state`, { credentials:'include' }).then(x=>x.json()));
+      setSorteioStatus(!!r?.open);
+    }catch(e){
+      if (!silent && typeof notify === 'function') notify('Erro ao buscar estado do sorteio.', 'error');
+    }
+  }
+
+  async function setEstadoSorteio(open){
+    const body = JSON.stringify({ open: !!open });
+    const r = await (typeof apiFetch === 'function'
+      ? apiFetch('/api/sorteio/state', { method:'PATCH', body })
+      : fetch(`${API}/api/sorteio/state`, { method:'PATCH', credentials:'include', headers:{'Content-Type':'application/json'}, body }).then(x=>x.json()));
+    setSorteioStatus(!!r?.open);
+    if (typeof notify === 'function') notify(open ? 'Sorteio aberto no Discord.' : 'Sorteio fechado no Discord.', 'ok');
+  }
+
+  if (btnOpen) btnOpen.addEventListener('click', ()=> setEstadoSorteio(true));
+  if (btnClose) btnClose.addEventListener('click', ()=> setEstadoSorteio(false));
+
+
   const colors = [
     '#ffd76b', '#ffb366', '#ff8a80', '#ff9ecd',
     '#b39fff', '#7ecbff', '#80e8c2', '#c6ff8f'
@@ -19,8 +61,7 @@
 
   async function carregarInscritosSorteio(silent){
     try {
-      const res = await fetch(`${API}/api/sorteio/inscricoes`);
-      inscritos = await res.json();
+            inscritos = await (typeof apiFetch === 'function' ? apiFetch('/api/sorteio/inscricoes') : fetch(`${API}/api/sorteio/inscricoes`, { credentials:'include' }).then(r=>r.json()));
       if (!Array.isArray(inscritos)) inscritos = [];
 
       atualizarTabelaSorteio();
@@ -78,10 +119,9 @@
   async function excluirInscritoSorteio(id){
     if (!id) return;
     try {
-      const res = await fetch(`${API}/api/sorteio/inscricoes/${id}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
+            const data = await (typeof apiFetch === 'function'
+        ? apiFetch(`/api/sorteio/inscricoes/${id}`, { method:'DELETE' })
+        : fetch(`${API}/api/sorteio/inscricoes/${id}`, { method:'DELETE', credentials:'include' }).then(r=>r.json()));
       if (!data || data.ok !== true) throw new Error('Resposta inválida da API');
 
       inscritos = inscritos.filter(i => i.id !== id);
@@ -209,10 +249,9 @@
     if (!ok) return;
 
     try {
-      const res = await fetch(`${API}/api/sorteio/inscricoes`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
+            const data = await (typeof apiFetch === 'function'
+        ? apiFetch('/api/sorteio/inscricoes', { method:'DELETE' })
+        : fetch(`${API}/api/sorteio/inscricoes`, { method:'DELETE', credentials:'include' }).then(r=>r.json()));
       if (!data || data.ok !== true) throw new Error('Resposta inválida da API');
 
       inscritos = [];
@@ -499,5 +538,6 @@
     });
   }
 
+  carregarEstadoSorteio(true);
   carregarInscritosSorteio(true);
 })();
