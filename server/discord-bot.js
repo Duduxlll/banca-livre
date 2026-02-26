@@ -240,6 +240,14 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     return null;
   }
 
+  onLog.log('🚀 [DISCORD] init ok. Tentando login…', {
+  enabled,
+  hasToken: !!token,
+  guildId: !!guildId,
+  entryChannelId: !!entryChannelId,
+  ticketsCategoryId: !!ticketsCategoryId,
+});
+
   const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
   const logChannelId = String(process.env.DISCORD_LOG_CHANNEL_ID || '').trim();
 
@@ -254,6 +262,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
+       GatewayIntentBits.Guilds ,
       GatewayIntentBits.MessageContent
     ],
     partials: [Partials.Channel, Partials.Message]
@@ -1326,6 +1335,15 @@ if (info.status !== 'APROVADO') {
       onLog.error('periodicCleanup falhou:', e?.message || e);
     }
   }
+
+  client.on('warn',  (m) => onLog.warn('⚠️ [DISCORD] warn:', m));
+client.on('error', (e) => onLog.error('❌ [DISCORD] error:', e?.message || e));
+
+client.on('shardError', (e) => onLog.error('❌ [DISCORD] shardError:', e?.message || e));
+client.on('shardDisconnect', (event, id) => {
+  onLog.error('❌ [DISCORD] shardDisconnect:', { id, code: event?.code, reason: event?.reason });
+});
+client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
 
   client.once(Events.ClientReady, async () => {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
