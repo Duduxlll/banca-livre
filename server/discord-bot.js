@@ -155,49 +155,8 @@ async function ensureTables(q) {
     )
   `);
 
-  await q(`
-    CREATE INDEX IF NOT EXISTS discord_deposit_tickets_channel_idx
-    ON discord_deposit_tickets (channel_id)
-  `);
-
-  await q(`
-    CREATE INDEX IF NOT EXISTS discord_deposit_tickets_user_idx
-    ON discord_deposit_tickets (user_id)
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS discord_sorteio_state (
-      id INTEGER PRIMARY KEY DEFAULT 1,
-      is_open BOOLEAN NOT NULL DEFAULT true,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-
-  await q(`
-    INSERT INTO discord_sorteio_state (id, is_open)
-    VALUES (1, true)
-    ON CONFLICT (id) DO NOTHING
-  `);
-
-  await q(`
-    CREATE TABLE IF NOT EXISTS discord_sorteio_entries (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      discord_tag TEXT NOT NULL,
-      twitch_name TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    )
-  `);
-
-  await q(`
-    CREATE INDEX IF NOT EXISTS discord_sorteio_entries_user_idx
-    ON discord_sorteio_entries (user_id)
-  `);
-
-  await q(`
-    CREATE INDEX IF NOT EXISTS discord_sorteio_entries_twitch_idx
-    ON discord_sorteio_entries (twitch_name)
-  `);
+  await q(`CREATE INDEX IF NOT EXISTS discord_deposit_tickets_channel_idx ON discord_deposit_tickets (channel_id)`);
+  await q(`CREATE INDEX IF NOT EXISTS discord_deposit_tickets_user_idx ON discord_deposit_tickets (user_id)`);
 }
 
 export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
@@ -213,19 +172,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const sorteioChannelId = String(process.env.DISCORD_SORTEIO_CHANNEL_ID || entryChannelId || '').trim();
   const ticketsCategoryId = process.env.DISCORD_TICKETS_CATEGORY_ID;
 
-  if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
-    onLog.error('❌ Variáveis faltando: DISCORD_TOKEN (ou DISCORD_BOT_KEY), DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
-    return null;
-  }
-
-  onLog.log('🚀 [DISCORD] init ok. Tentando login…', {
-    enabled,
-    hasToken: !!token,
-    guildId: !!guildId,
-    entryChannelId: !!entryChannelId,
-    ticketsCategoryId: !!ticketsCategoryId
-  });
-
   const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
   const logChannelId = String(process.env.DISCORD_LOG_CHANNEL_ID || '').trim();
 
@@ -233,20 +179,25 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const deleteMin = Math.max(0, parseInt(process.env.DISCORD_TICKET_DELETE_MINUTES || '2', 10) || 2);
 
   const idleCloseMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_IDLE_CLOSE_MINUTES || '8', 10) || 8);
-  const idleWarnBeforeMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_IDLE_WARN_BEFORE_MINUTES || '2', 10) || 2);
+  const idleWarnBeforeMin = Math.max(1, parseInt(process.env.DISCORD_TICKET_IDLE_WARN_BEFORE_MINUTES || '3', 10) || 3);
 
-  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || '').trim();
-  const cloudApiKey = String(process.env.CLOUDINARY_API_KEY || '').trim();
-  const cloudApiSecret = String(process.env.CLOUDINARY_API_SECRET || '').trim();
-  const cloudFolder = String(process.env.CLOUDINARY_DISCORD_FOLDER || process.env.CLOUDINARY_FOLDER || 'discord').trim();
+  if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
+    onLog.error('❌ Variáveis faltando: DISCORD_TOKEN (ou DISCORD_BOT_KEY), DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
+    return null;
+  }
 
-  const allowOnlyOneOpenTicket = asBool(process.env.DISCORD_TICKET_ONE_OPEN_PER_USER, true);
+  onLog.log('🚀 [DISCORD] init ok. Tentando login…', {
+    enabled: true,
+    hasToken: !!token,
+    guildId: !!guildId,
+    entryChannelId: !!entryChannelId,
+    ticketsCategoryId: !!ticketsCategoryId
+  });
 
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent
+      GatewayIntentBits.GuildMessages
     ],
     partials: [Partials.Channel, Partials.Message]
   });
@@ -266,29 +217,108 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const waitTimers = new Map();
   const idleTimers = new Map();
 
-  function isStaff(member) {
+  function dayEqTodaySql(col) {
+    return `((${col} AT TIME ZONE 'America/Sao_Paulo')::date = (now() AT TIME ZONE 'America/Sao_Paulo')::date)`;
+  }
+
+  async function getSorteioState() {
     try {
-      if (!member) return false;
-      if (member.permissions?.has?.(PermissionsBitField.Flags.Administrator)) return true;
-      if (!staffRoleIds.length) return false;
-      const roles = member.roles?.cache;
-      if (!roles) return false;
-      return staffRoleIds.some(id => roles.has(id));
+      const r = await q(`SELECT is_open, discord_channel_id, discord_message_id FROM sorteio_state WHERE id=1`);
+      const row = r?.rows?.[0] || null;
+      const open = !!row?.is_open;
+      const channelId = String(row?.discord_channel_id || sorteioChannelId || entryChannelId || '').trim();
+      const messageId = row?.discord_message_id ? String(row.discord_message_id) : null;
+      return { open, channelId, messageId };
     } catch {
-      return false;
+      return { open: true, channelId: sorteioChannelId || entryChannelId, messageId: null };
     }
   }
 
-  async function logToChannel(embedOrText) {
+  async function setSorteioMessageRef(channelId, messageId) {
+    try {
+      await q(`UPDATE sorteio_state SET discord_channel_id=$1, discord_message_id=$2, updated_at=now() WHERE id=1`, [
+        String(channelId || ''),
+        String(messageId || '')
+      ]);
+    } catch {}
+  }
+
+  function buildEntryMessage() {
+    const embed = new EmbedBuilder()
+      .setTitle('📥 Enviar print do depósito')
+      .setDescription('Clique no botão abaixo para abrir um ticket e enviar seu print.')
+      .setFooter({ text: 'Sistema de tickets automático' });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('dep:open')
+        .setLabel('Enviar print')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return { embeds: [embed], components: [row] };
+  }
+
+  function buildSorteioMessage(open) {
+    const embed = new EmbedBuilder()
+      .setTitle('🎁 Sorteio')
+      .setDescription(open ? 'Inscrições abertas! Clique para participar.' : 'Inscrições fechadas no momento.')
+      .setFooter({ text: `Atualizado em ${nowIso()}` });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('sorteio:join')
+        .setLabel(open ? 'Inscrever no sorteio' : 'Sorteio fechado')
+        .setStyle(open ? ButtonStyle.Success : ButtonStyle.Secondary)
+        .setDisabled(!open)
+    );
+
+    return { embeds: [embed], components: [row] };
+  }
+
+  async function ensureEntryMessage() {
+    const ch = await client.channels.fetch(entryChannelId).catch(() => null);
+    if (!ch || !ch.isTextBased()) return;
+
+    const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+    const already = msgs?.find(m => {
+      if (!m.author || m.author.id !== client.user.id) return false;
+      const hasBtn = (m.components || []).some(row =>
+        (row.components || []).some(c => c.customId === 'dep:open')
+      );
+      return hasBtn;
+    });
+
+    if (!already) {
+      await ch.send(buildEntryMessage()).catch(() => {});
+    }
+  }
+
+  async function ensureSorteioMessage() {
+    const st = await getSorteioState();
+    const ch = await client.channels.fetch(st.channelId).catch(() => null);
+    if (!ch || !ch.isTextBased()) return;
+
+    if (st.messageId) {
+      const msg = await ch.messages.fetch(st.messageId).catch(() => null);
+      if (msg) {
+        await msg.edit(buildSorteioMessage(st.open)).catch(() => {});
+        return;
+      }
+    }
+
+    const sent = await ch.send(buildSorteioMessage(st.open)).catch(() => null);
+    if (sent?.id) {
+      await setSorteioMessageRef(ch.id, sent.id);
+    }
+  }
+
+  async function logToChannel(content) {
     try {
       if (!logChannelId) return;
       const ch = await client.channels.fetch(logChannelId).catch(() => null);
-      if (!ch) return;
-      if (typeof embedOrText === 'string') {
-        await ch.send({ content: embedOrText }).catch(() => {});
-        return;
-      }
-      await ch.send({ embeds: [embedOrText] }).catch(() => {});
+      if (!ch || !ch.isTextBased()) return;
+      await ch.send(content).catch(() => {});
     } catch {}
   }
 
@@ -305,64 +335,47 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   }
 
   async function getOpenTicketByUser(userId) {
-    const r = await q(
-      `SELECT * FROM discord_deposit_tickets
-       WHERE user_id=$1 AND status IN ('OPEN','WAIT_IMAGE')
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [String(userId)]
-    );
-    return r.rows?.[0] || null;
+    try {
+      const r = await q(
+        `SELECT * FROM discord_deposit_tickets WHERE user_id=$1 AND closed_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [String(userId)]
+      );
+      return r?.rows?.[0] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function getOpenTicketById(ticketId) {
+    try {
+      const r = await q(
+        `SELECT * FROM discord_deposit_tickets WHERE id=$1 AND closed_at IS NULL LIMIT 1`,
+        [String(ticketId)]
+      );
+      return r?.rows?.[0] || null;
+    } catch {
+      return null;
+    }
   }
 
   async function getOpenTicketByChannel(channelId) {
-    const r = await q(
-      `SELECT * FROM discord_deposit_tickets
-       WHERE channel_id=$1 AND status IN ('OPEN','WAIT_IMAGE')
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [String(channelId)]
-    );
-    return r.rows?.[0] || null;
+    try {
+      const r = await q(
+        `SELECT * FROM discord_deposit_tickets WHERE channel_id=$1 AND closed_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+        [String(channelId)]
+      );
+      return r?.rows?.[0] || null;
+    } catch {
+      return null;
+    }
   }
 
-  async function createTicketRow({ ticketId, userId, channelId }) {
-    await q(
-      `INSERT INTO discord_deposit_tickets (id, user_id, channel_id, status)
-       VALUES ($1,$2,$3,'OPEN')
-       ON CONFLICT (id) DO UPDATE SET updated_at=now()`,
-      [String(ticketId), String(userId), String(channelId)]
-    );
-  }
+  function buildTicketPanel(ticketId) {
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Ticket aberto')
+      .setDescription('Clique em **Preencher dados**, escolha o tipo de Pix e depois envie o **print** (imagem) aqui no ticket.')
+      .setFooter({ text: `Ticket: ${ticketId}` });
 
-  async function setTicketStatus(ticketId, status) {
-    await q(
-      `UPDATE discord_deposit_tickets
-       SET status=$2, updated_at=now(),
-           closed_at = CASE WHEN $2 IN ('CLOSED','DONE','CANCELLED') THEN now() ELSE closed_at END
-       WHERE id=$1`,
-      [String(ticketId), String(status)]
-    );
-  }
-
-  async function saveTicketData(ticketId, { pixType, twitchName, pixKey, submissionId }) {
-    await q(
-      `UPDATE discord_deposit_tickets
-       SET pix_type = COALESCE($2, pix_type),
-           twitch_name = COALESCE($3, twitch_name),
-           pix_key = COALESCE($4, pix_key),
-           submission_id = COALESCE($5, submission_id),
-           updated_at = now()
-       WHERE id=$1`,
-      [String(ticketId), pixType ?? null, twitchName ?? null, pixKey ?? null, submissionId ?? null]
-    );
-  }
-
-  async function deleteTicketRow(ticketId) {
-    await q(`DELETE FROM discord_deposit_tickets WHERE id=$1`, [String(ticketId)]);
-  }
-
-  function buildEntryComponents(ticketId) {
     const row1 = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`dep:fill:${ticketId}`)
@@ -382,108 +395,52 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         )
     );
 
-    return [row1, row2];
+    return { embeds: [embed], components: [row1, row2] };
   }
 
-  function buildSorteioComponents(isOpen) {
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('sorteio:join')
-        .setLabel(isOpen ? 'Inscrever no sorteio' : 'Sorteio fechado')
-        .setStyle(isOpen ? ButtonStyle.Success : ButtonStyle.Secondary)
-        .setDisabled(!isOpen)
-    );
-    return [row];
-  }
-
-  async function ensureEntryMessage() {
-    const ch = await client.channels.fetch(entryChannelId).catch(() => null);
-    if (!ch) return;
-
+  async function logTicket({ kind, userId, channelId, ticketId, extra }) {
     const embed = new EmbedBuilder()
-      .setTitle('📥 Enviar print do depósito')
-      .setDescription('Clique no botão abaixo para abrir um ticket e enviar seu print.')
-      .setFooter({ text: 'Sistema de tickets automático' });
+      .setTitle(`📌 Ticket: ${kind}`)
+      .setDescription(`Usuário: <@${userId}>\nCanal: <#${channelId}>\nTicket: ${ticketId}${extra ? `\n${extra}` : ''}`)
+      .setFooter({ text: nowIso() });
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('dep:open')
-        .setLabel('Enviar print')
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    await ch.send({ embeds: [embed], components: [row] }).catch(() => {});
+    await logToChannel({ embeds: [embed] });
   }
 
-  async function getSorteioState() {
-    const r = await q(`SELECT is_open FROM discord_sorteio_state WHERE id=1`);
-    return { open: !!r.rows?.[0]?.is_open };
-  }
+  async function scheduleIdle(ticketId, channelId, userId) {
+    clearIdle(ticketId);
 
-  async function setSorteioState(open) {
-    await q(`UPDATE discord_sorteio_state SET is_open=$1, updated_at=now() WHERE id=1`, [!!open]);
-  }
+    const warnAtMs = Math.max(1, idleCloseMin - idleWarnBeforeMin) * 60 * 1000;
+    const closeAtMs = idleCloseMin * 60 * 1000;
 
-  async function updateSorteioMessage(isOpen) {
-    try {
-      const ch = await client.channels.fetch(sorteioChannelId).catch(() => null);
-      if (!ch) return;
+    const timer = setTimeout(async () => {
+      try {
+        const ch = await client.channels.fetch(channelId).catch(() => null);
+        if (!ch || !ch.isTextBased()) return;
 
-      const embed = new EmbedBuilder()
-        .setTitle('🎁 Sorteio')
-        .setDescription(isOpen ? 'Inscrições abertas! Clique para participar.' : 'Inscrições fechadas no momento.')
-        .setFooter({ text: `Atualizado em ${nowIso()}` });
+        await ch.send({ content: `<@${userId}> ⏳ Ticket inativo. Se não mandar o print, ele vai fechar em ${idleWarnBeforeMin} minuto(s).` }).catch(() => {});
+      } catch {}
+    }, warnAtMs);
 
-      await ch.send({ embeds: [embed], components: buildSorteioComponents(isOpen) }).catch(() => {});
-    } catch {}
-  }
+    idleTimers.set(ticketId, timer);
 
-  async function tryUploadToCloudinary({ imageUrl, ticketId, onLog }) {
-    try {
-      if (!cloudName || !cloudApiKey || !cloudApiSecret) return null;
+    setTimeout(async () => {
+      try {
+        const t = await getOpenTicketById(ticketId);
+        if (!t) return;
 
-      const boundary = '----WebKitFormBoundary' + crypto.randomBytes(12).toString('hex');
-
-      const timestamp = Math.floor(Date.now() / 1000);
-      const publicId = `ticket_${ticketId}_${timestamp}`;
-
-      const paramsToSign = `folder=${encodeURIComponent(cloudFolder)}&public_id=${encodeURIComponent(publicId)}&timestamp=${timestamp}`;
-      const sig = crypto
-        .createHash('sha1')
-        .update(`${paramsToSign}${cloudApiSecret}`)
-        .digest('hex');
-
-      const formParts = [];
-      const pushField = (name, value) => {
-        formParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`);
-      };
-
-      pushField('file', imageUrl);
-      pushField('api_key', cloudApiKey);
-      pushField('timestamp', String(timestamp));
-      pushField('signature', sig);
-      pushField('folder', cloudFolder);
-      pushField('public_id', publicId);
-
-      formParts.push(`--${boundary}--\r\n`);
-      const body = formParts.join('');
-
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-        method: 'POST',
-        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-        body
-      });
-
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        onLog?.error?.('Cloudinary upload falhou:', json || res.status);
-        return null;
-      }
-      return json?.secure_url || json?.url || null;
-    } catch (e) {
-      onLog?.error?.('Cloudinary upload erro:', e?.message || e);
-      return null;
-    }
+        await q(`UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`, [String(ticketId)]);
+        const ch = await client.channels.fetch(channelId).catch(() => null);
+        if (ch && ch.isTextBased()) {
+          await ch.send({ content: '⛔ Ticket fechado por inatividade. Se precisar, abra outro.' }).catch(() => {});
+          if (deleteMin > 0) {
+            setTimeout(async () => {
+              await ch.delete().catch(() => {});
+            }, deleteMin * 60 * 1000);
+          }
+        }
+      } catch {}
+    }, closeAtMs);
   }
 
   async function openTicket(interaction) {
@@ -492,235 +449,254 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     } catch {}
 
     const userId = interaction.user.id;
+    const guild = await client.guilds.fetch(guildId);
+    const member = await guild.members.fetch(userId).catch(() => null);
 
-    try {
-      if (allowOnlyOneOpenTicket) {
-        const existing = await getOpenTicketByUser(userId);
-        if (existing) {
-          await interaction.editReply({ content: 'Você já tem um ticket aberto. Verifique o canal do ticket.' }).catch(() => {});
-          return;
-        }
-      }
+    let existing = await getOpenTicketByUser(userId);
 
-      const g = await client.guilds.fetch(guildId).catch(() => null);
-      if (!g) {
-        await interaction.editReply({ content: 'Servidor não encontrado. Fala com a staff.' }).catch(() => {});
+    if (existing) {
+      const ch = await client.channels.fetch(String(existing.channel_id)).catch(() => null);
+      if (ch) {
+        await interaction.editReply({
+          content: `Você já tem um ticket aberto: <#${ch.id}>`
+        }).catch(() => {});
         return;
       }
 
-      const member = await g.members.fetch(userId).catch(() => null);
-      if (!member) {
-        await interaction.editReply({ content: 'Não consegui te localizar no servidor. Fala com a staff.' }).catch(() => {});
-        return;
-      }
+      await q(
+        `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
+        [String(existing.id)]
+      );
+      clearWaitTimer(String(existing.id));
+      clearIdle(String(existing.id));
+      existing = null;
+    }
 
-      const parent = await client.channels.fetch(ticketsCategoryId).catch(() => null);
-      if (!parent) {
-        await interaction.editReply({ content: 'Categoria de tickets não encontrada. Fala com a staff.' }).catch(() => {});
-        return;
-      }
+    const ticketId = (typeof uid === 'function' ? uid() : crypto.randomUUID());
+    const slug = safeChannelSlug(member?.user?.username || interaction.user.username);
+    const rand = Math.floor(100 + Math.random() * 900);
+    const channelName = `ticket-${slug}-${rand}`;
 
-      const ticketId = crypto.randomUUID();
-      const chanName = `dep-${safeChannelSlug(interaction.user.username)}-${ticketId.slice(0, 4)}`;
+    const overwrites = [];
 
-      const ch = await g.channels.create({
-        name: chanName,
-        type: ChannelType.GuildText,
-        parent: ticketsCategoryId,
-        permissionOverwrites: [
-          { id: g.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-          { id: userId, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory, PermissionsBitField.Flags.AttachFiles] }
+    overwrites.push({
+      id: guild.roles.everyone.id,
+      deny: [PermissionsBitField.Flags.ViewChannel]
+    });
+
+    overwrites.push({
+      id: userId,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.AttachFiles
+      ]
+    });
+
+    for (const rid of staffRoleIds) {
+      overwrites.push({
+        id: rid,
+        allow: [
+          PermissionsBitField.Flags.ViewChannel,
+          PermissionsBitField.Flags.SendMessages,
+          PermissionsBitField.Flags.ReadMessageHistory,
+          PermissionsBitField.Flags.ManageMessages,
+          PermissionsBitField.Flags.AttachFiles
         ]
       });
-
-      await createTicketRow({ ticketId, userId, channelId: ch.id });
-
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Ticket aberto')
-        .setDescription('Clique em **Preencher dados**, escolha o tipo de Pix, e depois envie o **print** (imagem) aqui no ticket.')
-        .setFooter({ text: `Ticket: ${ticketId}` });
-
-      const comps = buildEntryComponents(ticketId);
-
-      await ch.send({ content: `<@${userId}>`, embeds: [embed], components: comps }).catch(() => {});
-      await interaction.editReply({ content: `Ticket criado: <#${ch.id}>` }).catch(() => {});
-
-      await logToChannel(new EmbedBuilder()
-        .setTitle('📥 Ticket criado')
-        .setDescription(`Usuário: <@${userId}>\nCanal: <#${ch.id}>\nTicket: ${ticketId}`)
-        .setFooter({ text: nowIso() })
-      );
-
-      if (deleteMin > 0) {
-        setTimeout(async () => {
-          try {
-            const t = await getOpenTicketByChannel(ch.id);
-            if (!t) return;
-            if (t.status === 'DONE' || t.status === 'CLOSED' || t.status === 'CANCELLED') return;
-            await setTicketStatus(ticketId, 'CLOSED');
-            await ch.send({ content: '⏳ Ticket fechado por tempo. Se precisar, abra novamente.' }).catch(() => {});
-            await ch.delete().catch(() => {});
-            await deleteTicketRow(ticketId);
-          } catch {}
-        }, deleteMin * 60 * 1000);
-      }
-    } catch (e) {
-      onLog.error('openTicket erro:', e?.message || e);
-      await interaction.editReply({ content: 'Falha ao abrir o ticket. Fala com a staff.' }).catch(() => {});
     }
-  }
 
-  async function handleFill(interaction, ticketId) {
-    try {
-      await interaction.showModal(
-        new ModalBuilder()
-          .setCustomId(`dep:modal:${ticketId}`)
-          .setTitle('Dados do depósito')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('twitch')
-                .setLabel('Seu nick da Twitch')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMinLength(3)
-                .setMaxLength(25)
-            ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('pixkey')
-                .setLabel('Sua chave Pix')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMinLength(5)
-                .setMaxLength(120)
-            )
-          )
-      );
-    } catch (e) {
-      onLog.error('handleFill erro:', e?.message || e);
-      if (interaction.deferred) {
-        await interaction.editReply({ content: 'Falha ao abrir formulário. Tenta de novo.' }).catch(() => {});
-      } else if (!interaction.replied) {
-        await interaction.reply({ flags: 64, content: 'Falha ao abrir formulário. Tenta de novo.' }).catch(() => {});
-      }
-    }
+    overwrites.push({
+      id: client.user.id,
+      allow: [
+        PermissionsBitField.Flags.ViewChannel,
+        PermissionsBitField.Flags.SendMessages,
+        PermissionsBitField.Flags.ReadMessageHistory,
+        PermissionsBitField.Flags.ManageChannels,
+        PermissionsBitField.Flags.ManageMessages,
+        PermissionsBitField.Flags.AttachFiles
+      ]
+    });
+
+    const ticketChannel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: ticketsCategoryId,
+      permissionOverwrites: overwrites,
+      topic: `ticketId=${ticketId} userId=${userId} created=${nowIso()}`
+    });
+
+    await q(
+      `INSERT INTO discord_deposit_tickets (id, user_id, channel_id, status, created_at, updated_at)
+       VALUES ($1,$2,$3,'OPEN',now(),now())`,
+      [String(ticketId), String(userId), String(ticketChannel.id)]
+    );
+
+    await logTicket({
+      kind: 'OPEN',
+      userId,
+      channelId: ticketChannel.id,
+      ticketId
+    });
+
+    const pingStaff = staffRoleIds.length ? staffRoleIds.map(r => `<@&${r}>`).join(' ') : '';
+    await ticketChannel.send({
+      content: `${pingStaff} <@${userId}>`,
+      ...buildTicketPanel(ticketId)
+    }).catch(() => {});
+
+    await interaction.editReply({
+      content: `✅ Ticket criado: <#${ticketChannel.id}>`
+    }).catch(() => {});
+
+    await scheduleIdle(ticketId, ticketChannel.id, userId);
   }
 
   async function handlePick(interaction, ticketId) {
-    try {
-      const pixType = String(interaction.values?.[0] || '').trim();
-      await saveTicketData(ticketId, { pixType });
-
-      await interaction.reply({ flags: 64, content: `✅ Tipo de Pix selecionado: **${toTitlePixType(pixType)}**` }).catch(() => {});
-    } catch (e) {
-      onLog.error('handlePick erro:', e?.message || e);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ flags: 64, content: 'Falha ao salvar tipo Pix.' }).catch(() => {});
-      }
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      return;
     }
+
+    const pixType = String(interaction.values?.[0] || '').trim();
+    if (!['cpf', 'email', 'phone', 'random'].includes(pixType)) {
+      await interaction.reply({ flags: 64, content: 'Tipo de Pix inválido.' }).catch(() => {});
+      return;
+    }
+
+    await q(
+      `UPDATE discord_deposit_tickets SET pix_type=$2, updated_at=now() WHERE id=$1`,
+      [String(ticketId), String(pixType)]
+    );
+
+    await interaction.reply({ flags: 64, content: `✅ Tipo de Pix selecionado: **${toTitlePixType(pixType)}**` }).catch(() => {});
+  }
+
+  async function handleFill(interaction, ticketId) {
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      return;
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(`dep:modal:${ticketId}`)
+      .setTitle('Dados do depósito');
+
+    const twitch = new TextInputBuilder()
+      .setCustomId('twitch')
+      .setLabel('Seu nick da Twitch')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(3)
+      .setMaxLength(25);
+
+    const pixKey = new TextInputBuilder()
+      .setCustomId('pixkey')
+      .setLabel('Sua chave Pix')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(5)
+      .setMaxLength(120);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(twitch),
+      new ActionRowBuilder().addComponents(pixKey)
+    );
+
+    await interaction.showModal(modal).catch(() => {});
   }
 
   async function handleModal(interaction, ticketId) {
-    try {
-      await interaction.deferReply({ flags: 64 }).catch(() => {});
-      const twitchRaw = interaction.fields.getTextInputValue('twitch');
-      const pixKey = interaction.fields.getTextInputValue('pixkey');
+    await interaction.deferReply({ flags: 64 }).catch(() => {});
 
-      if (!isValidTwitchName(twitchRaw)) {
-        await interaction.editReply({ content: 'Nick da Twitch inválido.' }).catch(() => {});
-        return;
-      }
-
-      const twitchName = normalizeTwitchName(twitchRaw);
-
-      const t = await q(`SELECT * FROM discord_deposit_tickets WHERE id=$1`, [String(ticketId)]);
-      const row = t.rows?.[0];
-      const pixType = row?.pix_type;
-
-      if (!pixType || !['cpf', 'email', 'phone', 'random'].includes(pixType)) {
-        await interaction.editReply({ content: 'Selecione o tipo de Pix antes.' }).catch(() => {});
-        return;
-      }
-
-      let okKey = true;
-      if (pixType === 'cpf') okKey = isValidCPF(pixKey);
-      if (pixType === 'email') okKey = isValidEmail(pixKey);
-      if (pixType === 'phone') okKey = isValidPhoneBR(pixKey);
-      if (!okKey) {
-        await interaction.editReply({ content: `Chave Pix inválida para o tipo ${toTitlePixType(pixType)}.` }).catch(() => {});
-        return;
-      }
-
-      await saveTicketData(ticketId, { twitchName, pixKey });
-
-      await setTicketStatus(ticketId, 'WAIT_IMAGE');
-
-      await interaction.editReply({ content: '✅ Dados salvos. Agora envie **somente a imagem** do print aqui no ticket.' }).catch(() => {});
-    } catch (e) {
-      onLog.error('handleModal erro:', e?.message || e);
-      await interaction.editReply({ content: 'Falha ao processar seus dados.' }).catch(() => {});
+    const t = await getOpenTicketById(ticketId);
+    if (!t) {
+      await interaction.editReply({ content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      return;
     }
+
+    const twitchRaw = interaction.fields.getTextInputValue('twitch');
+    const pixKey = interaction.fields.getTextInputValue('pixkey');
+
+    if (!isValidTwitchName(twitchRaw)) {
+      await interaction.editReply({ content: 'Nick da Twitch inválido.' }).catch(() => {});
+      return;
+    }
+
+    const twitchName = normalizeTwitchName(twitchRaw);
+
+    const pixType = t.pix_type;
+    if (!pixType || !['cpf', 'email', 'phone', 'random'].includes(pixType)) {
+      await interaction.editReply({ content: 'Selecione o tipo de Pix antes.' }).catch(() => {});
+      return;
+    }
+
+    let okKey = true;
+    if (pixType === 'cpf') okKey = isValidCPF(pixKey);
+    if (pixType === 'email') okKey = isValidEmail(pixKey);
+    if (pixType === 'phone') okKey = isValidPhoneBR(pixKey);
+
+    if (!okKey) {
+      await interaction.editReply({ content: `Chave Pix inválida para o tipo ${toTitlePixType(pixType)}.` }).catch(() => {});
+      return;
+    }
+
+    await q(
+      `UPDATE discord_deposit_tickets
+       SET twitch_name=$2, pix_key=$3, status='WAIT_IMAGE', updated_at=now()
+       WHERE id=$1`,
+      [String(ticketId), String(twitchName), String(pixKey)]
+    );
+
+    await interaction.editReply({ content: '✅ Dados salvos. Agora envie **somente a imagem** do print aqui no ticket.' }).catch(() => {});
   }
 
   async function openSorteioModal(interaction) {
-    try {
-      await interaction.showModal(
-        new ModalBuilder()
-          .setCustomId('sorteio:modal')
-          .setTitle('Inscrição no sorteio')
-          .addComponents(
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder()
-                .setCustomId('twitch')
-                .setLabel('Seu nick da Twitch')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMinLength(3)
-                .setMaxLength(25)
-            )
-          )
-      );
-    } catch (e) {
-      onLog.error('openSorteioModal erro:', e?.message || e);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ flags: 64, content: 'Falha ao abrir inscrição.' }).catch(() => {});
-      }
-    }
+    const modal = new ModalBuilder()
+      .setCustomId('sorteio:modal')
+      .setTitle('Inscrição no sorteio');
+
+    const twitch = new TextInputBuilder()
+      .setCustomId('twitch')
+      .setLabel('Seu nick da Twitch')
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMinLength(3)
+      .setMaxLength(25);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(twitch));
+    await interaction.showModal(modal).catch(() => {});
   }
 
   async function handleSorteioModal(interaction) {
-    try {
-      await interaction.deferReply({ flags: 64 }).catch(() => {});
-      const st = await getSorteioState();
-      if (!st.open) {
-        await interaction.editReply({ content: 'Sorteio fechado no momento.' }).catch(() => {});
-        return;
-      }
+    await interaction.deferReply({ flags: 64 }).catch(() => {});
 
-      const twitchRaw = interaction.fields.getTextInputValue('twitch');
-      if (!isValidTwitchName(twitchRaw)) {
-        await interaction.editReply({ content: 'Nick da Twitch inválido.' }).catch(() => {});
-        return;
-      }
-
-      const twitchName = normalizeTwitchName(twitchRaw);
-
-      const userId = interaction.user.id;
-      const tag = `${interaction.user.username}#${interaction.user.discriminator}`;
-
-      const id = crypto.randomUUID();
-      await q(
-        `INSERT INTO discord_sorteio_entries (id, user_id, discord_tag, twitch_name)
-         VALUES ($1,$2,$3,$4)`,
-        [id, String(userId), String(tag), String(twitchName)]
-      );
-
-      await interaction.editReply({ content: '✅ Inscrição registrada! Boa sorte 🍀' }).catch(() => {});
-    } catch (e) {
-      onLog.error('handleSorteioModal erro:', e?.message || e);
-      await interaction.editReply({ content: 'Falha ao registrar inscrição.' }).catch(() => {});
+    const st = await getSorteioState();
+    if (!st.open) {
+      await interaction.editReply({ content: 'Sorteio fechado no momento.' }).catch(() => {});
+      return;
     }
+
+    const twitchRaw = interaction.fields.getTextInputValue('twitch');
+    if (!isValidTwitchName(twitchRaw)) {
+      await interaction.editReply({ content: 'Nick da Twitch inválido.' }).catch(() => {});
+      return;
+    }
+
+    const twitchName = normalizeTwitchName(twitchRaw);
+    const userId = interaction.user.id;
+    const tag = `${interaction.user.username}#${interaction.user.discriminator}`;
+
+    await q(
+      `INSERT INTO sorteio_entries (id, discord_user_id, discord_tag, twitch_name, created_at)
+       VALUES ($1,$2,$3,$4,now())`,
+      [crypto.randomUUID(), String(userId), String(tag), String(twitchName)]
+    ).catch(() => {});
+
+    await interaction.editReply({ content: '✅ Inscrição registrada! Boa sorte 🍀' }).catch(() => {});
   }
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -764,7 +740,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         }
       }
     } catch (e) {
-      onLog.error('❌ [DISCORD] InteractionCreate falhou:', e?.message || e);
+      onLog.error('InteractionCreate falhou:', e?.message || e);
       try {
         const msg = 'Falha ao processar. Tenta de novo.';
         if (interaction.deferred) {
@@ -776,55 +752,23 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
   });
 
-  async function periodicCleanup() {
-    try {
-      const r = await q(
-        `SELECT * FROM discord_deposit_tickets
-         WHERE status IN ('OPEN','WAIT_IMAGE')
-         ORDER BY created_at ASC
-         LIMIT 50`
-      );
-
-      for (const t of r.rows || []) {
-        const ticketId = String(t.id);
-        const channelId = String(t.channel_id);
-
-        const ch = await client.channels.fetch(channelId).catch(() => null);
-        if (!ch) {
-          await setTicketStatus(ticketId, 'CLOSED');
-          await deleteTicketRow(ticketId);
-          continue;
-        }
-      }
-    } catch {}
-  }
-
   client.on(Events.MessageCreate, async (msg) => {
     try {
       if (!msg || !msg.guildId) return;
       if (String(msg.guildId) !== String(guildId)) return;
       if (msg.author?.bot) return;
 
-      if (msg.partial) {
-        msg = await msg.fetch().catch(() => msg);
-      }
-
       const t = await getOpenTicketByChannel(msg.channelId);
       if (!t) return;
-
-      if (String(msg.author.id) !== String(t.user_id)) return;
-
       if (String(t.status) !== 'WAIT_IMAGE') return;
+      if (String(msg.author.id) !== String(t.user_id)) return;
 
       const imgs = Array.from(msg.attachments?.values?.() || []).filter(likelyImageAttachment);
       if (!imgs.length) {
         const last = warnCooldown.get(msg.channelId) || 0;
         if (Date.now() - last < 20000) return;
         warnCooldown.set(msg.channelId, Date.now());
-
-        await msg.channel.send({
-          content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).`
-        }).catch(() => {});
+        await msg.channel.send({ content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).` }).catch(() => {});
         return;
       }
 
@@ -835,9 +779,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       clearWaitTimer(String(t.id));
       clearIdle(String(t.id));
 
-      const uploaded = await tryUploadToCloudinary({ imageUrl: rawUrl, ticketId: t.id, onLog });
-      const finalUrl = uploaded || rawUrl;
-
       const pixType = t.pix_type || '—';
       const twitchName = t.twitch_name || '—';
       const pixKeyMasked = maskPixKey(pixType, t.pix_key);
@@ -845,24 +786,26 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       const embed = new EmbedBuilder()
         .setTitle('✅ Print recebido')
         .setDescription(`Twitch: **${twitchName}**\nPix: **${toTitlePixType(pixType)}** (${pixKeyMasked})`)
-        .setImage(finalUrl)
+        .setImage(rawUrl)
         .setFooter({ text: `Ticket: ${t.id}` });
 
       await msg.channel.send({ embeds: [embed] }).catch(() => {});
-      await setTicketStatus(String(t.id), 'DONE');
 
-      await logToChannel(new EmbedBuilder()
-        .setTitle('✅ Depósito enviado')
-        .setDescription(`Usuário: <@${t.user_id}>\nTwitch: **${twitchName}**\nPix: **${toTitlePixType(pixType)}** (${pixKeyMasked})\nCanal: <#${msg.channelId}>`)
-        .setFooter({ text: nowIso() })
-      );
+      await q(`UPDATE discord_deposit_tickets SET status='DONE', updated_at=now() WHERE id=$1`, [String(t.id)]).catch(() => {});
+
+      await logTicket({
+        kind: 'DONE',
+        userId: t.user_id,
+        channelId: msg.channelId,
+        ticketId: t.id,
+        extra: `Twitch: **${twitchName}** | Pix: **${toTitlePixType(pixType)}** (${pixKeyMasked})`
+      });
 
       if (deleteMin > 0) {
         setTimeout(async () => {
           try {
             const ch = await client.channels.fetch(msg.channelId).catch(() => null);
             await ch?.delete?.().catch(() => {});
-            await deleteTicketRow(String(t.id));
           } catch {}
         }, deleteMin * 60 * 1000);
       }
@@ -871,16 +814,31 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
   });
 
+  async function periodicCleanup() {
+    try {
+      const r = await q(
+        `SELECT * FROM discord_deposit_tickets WHERE closed_at IS NULL ORDER BY created_at DESC LIMIT 200`
+      );
+      const rows = r?.rows || [];
+      for (const t of rows) {
+        const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
+        if (!ch) {
+          await q(
+            `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
+            [String(t.id)]
+          );
+          clearWaitTimer(String(t.id));
+          clearIdle(String(t.id));
+        }
+      }
+    } catch {}
+  }
+
   client.once(Events.ClientReady, async () => {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
     await ensureTables(q);
     await ensureEntryMessage();
-
-    try {
-      const st = await getSorteioState();
-      await updateSorteioMessage(st.open);
-    } catch {}
-
+    await ensureSorteioMessage();
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
@@ -891,5 +849,5 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       onLog.error('❌ [DISCORD] login falhou:', e?.message || e);
     });
 
-  return { client, updateSorteioMessage };
+  return { client };
 }
