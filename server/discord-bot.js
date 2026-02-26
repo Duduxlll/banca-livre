@@ -241,12 +241,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   }
 
   onLog.log('🚀 [DISCORD] init ok. Tentando login…', {
-  enabled,
-  hasToken: !!token,
-  guildId: !!guildId,
-  entryChannelId: !!entryChannelId,
-  ticketsCategoryId: !!ticketsCategoryId,
-});
+    enabled,
+    hasToken: !!token,
+    guildId: !!guildId,
+    entryChannelId: !!entryChannelId,
+    ticketsCategoryId: !!ticketsCategoryId
+  });
 
   const staffRoleIds = parseIdsCsv(process.env.DISCORD_STAFF_ROLE_IDS || process.env.DISCORD_STAFF_ROLE_ID);
   const logChannelId = String(process.env.DISCORD_LOG_CHANNEL_ID || '').trim();
@@ -260,24 +260,32 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers,
-      GatewayIntentBits.GuildMessages,
-       GatewayIntentBits.Guilds ,
-      GatewayIntentBits.MessageContent
+      GatewayIntentBits.GuildMessages
     ],
     partials: [Partials.Channel, Partials.Message]
   });
+
+  process.on('unhandledRejection', (e) => onLog.error('❌ [DISCORD] unhandledRejection:', e));
+  process.on('uncaughtException', (e) => onLog.error('❌ [DISCORD] uncaughtException:', e));
+
+  client.on('warn', (m) => onLog.warn('⚠️ [DISCORD] warn:', m));
+  client.on('error', (e) => onLog.error('❌ [DISCORD] error:', e?.message || e));
+  client.on('shardError', (e) => onLog.error('❌ [DISCORD] shardError:', e?.message || e));
+  client.on('shardDisconnect', (event, id) => {
+    onLog.error('❌ [DISCORD] shardDisconnect:', { id, code: event?.code, reason: event?.reason });
+  });
+  client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
 
   const warnCooldown = new Map();
   const waitTimers = new Map();
   const idleTimers = new Map();
 
-  function dayEqTodaySql(col){
+  function dayEqTodaySql(col) {
     return `((${col} AT TIME ZONE 'America/Sao_Paulo')::date = (now() AT TIME ZONE 'America/Sao_Paulo')::date)`;
   }
 
-  async function getSorteioState(){
-    try{
+  async function getSorteioState() {
+    try {
       const r = await q(`SELECT is_open, discord_channel_id, discord_message_id FROM sorteio_state WHERE id=1`);
       const row = r?.rows?.[0] || null;
       const open = !!row?.is_open;
@@ -294,18 +302,18 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       }
 
       return { open, channelId: channelId || null, messageId };
-    }catch(e){
-      return { open:false, channelId: sorteioChannelId || entryChannelId, messageId:null };
+    } catch {
+      return { open: false, channelId: sorteioChannelId || entryChannelId, messageId: null };
     }
   }
 
-  async function setSorteioMessageIds(channelId, messageId){
-    try{
+  async function setSorteioMessageIds(channelId, messageId) {
+    try {
       await q(`UPDATE sorteio_state SET discord_channel_id=$1, discord_message_id=$2, updated_at=now() WHERE id=1`, [channelId || null, messageId || null]);
-    }catch{}
+    } catch {}
   }
 
-  function sorteioPayload(open){
+  function sorteioPayload(open) {
     const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
 
     const desc =
@@ -329,11 +337,11 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       .setDisabled(!open);
 
     const row = new ActionRowBuilder().addComponents(btn);
-    return { embeds:[embed], components:[row] };
+    return { embeds: [embed], components: [row] };
   }
 
-  async function findExistingSorteioMessage(ch){
-    try{
+  async function findExistingSorteioMessage(ch) {
+    try {
       const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
       if (!msgs) return null;
 
@@ -346,12 +354,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       });
 
       return found || null;
-    }catch{
+    } catch {
       return null;
     }
   }
 
-  async function updateSorteioMessage(open){
+  async function updateSorteioMessage(open) {
     const st = await getSorteioState();
     const channelId = st.channelId || sorteioChannelId || entryChannelId;
     if (!channelId) return;
@@ -382,68 +390,22 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
   }
 
-  async function hasDepositoHoje(twitchName){
+  async function jaInscritoSorteio(twitchName) {
     const nn = normalizeTwitchName(twitchName);
-    try{
-      const r = await q(
-        `SELECT 1 FROM extratos
-         WHERE tipo='deposito' AND lower(nome)=$1 AND ${dayEqTodaySql('created_at')}
-         LIMIT 1`,
-        [nn]
-      );
-      return (r?.rows?.length || 0) > 0;
-    }catch{
-      return false;
-    }
-  }
-
-  async function hasPrintHoje(twitchName){
-    const nn = normalizeTwitchName(twitchName);
-
-    try{
-      const r = await q(
-        `SELECT 1 FROM cashback_submissions
-WHERE lower(twitch_name)=$1
-  AND ${dayEqTodaySql('created_at')}
-  AND upper(status)='APROVADO'
-ORDER BY created_at DESC
-LIMIT 1
-`,
-        [nn]
-      );
-      if ((r?.rows?.length || 0) > 0) return true;
-    }catch{}
-
-    try{
-      const r = await q(
-        `SELECT 1 FROM cashbacks
-         WHERE lower(twitch_nick)=$1 AND ${dayEqTodaySql('created_at')}
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [nn]
-      );
-      if ((r?.rows?.length || 0) > 0) return true;
-    }catch{}
-
-    return false;
-  }
-
-  async function jaInscritoSorteio(twitchName){
-    const nn = normalizeTwitchName(twitchName);
-    try{
+    try {
       const r = await q(`SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=$1 LIMIT 1`, [nn]);
       return (r?.rows?.length || 0) > 0;
-    }catch{
+    } catch {
       return false;
     }
   }
 
-  async function inserirSorteio(twitchName){
+  async function inserirSorteio(twitchName) {
     const nome = String(twitchName || '').trim().replace(/^@+/, '');
     await q(`INSERT INTO sorteio_inscricoes (nome_twitch, mensagem) VALUES ($1, NULL)`, [nome]);
   }
 
-  async function openSorteioModal(interaction){
+  async function openSorteioModal(interaction) {
     const st = await getSorteioState();
     if (!st.open) {
       await interaction.reply({ flags: 64, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
@@ -469,34 +431,33 @@ LIMIT 1
     });
   }
 
-  async function getPrintHojeInfo(twitchName){
-  const nn = normalizeTwitchName(twitchName);
+  async function getPrintHojeInfo(twitchName) {
+    const nn = normalizeTwitchName(twitchName);
 
-  try{
-    const r = await q(
-      `SELECT status, reason
-       FROM cashback_submissions
-       WHERE lower(twitch_name)=$1
-         AND ${dayEqTodaySql('created_at')}
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [nn]
-    );
+    try {
+      const r = await q(
+        `SELECT status, reason
+         FROM cashback_submissions
+         WHERE lower(twitch_name)=$1
+           AND ${dayEqTodaySql('created_at')}
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [nn]
+      );
 
-    const row = r?.rows?.[0] || null;
-    if (!row) return { found:false, status:null, reason:null };
+      const row = r?.rows?.[0] || null;
+      if (!row) return { found: false, status: null, reason: null };
 
-    const status = row.status ? String(row.status).toUpperCase() : null;
-    const reason = row.reason ? String(row.reason) : null;
+      const status = row.status ? String(row.status).toUpperCase() : null;
+      const reason = row.reason ? String(row.reason) : null;
 
-    return { found:true, status, reason };
-  }catch(e){
-    return { found:false, status:null, reason:null };
+      return { found: true, status, reason };
+    } catch {
+      return { found: false, status: null, reason: null };
+    }
   }
-}
 
-
-  async function handleSorteioModal(interaction){
+  async function handleSorteioModal(interaction) {
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
     const nome = raw.trim().replace(/^@+/, '');
 
@@ -518,48 +479,46 @@ LIMIT 1
 
     const info = await getPrintHojeInfo(nome);
 
-if (!info.found) {
-  await interaction.reply({
-    flags: 64,
-    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
-  }).catch(()=>{});
-  return;
-}
+    if (!info.found) {
+      await interaction.reply({
+        flags: 64,
+        content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
+      }).catch(() => {});
+      return;
+    }
 
-if (info.status === 'PENDENTE') {
-  await interaction.reply({
-    flags: 64,
-    content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
-  }).catch(()=>{});
-  return;
-}
+    if (info.status === 'PENDENTE') {
+      await interaction.reply({
+        flags: 64,
+        content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
+      }).catch(() => {});
+      return;
+    }
 
-if (info.status === 'REPROVADO') {
-  const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
-  await interaction.reply({
-    flags: 64,
-    content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
-  }).catch(()=>{});
-  return;
-}
+    if (info.status === 'REPROVADO') {
+      const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
+      await interaction.reply({
+        flags: 64,
+        content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
+      }).catch(() => {});
+      return;
+    }
 
-if (info.status !== 'APROVADO') {
-  await interaction.reply({
-    flags: 64,
-    content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
-  }).catch(()=>{});
-  return;
-}
+    if (info.status !== 'APROVADO') {
+      await interaction.reply({
+        flags: 64,
+        content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
+      }).catch(() => {});
+      return;
+    }
 
-
-
-    try{
+    try {
       await inserirSorteio(nome);
       if (typeof sseSendAll === 'function') {
-        sseSendAll('sorteio-changed', { action:'join', nome_twitch: nome });
+        sseSendAll('sorteio-changed', { action: 'join', nome_twitch: nome });
       }
       await interaction.reply({ flags: 64, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
-    }catch(e){
+    } catch (e) {
       if (e?.code === '23505') {
         await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
       } else {
@@ -898,9 +857,7 @@ if (info.status !== 'APROVADO') {
     if (existing) {
       const ch = await client.channels.fetch(String(existing.channel_id)).catch(() => null);
       if (ch) {
-        await interaction.editReply({
-          content: `Você já tem um ticket aberto: <#${ch.id}>`
-        }).catch(() => {});
+        await interaction.editReply({ content: `Você já tem um ticket aberto: <#${ch.id}>` }).catch(() => {});
         return;
       }
 
@@ -974,12 +931,7 @@ if (info.status !== 'APROVADO') {
       [String(ticketId), String(userId), String(ticketChannel.id)]
     );
 
-    await logTicket({
-      kind: 'OPEN',
-      userId,
-      channelId: ticketChannel.id,
-      ticketId
-    });
+    await logTicket({ kind: 'OPEN', userId, channelId: ticketChannel.id, ticketId });
 
     const pingStaff = staffRoleIds.length ? staffRoleIds.map(r => `<@&${r}>`).join(' ') : '';
     await ticketChannel.send({
@@ -987,10 +939,7 @@ if (info.status !== 'APROVADO') {
       ...buildTicketPanel(ticketId)
     }).catch(() => {});
 
-    await interaction.editReply({
-      content: `✅ Ticket criado: <#${ticketChannel.id}>`
-    }).catch(() => {});
-
+    await interaction.editReply({ content: `✅ Ticket criado: <#${ticketChannel.id}>` }).catch(() => {});
     await scheduleIdle(ticketId, ticketChannel.id, userId);
   }
 
@@ -1053,7 +1002,6 @@ if (info.status !== 'APROVADO') {
     }
 
     await scheduleIdle(ticketId, t.channel_id, t.user_id);
-
     await interaction.showModal(buildModal(ticketId)).catch(() => {});
   }
 
@@ -1196,7 +1144,6 @@ if (info.status !== 'APROVADO') {
       if (!t) return;
 
       if (String(msg.author.id) !== String(t.user_id)) return;
-
       if (String(t.status) !== 'WAIT_IMAGE') return;
 
       const imgs = Array.from(msg.attachments?.values?.() || []).filter(likelyImageAttachment);
@@ -1205,9 +1152,7 @@ if (info.status !== 'APROVADO') {
         if (Date.now() - last < 20000) return;
         warnCooldown.set(msg.channelId, Date.now());
 
-        await msg.channel.send({
-          content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).`
-        }).catch(() => {});
+        await msg.channel.send({ content: `<@${msg.author.id}> Manda **somente a imagem** do print (PNG/JPG/WEBP).` }).catch(() => {});
         return;
       }
 
@@ -1226,7 +1171,7 @@ if (info.status !== 'APROVADO') {
         submissionId = await submitToCashback(t, finalUrl);
       } catch (e) {
         onLog.error('submitToCashback falhou:', e?.message || e);
-        await msg.channel.send({ content: `❌ Deu erro ao registrar o print. Tenta de novo ou chama um admin.` }).catch(() => {});
+        await msg.channel.send({ content: '❌ Deu erro ao registrar o print. Tenta de novo ou chama um admin.' }).catch(() => {});
         scheduleWaitImage(String(t.id));
         return;
       }
@@ -1298,8 +1243,11 @@ if (info.status !== 'APROVADO') {
     } catch (e) {
       onLog.error('InteractionCreate falhou:', e?.message || e);
       try {
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ flags: 64, content: 'Falha ao processar. Tenta de novo.' }).catch(() => {});
+        const msg = 'Falha ao processar. Tenta de novo.';
+        if (interaction.deferred) {
+          await interaction.editReply({ content: msg }).catch(() => {});
+        } else if (!interaction.replied) {
+          await interaction.reply({ flags: 64, content: msg }).catch(() => {});
         }
       } catch {}
     }
@@ -1307,17 +1255,12 @@ if (info.status !== 'APROVADO') {
 
   async function periodicCleanup() {
     try {
-      const r = await q(
-        `SELECT * FROM discord_deposit_tickets WHERE closed_at IS NULL ORDER BY created_at DESC LIMIT 200`
-      );
+      const r = await q(`SELECT * FROM discord_deposit_tickets WHERE closed_at IS NULL ORDER BY created_at DESC LIMIT 200`);
       const rows = r?.rows || [];
       for (const t of rows) {
         const ch = await client.channels.fetch(String(t.channel_id)).catch(() => null);
         if (!ch) {
-          await q(
-            `UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`,
-            [String(t.id)]
-          );
+          await q(`UPDATE discord_deposit_tickets SET closed_at=now(), status='CLOSED', updated_at=now() WHERE id=$1`, [String(t.id)]);
           clearWaitTimer(String(t.id));
           clearIdle(String(t.id));
           continue;
@@ -1336,15 +1279,6 @@ if (info.status !== 'APROVADO') {
     }
   }
 
-  client.on('warn',  (m) => onLog.warn('⚠️ [DISCORD] warn:', m));
-client.on('error', (e) => onLog.error('❌ [DISCORD] error:', e?.message || e));
-
-client.on('shardError', (e) => onLog.error('❌ [DISCORD] shardError:', e?.message || e));
-client.on('shardDisconnect', (event, id) => {
-  onLog.error('❌ [DISCORD] shardDisconnect:', { id, code: event?.code, reason: event?.reason });
-});
-client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
-
   client.once(Events.ClientReady, async () => {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
     await ensureTables(q);
@@ -1358,9 +1292,10 @@ client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  client.login(token).catch((e) => {
-    onLog.error('❌ Discord login falhou:', e?.message || e);
-  });
+  onLog.log('🚀 [DISCORD] chamando client.login()…');
+  client.login(token)
+    .then(() => onLog.log('✅ [DISCORD] login OK'))
+    .catch((e) => onLog.error('❌ [DISCORD] login falhou:', e?.message || e));
 
   return { client, updateSorteioMessage };
 }
