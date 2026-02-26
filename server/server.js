@@ -2336,7 +2336,7 @@ app.listen(PORT, async () => {
     await ensureTorneioTables(q);
     await ensureExtratosOrigemColumn();
     discordBot = initDiscordBot({ q, uid, onLog: console, sseSendAll });
-
+    console.log('🧩 Discord init retornou:', discordBot ? 'OK' : 'NULL');
 
 
 
