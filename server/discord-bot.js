@@ -230,10 +230,10 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   }
 
   const token = String(process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_KEY || '').trim();
-  const guildId = process.env.DISCORD_GUILD_ID;
-  const entryChannelId = process.env.DISCORD_ENTRY_CHANNEL_ID;
+  const guildId = String(process.env.DISCORD_GUILD_ID || '').trim();
+  const entryChannelId = String(process.env.DISCORD_ENTRY_CHANNEL_ID || '').trim();
   const sorteioChannelId = String(process.env.DISCORD_SORTEIO_CHANNEL_ID || entryChannelId || '').trim();
-  const ticketsCategoryId = process.env.DISCORD_TICKETS_CATEGORY_ID;
+  const ticketsCategoryId = String(process.env.DISCORD_TICKETS_CATEGORY_ID || '').trim();
 
   if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
     onLog.error('❌ Variáveis faltando: DISCORD_TOKEN (ou DISCORD_BOT_KEY), DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
@@ -259,16 +259,26 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     partials: [Partials.Channel, Partials.Message]
   });
 
+  client.on('warn', (m) => onLog.warn('DISCORD WARN:', m));
+  client.on('error', (e) => onLog.error('DISCORD ERROR:', e?.message || e));
+  client.on('shardError', (e) => onLog.error('DISCORD SHARD ERROR:', e?.message || e));
+  client.on('shardDisconnect', (event, id) => onLog.warn('DISCORD SHARD DISCONNECT:', id, event?.code, event?.reason));
+  client.on('shardReconnecting', (id) => onLog.warn('DISCORD SHARD RECONNECTING:', id));
+  client.on('shardReady', (id) => onLog.log('DISCORD SHARD READY:', id));
+
+  process.on('unhandledRejection', (e) => onLog.error('UNHANDLED REJECTION:', e));
+  process.on('uncaughtException', (e) => onLog.error('UNCAUGHT EXCEPTION:', e));
+
   const warnCooldown = new Map();
   const waitTimers = new Map();
   const idleTimers = new Map();
 
-  function dayEqTodaySql(col){
+  function dayEqTodaySql(col) {
     return `((${col} AT TIME ZONE 'America/Sao_Paulo')::date = (now() AT TIME ZONE 'America/Sao_Paulo')::date)`;
   }
 
-  async function getSorteioState(){
-    try{
+  async function getSorteioState() {
+    try {
       const r = await q(`SELECT is_open, discord_channel_id, discord_message_id FROM sorteio_state WHERE id=1`);
       const row = r?.rows?.[0] || null;
       const open = !!row?.is_open;
@@ -285,18 +295,18 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       }
 
       return { open, channelId: channelId || null, messageId };
-    }catch(e){
-      return { open:false, channelId: sorteioChannelId || entryChannelId, messageId:null };
+    } catch {
+      return { open: false, channelId: sorteioChannelId || entryChannelId, messageId: null };
     }
   }
 
-  async function setSorteioMessageIds(channelId, messageId){
-    try{
+  async function setSorteioMessageIds(channelId, messageId) {
+    try {
       await q(`UPDATE sorteio_state SET discord_channel_id=$1, discord_message_id=$2, updated_at=now() WHERE id=1`, [channelId || null, messageId || null]);
-    }catch{}
+    } catch {}
   }
 
-  function sorteioPayload(open){
+  function sorteioPayload(open) {
     const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
 
     const desc =
@@ -320,11 +330,11 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       .setDisabled(!open);
 
     const row = new ActionRowBuilder().addComponents(btn);
-    return { embeds:[embed], components:[row] };
+    return { embeds: [embed], components: [row] };
   }
 
-  async function findExistingSorteioMessage(ch){
-    try{
+  async function findExistingSorteioMessage(ch) {
+    try {
       const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
       if (!msgs) return null;
 
@@ -337,12 +347,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       });
 
       return found || null;
-    }catch{
+    } catch {
       return null;
     }
   }
 
-  async function updateSorteioMessage(open){
+  async function updateSorteioMessage(open) {
     const st = await getSorteioState();
     const channelId = st.channelId || sorteioChannelId || entryChannelId;
     if (!channelId) return;
@@ -373,68 +383,48 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     }
   }
 
-  async function hasDepositoHoje(twitchName){
+  async function jaInscritoSorteio(twitchName) {
     const nn = normalizeTwitchName(twitchName);
-    try{
-      const r = await q(
-        `SELECT 1 FROM extratos
-         WHERE tipo='deposito' AND lower(nome)=$1 AND ${dayEqTodaySql('created_at')}
-         LIMIT 1`,
-        [nn]
-      );
-      return (r?.rows?.length || 0) > 0;
-    }catch{
-      return false;
-    }
-  }
-
-  async function hasPrintHoje(twitchName){
-    const nn = normalizeTwitchName(twitchName);
-
-    try{
-      const r = await q(
-        `SELECT 1 FROM cashback_submissions
-WHERE lower(twitch_name)=$1
-  AND ${dayEqTodaySql('created_at')}
-  AND upper(status)='APROVADO'
-ORDER BY created_at DESC
-LIMIT 1
-`,
-        [nn]
-      );
-      if ((r?.rows?.length || 0) > 0) return true;
-    }catch{}
-
-    try{
-      const r = await q(
-        `SELECT 1 FROM cashbacks
-         WHERE lower(twitch_nick)=$1 AND ${dayEqTodaySql('created_at')}
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [nn]
-      );
-      if ((r?.rows?.length || 0) > 0) return true;
-    }catch{}
-
-    return false;
-  }
-
-  async function jaInscritoSorteio(twitchName){
-    const nn = normalizeTwitchName(twitchName);
-    try{
+    try {
       const r = await q(`SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=$1 LIMIT 1`, [nn]);
       return (r?.rows?.length || 0) > 0;
-    }catch{
+    } catch {
       return false;
     }
   }
 
-  async function inserirSorteio(twitchName){
+  async function inserirSorteio(twitchName) {
     const nome = String(twitchName || '').trim().replace(/^@+/, '');
     await q(`INSERT INTO sorteio_inscricoes (nome_twitch, mensagem) VALUES ($1, NULL)`, [nome]);
   }
 
-  async function openSorteioModal(interaction){
+  async function getPrintHojeInfo(twitchName) {
+    const nn = normalizeTwitchName(twitchName);
+
+    try {
+      const r = await q(
+        `SELECT status, reason
+         FROM cashback_submissions
+         WHERE lower(twitch_name)=$1
+           AND ${dayEqTodaySql('created_at')}
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [nn]
+      );
+
+      const row = r?.rows?.[0] || null;
+      if (!row) return { found: false, status: null, reason: null };
+
+      const status = row.status ? String(row.status).toUpperCase() : null;
+      const reason = row.reason ? String(row.reason) : null;
+
+      return { found: true, status, reason };
+    } catch {
+      return { found: false, status: null, reason: null };
+    }
+  }
+
+  async function openSorteioModal(interaction) {
     const st = await getSorteioState();
     if (!st.open) {
       await interaction.reply({ ephemeral: true, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
@@ -460,33 +450,7 @@ LIMIT 1
     });
   }
 
-  async function getPrintHojeInfo(twitchName){
-    const nn = normalizeTwitchName(twitchName);
-
-    try{
-      const r = await q(
-        `SELECT status, reason
-         FROM cashback_submissions
-         WHERE lower(twitch_name)=$1
-           AND ${dayEqTodaySql('created_at')}
-         ORDER BY created_at DESC
-         LIMIT 1`,
-        [nn]
-      );
-
-      const row = r?.rows?.[0] || null;
-      if (!row) return { found:false, status:null, reason:null };
-
-      const status = row.status ? String(row.status).toUpperCase() : null;
-      const reason = row.reason ? String(row.reason) : null;
-
-      return { found:true, status, reason };
-    }catch(e){
-      return { found:false, status:null, reason:null };
-    }
-  }
-
-  async function handleSorteioModal(interaction){
+  async function handleSorteioModal(interaction) {
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
     const nome = raw.trim().replace(/^@+/, '');
 
@@ -512,7 +476,7 @@ LIMIT 1
       await interaction.reply({
         ephemeral: true,
         content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
-      }).catch(()=>{});
+      }).catch(() => {});
       return;
     }
 
@@ -520,7 +484,7 @@ LIMIT 1
       await interaction.reply({
         ephemeral: true,
         content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
-      }).catch(()=>{});
+      }).catch(() => {});
       return;
     }
 
@@ -529,7 +493,7 @@ LIMIT 1
       await interaction.reply({
         ephemeral: true,
         content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
-      }).catch(()=>{});
+      }).catch(() => {});
       return;
     }
 
@@ -537,17 +501,17 @@ LIMIT 1
       await interaction.reply({
         ephemeral: true,
         content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
-      }).catch(()=>{});
+      }).catch(() => {});
       return;
     }
 
-    try{
+    try {
       await inserirSorteio(nome);
       if (typeof sseSendAll === 'function') {
-        sseSendAll('sorteio-changed', { action:'join', nome_twitch: nome });
+        sseSendAll('sorteio-changed', { action: 'join', nome_twitch: nome });
       }
       await interaction.reply({ ephemeral: true, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
-    }catch(e){
+    } catch (e) {
       if (e?.code === '23505') {
         await interaction.reply({ ephemeral: true, content: `@${nome} já está inscrito.` }).catch(() => {});
       } else {
@@ -1184,7 +1148,6 @@ LIMIT 1
       if (!t) return;
 
       if (String(msg.author.id) !== String(t.user_id)) return;
-
       if (String(t.status) !== 'WAIT_IMAGE') return;
 
       const imgs = Array.from(msg.attachments?.values?.() || []).filter(likelyImageAttachment);
@@ -1337,9 +1300,28 @@ LIMIT 1
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  client.login(token).catch((e) => {
-    onLog.error('❌ Discord login falhou:', e?.message || e);
-  });
+  async function loginWithBackoff() {
+    let attempt = 0;
+    const maxDelay = 15 * 60 * 1000;
+
+    while (true) {
+      try {
+        await client.login(token);
+        return;
+      } catch (e) {
+        const msg = e?.message || String(e);
+        onLog.error('❌ Discord login falhou:', msg);
+
+        const delay = Math.min(30_000 * (2 ** attempt), maxDelay);
+        attempt = Math.min(attempt + 1, 10);
+
+        onLog.warn('Discord retry em ms=', delay);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+
+  loginWithBackoff();
 
   return { client, updateSorteioMessage };
 }
