@@ -1354,24 +1354,34 @@ onLog.log('DISCORD tokenHash=', crypto.createHash('sha256').update(token).digest
 onLog.log('DISCORD guildId=', String(guildId || '').trim(), 'entryChannelId=', String(entryChannelId || '').trim(), 'ticketsCategoryId=', String(ticketsCategoryId || '').trim());
 
 
-https.get('https://discord.com/api/v10/gateway', (res) => {
-  onLog.log('DISCORD gateway http status=', res.statusCode);
-  res.resume();
-}).on('error', (e) => {
-  onLog.error('DISCORD gateway http error=', e?.message || e);
+
+
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, { method: 'GET', headers }, (res) => {
+      let data = '';
+      res.on('data', (c) => data += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: data.slice(0, 300) }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+onLog.log('DISCORD attempting login. tokenLen=', token.length);
+
+httpGet('https://discord.com/api/v10/gateway/bot', {
+  Authorization: `Bot ${token}`
+}).then(r => {
+  onLog.log('DISCORD gateway/bot status=', r.status);
+  if (r.status !== 200) onLog.log('DISCORD gateway/bot body=', r.body);
+}).catch(e => {
+  onLog.error('DISCORD gateway/bot error=', e?.message || e);
 });
 
-setTimeout(() => {
-  try {
-    onLog.log('DISCORD ws status=', client.ws?.status);
-  } catch (e) {
-    onLog.error('DISCORD ws status read error=', e?.message || e);
-  }
-}, 15000);
-
-  client.login(token).catch((e) => {
-    onLog.error('❌ Discord login falhou:', e?.message || e);
-  });
+client.login(token).catch((e) => {
+  onLog.error('❌ Discord login falhou:', e?.message || e);
+});
 
   return { client, updateSorteioMessage };
 }
