@@ -300,13 +300,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
 
     const desc =
-      '📌 **Como participar:**\n' +
-      '1) Aguarde o streamer liberar o sorteio na live.\n' +
-      '2) Quando estiver liberado, clique no botão abaixo.\n' +
-      '3) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
-      '⚠️ **Para receber o prêmio é obrigatório:**\n' +
-      '✅ ter feito **DEPÓSITO HOJE**\n' +
-      '✅ ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **Enviar print do depósito**)\n\n' +
+      '📌 **Para participar do sorteio é obrigatório:**\n' +
+      '1) ter feito **DEPÓSITO HOJE**\n' +
+      '2) ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
+      '3) Aguarde o streamer liberar o sorteio na live.\n' +
+      '4) Quando estiver liberado, clique no botão abaixo.\n' +
+      '5) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
       (open ? '🟢 **INSCRIÇÕES ABERTAS!**' : '🔴 **INSCRIÇÕES FECHADAS** — aguarde o streamer abrir.');
 
     const embed = new EmbedBuilder()
@@ -395,9 +394,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     try{
       const r = await q(
         `SELECT 1 FROM cashback_submissions
-         WHERE lower(twitch_name)=$1 AND ${dayEqTodaySql('created_at')}
-         ORDER BY created_at DESC
-         LIMIT 1`,
+WHERE lower(twitch_name)=$1
+  AND ${dayEqTodaySql('created_at')}
+  AND upper(status)='APROVADO'
+ORDER BY created_at DESC
+LIMIT 1
+`,
         [nn]
       );
       if ((r?.rows?.length || 0) > 0) return true;
@@ -458,6 +460,33 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     });
   }
 
+  async function getPrintHojeInfo(twitchName){
+  const nn = normalizeTwitchName(twitchName);
+
+  try{
+    const r = await q(
+      `SELECT status, reason
+       FROM cashback_submissions
+       WHERE lower(twitch_name)=$1
+         AND ${dayEqTodaySql('created_at')}
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [nn]
+    );
+
+    const row = r?.rows?.[0] || null;
+    if (!row) return { found:false, status:null, reason:null };
+
+    const status = row.status ? String(row.status).toUpperCase() : null;
+    const reason = row.reason ? String(row.reason) : null;
+
+    return { found:true, status, reason };
+  }catch(e){
+    return { found:false, status:null, reason:null };
+  }
+}
+
+
   async function handleSorteioModal(interaction){
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
     const nome = raw.trim().replace(/^@+/, '');
@@ -478,15 +507,42 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       return;
     }
 
-    const okPrint = await hasPrintHoje(nome);
+    const info = await getPrintHojeInfo(nome);
 
-if (!okPrint) {
+if (!info.found) {
   await interaction.reply({
     flags: 64,
-    content: 'Para participar, é obrigatório ter enviado **hoje** o print do **histórico de depósito** no sistema (Enviar print).'
-  }).catch(() => {});
+    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
+  }).catch(()=>{});
   return;
 }
+
+if (info.status === 'PENDENTE') {
+  await interaction.reply({
+    flags: 64,
+    content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
+  }).catch(()=>{});
+  return;
+}
+
+if (info.status === 'REPROVADO') {
+  const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
+  await interaction.reply({
+    flags: 64,
+    content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
+  }).catch(()=>{});
+  return;
+}
+
+if (info.status !== 'APROVADO') {
+  await interaction.reply({
+    flags: 64,
+    content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
+  }).catch(()=>{});
+  return;
+}
+
+
 
     try{
       await inserirSorteio(nome);
