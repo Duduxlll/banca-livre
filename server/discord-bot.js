@@ -43,7 +43,7 @@ function isValidTwitchName(raw) {
 function isValidEmail(s) {
   const v = String(s || '').trim();
   if (v.length < 6 || v.length > 160) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+\.[^\s@]{2,}$/.test(v);
 }
 
 function isValidUUID(s) {
@@ -437,7 +437,7 @@ LIMIT 1
   async function openSorteioModal(interaction){
     const st = await getSorteioState();
     if (!st.open) {
-      await interaction.reply({ flags: 64, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
       return;
     }
 
@@ -456,7 +456,7 @@ LIMIT 1
     modal.addComponents(new ActionRowBuilder().addComponents(inp));
 
     await interaction.showModal(modal).catch(async () => {
-      await interaction.reply({ flags: 64, content: 'Não consegui abrir o formulário. Tenta de novo.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Não consegui abrir o formulário. Tenta de novo.' }).catch(() => {});
     });
   }
 
@@ -492,18 +492,18 @@ LIMIT 1
     const nome = raw.trim().replace(/^@+/, '');
 
     if (!isValidTwitchName(nome)) {
-      await interaction.reply({ flags: 64, content: 'Nick inválido. Use 3–25 caracteres (letras, números e _).' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Nick inválido. Use 3–25 caracteres (letras, números e _).' }).catch(() => {});
       return;
     }
 
     const st = await getSorteioState();
     if (!st.open) {
-      await interaction.reply({ flags: 64, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
       return;
     }
 
     if (await jaInscritoSorteio(nome)) {
-      await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: `@${nome} já está inscrito.` }).catch(() => {});
       return;
     }
 
@@ -511,7 +511,7 @@ LIMIT 1
 
 if (!info.found) {
   await interaction.reply({
-    flags: 64,
+    ephemeral: true,
     content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
   }).catch(()=>{});
   return;
@@ -519,7 +519,7 @@ if (!info.found) {
 
 if (info.status === 'PENDENTE') {
   await interaction.reply({
-    flags: 64,
+    ephemeral: true,
     content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
   }).catch(()=>{});
   return;
@@ -528,7 +528,7 @@ if (info.status === 'PENDENTE') {
 if (info.status === 'REPROVADO') {
   const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
   await interaction.reply({
-    flags: 64,
+    ephemeral: true,
     content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
   }).catch(()=>{});
   return;
@@ -536,7 +536,7 @@ if (info.status === 'REPROVADO') {
 
 if (info.status !== 'APROVADO') {
   await interaction.reply({
-    flags: 64,
+    ephemeral: true,
     content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
   }).catch(()=>{});
   return;
@@ -549,12 +549,12 @@ if (info.status !== 'APROVADO') {
       if (typeof sseSendAll === 'function') {
         sseSendAll('sorteio-changed', { action:'join', nome_twitch: nome });
       }
-      await interaction.reply({ flags: 64, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
     }catch(e){
       if (e?.code === '23505') {
-        await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
+        await interaction.reply({ ephemeral: true, content: `@${nome} já está inscrito.` }).catch(() => {});
       } else {
-        await interaction.reply({ flags: 64, content: 'Erro ao inscrever. Tenta de novo.' }).catch(() => {});
+        await interaction.reply({ ephemeral: true, content: 'Erro ao inscrever. Tenta de novo.' }).catch(() => {});
       }
     }
   }
@@ -877,7 +877,7 @@ if (info.status !== 'APROVADO') {
 
   async function openTicket(interaction) {
     try {
-      await interaction.deferReply({ flags: 64 }).catch(() => {});
+      await interaction.deferReply({ ephemeral: true }).catch(() => {});
     } catch {}
 
     const userId = interaction.user.id;
@@ -988,7 +988,7 @@ if (info.status !== 'APROVADO') {
   async function handlePick(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
@@ -998,13 +998,13 @@ if (info.status !== 'APROVADO') {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ flags: 64, content: 'Sem permissão.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' }).catch(() => {});
       return;
     }
 
     const val = interaction.values?.[0] || null;
     if (!['cpf', 'email', 'phone', 'random'].includes(val)) {
-      await interaction.reply({ flags: 64, content: 'Tipo Pix inválido.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Tipo Pix inválido.' }).catch(() => {});
       return;
     }
 
@@ -1016,7 +1016,7 @@ if (info.status !== 'APROVADO') {
     await scheduleIdle(ticketId, t.channel_id, t.user_id);
 
     await interaction.reply({
-      flags: 64,
+      ephemeral: true,
       content: `✅ Tipo Pix selecionado: **${toTitlePixType(val)}**`
     }).catch(() => {});
   }
@@ -1024,7 +1024,7 @@ if (info.status !== 'APROVADO') {
   async function handleFill(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
@@ -1034,12 +1034,12 @@ if (info.status !== 'APROVADO') {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ flags: 64, content: 'Sem permissão.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' }).catch(() => {});
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
       return;
     }
 
@@ -1072,12 +1072,12 @@ if (info.status !== 'APROVADO') {
   async function handleModal(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
       return;
     }
 
@@ -1088,7 +1088,7 @@ if (info.status !== 'APROVADO') {
     const pixKey = String(pixRaw || '').trim();
 
     if (!isValidTwitchName(twitch)) {
-      await interaction.reply({ flags: 64, content: 'Nick da Twitch inválido.' }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: 'Nick da Twitch inválido.' }).catch(() => {});
       return;
     }
 
@@ -1108,7 +1108,7 @@ if (info.status !== 'APROVADO') {
         pixType === 'phone' ? 'Telefone inválido.' :
         pixType === 'random' ? 'Chave aleatória inválida (UUID).' :
         'Chave Pix inválida.';
-      await interaction.reply({ flags: 64, content: `❌ ${msg}` }).catch(() => {});
+      await interaction.reply({ ephemeral: true, content: `❌ ${msg}` }).catch(() => {});
       return;
     }
 
@@ -1123,7 +1123,7 @@ if (info.status !== 'APROVADO') {
     scheduleWaitImage(ticketId);
 
     await interaction.reply({
-      flags: 64,
+      ephemeral: true,
       content: `✅ Dados recebidos. Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP). Você tem **${waitImageMin} min**.`
     }).catch(() => {});
 
@@ -1290,7 +1290,7 @@ if (info.status !== 'APROVADO') {
       onLog.error('InteractionCreate falhou:', e?.message || e);
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ flags: 64, content: 'Falha ao processar. Tenta de novo.' }).catch(() => {});
+          await interaction.reply({ ephemeral: true, content: 'Falha ao processar. Tenta de novo.' }).catch(() => {});
         }
       } catch {}
     }
