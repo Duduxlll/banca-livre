@@ -16,7 +16,7 @@ import {
   Events
 } from 'discord.js';
 import crypto from 'node:crypto';
-import https from 'node:https';
+
 function asBool(v, def = false) {
   if (v == null) return def;
   const s = String(v).trim().toLowerCase();
@@ -43,7 +43,7 @@ function isValidTwitchName(raw) {
 function isValidEmail(s) {
   const v = String(s || '').trim();
   if (v.length < 6 || v.length > 160) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+\.[^\s@]{2,}$/.test(v);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
 }
 
 function isValidUUID(s) {
@@ -259,15 +259,6 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     partials: [Partials.Channel, Partials.Message]
   });
 
-  client.on('warn', (m) => onLog.warn('DISCORD WARN:', m));
-client.on('error', (e) => onLog.error('DISCORD ERROR:', e?.message || e));
-client.on('shardError', (e) => onLog.error('DISCORD SHARD ERROR:', e?.message || e));
-client.on('shardDisconnect', (event, id) => onLog.warn('DISCORD SHARD DISCONNECT:', id, event?.code, event?.reason));
-client.on('shardReconnecting', (id) => onLog.warn('DISCORD SHARD RECONNECTING:', id));
-client.on('shardReady', (id) => onLog.log('DISCORD SHARD READY:', id));
-process.on('unhandledRejection', (e) => onLog.error('UNHANDLED REJECTION:', e));
-process.on('uncaughtException', (e) => onLog.error('UNCAUGHT EXCEPTION:', e));
-
   const warnCooldown = new Map();
   const waitTimers = new Map();
   const idleTimers = new Map();
@@ -470,31 +461,30 @@ LIMIT 1
   }
 
   async function getPrintHojeInfo(twitchName){
-  const nn = normalizeTwitchName(twitchName);
+    const nn = normalizeTwitchName(twitchName);
 
-  try{
-    const r = await q(
-      `SELECT status, reason
-       FROM cashback_submissions
-       WHERE lower(twitch_name)=$1
-         AND ${dayEqTodaySql('created_at')}
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [nn]
-    );
+    try{
+      const r = await q(
+        `SELECT status, reason
+         FROM cashback_submissions
+         WHERE lower(twitch_name)=$1
+           AND ${dayEqTodaySql('created_at')}
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [nn]
+      );
 
-    const row = r?.rows?.[0] || null;
-    if (!row) return { found:false, status:null, reason:null };
+      const row = r?.rows?.[0] || null;
+      if (!row) return { found:false, status:null, reason:null };
 
-    const status = row.status ? String(row.status).toUpperCase() : null;
-    const reason = row.reason ? String(row.reason) : null;
+      const status = row.status ? String(row.status).toUpperCase() : null;
+      const reason = row.reason ? String(row.reason) : null;
 
-    return { found:true, status, reason };
-  }catch(e){
-    return { found:false, status:null, reason:null };
+      return { found:true, status, reason };
+    }catch(e){
+      return { found:false, status:null, reason:null };
+    }
   }
-}
-
 
   async function handleSorteioModal(interaction){
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
@@ -518,40 +508,38 @@ LIMIT 1
 
     const info = await getPrintHojeInfo(nome);
 
-if (!info.found) {
-  await interaction.reply({
-    ephemeral: true,
-    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
-  }).catch(()=>{});
-  return;
-}
+    if (!info.found) {
+      await interaction.reply({
+        ephemeral: true,
+        content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
+      }).catch(()=>{});
+      return;
+    }
 
-if (info.status === 'PENDENTE') {
-  await interaction.reply({
-    ephemeral: true,
-    content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
-  }).catch(()=>{});
-  return;
-}
+    if (info.status === 'PENDENTE') {
+      await interaction.reply({
+        ephemeral: true,
+        content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
+      }).catch(()=>{});
+      return;
+    }
 
-if (info.status === 'REPROVADO') {
-  const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
-  await interaction.reply({
-    ephemeral: true,
-    content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
-  }).catch(()=>{});
-  return;
-}
+    if (info.status === 'REPROVADO') {
+      const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
+      await interaction.reply({
+        ephemeral: true,
+        content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
+      }).catch(()=>{});
+      return;
+    }
 
-if (info.status !== 'APROVADO') {
-  await interaction.reply({
-    ephemeral: true,
-    content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
-  }).catch(()=>{});
-  return;
-}
-
-
+    if (info.status !== 'APROVADO') {
+      await interaction.reply({
+        ephemeral: true,
+        content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
+      }).catch(()=>{});
+      return;
+    }
 
     try{
       await inserirSorteio(nome);
@@ -1349,39 +1337,9 @@ if (info.status !== 'APROVADO') {
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  onLog.log('DISCORD tokenLen=', token.length);
-onLog.log('DISCORD tokenHash=', crypto.createHash('sha256').update(token).digest('hex').slice(0, 10));
-onLog.log('DISCORD guildId=', String(guildId || '').trim(), 'entryChannelId=', String(entryChannelId || '').trim(), 'ticketsCategoryId=', String(ticketsCategoryId || '').trim());
-
-
-
-
-function httpGet(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, { method: 'GET', headers }, (res) => {
-      let data = '';
-      res.on('data', (c) => data += c);
-      res.on('end', () => resolve({ status: res.statusCode, body: data.slice(0, 300) }));
-    });
-    req.on('error', reject);
-    req.end();
+  client.login(token).catch((e) => {
+    onLog.error('❌ Discord login falhou:', e?.message || e);
   });
-}
-
-onLog.log('DISCORD attempting login. tokenLen=', token.length);
-
-httpGet('https://discord.com/api/v10/gateway/bot', {
-  Authorization: `Bot ${token}`
-}).then(r => {
-  onLog.log('DISCORD gateway/bot status=', r.status);
-  if (r.status !== 200) onLog.log('DISCORD gateway/bot body=', r.body);
-}).catch(e => {
-  onLog.error('DISCORD gateway/bot error=', e?.message || e);
-});
-
-client.login(token).catch((e) => {
-  onLog.error('❌ Discord login falhou:', e?.message || e);
-});
 
   return { client, updateSorteioMessage };
 }
