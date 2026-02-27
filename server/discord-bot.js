@@ -259,6 +259,15 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     partials: [Partials.Channel, Partials.Message]
   });
 
+  client.on('warn', (m) => onLog.warn('DISCORD WARN:', m));
+client.on('error', (e) => onLog.error('DISCORD ERROR:', e?.message || e));
+client.on('shardError', (e) => onLog.error('DISCORD SHARD ERROR:', e?.message || e));
+client.on('shardDisconnect', (event, id) => onLog.warn('DISCORD SHARD DISCONNECT:', id, event?.code, event?.reason));
+client.on('shardReconnecting', (id) => onLog.warn('DISCORD SHARD RECONNECTING:', id));
+client.on('shardReady', (id) => onLog.log('DISCORD SHARD READY:', id));
+process.on('unhandledRejection', (e) => onLog.error('UNHANDLED REJECTION:', e));
+process.on('uncaughtException', (e) => onLog.error('UNCAUGHT EXCEPTION:', e));
+
   const warnCooldown = new Map();
   const waitTimers = new Map();
   const idleTimers = new Map();
@@ -1339,6 +1348,9 @@ if (info.status !== 'APROVADO') {
 
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
+
+  onLog.log('DISCORD attempting login. tokenLen=', String(token || '').trim().length);
+onLog.log('DISCORD guildId=', String(guildId || '').trim(), 'entryChannelId=', String(entryChannelId || '').trim(), 'ticketsCategoryId=', String(ticketsCategoryId || '').trim());
 
   client.login(token).catch((e) => {
     onLog.error('❌ Discord login falhou:', e?.message || e);
