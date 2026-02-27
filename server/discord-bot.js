@@ -229,11 +229,11 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     return null;
   }
 
-  const token = String(process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_KEY || '').trim();
-  const guildId = String(process.env.DISCORD_GUILD_ID || '').trim();
-  const entryChannelId = String(process.env.DISCORD_ENTRY_CHANNEL_ID || '').trim();
+  const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_KEY;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  const entryChannelId = process.env.DISCORD_ENTRY_CHANNEL_ID;
   const sorteioChannelId = String(process.env.DISCORD_SORTEIO_CHANNEL_ID || entryChannelId || '').trim();
-  const ticketsCategoryId = String(process.env.DISCORD_TICKETS_CATEGORY_ID || '').trim();
+  const ticketsCategoryId = process.env.DISCORD_TICKETS_CATEGORY_ID;
 
   if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
     onLog.error('❌ Variáveis faltando: DISCORD_TOKEN (ou DISCORD_BOT_KEY), DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
@@ -259,100 +259,59 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     partials: [Partials.Channel, Partials.Message]
   });
 
-  client.on('warn', (m) => onLog.warn('DISCORD WARN:', m));
-  client.on('error', (e) => onLog.error('DISCORD ERROR:', e?.message || e));
-  client.on('shardError', (e) => onLog.error('DISCORD SHARD ERROR:', e?.message || e));
-  client.on('shardDisconnect', (event, id) => onLog.warn('DISCORD SHARD DISCONNECT:', id, event?.code, event?.reason));
-  client.on('shardReconnecting', (id) => onLog.warn('DISCORD SHARD RECONNECTING:', id));
-  client.on('shardReady', (id) => onLog.log('DISCORD SHARD READY:', id));
-
-  process.on('unhandledRejection', (e) => onLog.error('UNHANDLED REJECTION:', e));
-  process.on('uncaughtException', (e) => onLog.error('UNCAUGHT EXCEPTION:', e));
-
   const warnCooldown = new Map();
   const waitTimers = new Map();
   const idleTimers = new Map();
 
-  function dayEqTodaySql(col) {
+  function dayEqTodaySql(col){
     return `((${col} AT TIME ZONE 'America/Sao_Paulo')::date = (now() AT TIME ZONE 'America/Sao_Paulo')::date)`;
   }
 
-  async function getSorteioState() {
-    try {
+  async function getSorteioState(){
+    try{
       const r = await q(`SELECT is_open, discord_channel_id, discord_message_id FROM sorteio_state WHERE id=1`);
       const row = r?.rows?.[0] || null;
       const open = !!row?.is_open;
       const channelId = String(row?.discord_channel_id || sorteioChannelId || entryChannelId || '').trim();
       const messageId = row?.discord_message_id ? String(row.discord_message_id) : null;
-
       if (!row) {
-        await q(
-          `INSERT INTO sorteio_state (id, is_open, discord_channel_id)
-           VALUES (1, false, $1)
-           ON CONFLICT (id) DO NOTHING`,
-          [channelId || null]
-        );
+        await q(`INSERT INTO sorteio_state (id, is_open, discord_channel_id) VALUES (1, false, $1) ON CONFLICT (id) DO NOTHING`, [channelId || null]);
       }
-
       return { open, channelId: channelId || null, messageId };
-    } catch {
-      return { open: false, channelId: sorteioChannelId || entryChannelId, messageId: null };
+    }catch(e){
+      return { open:false, channelId: sorteioChannelId || entryChannelId, messageId:null };
     }
   }
 
-  async function setSorteioMessageIds(channelId, messageId) {
-    try {
+  async function setSorteioMessageIds(channelId, messageId){
+    try{
       await q(`UPDATE sorteio_state SET discord_channel_id=$1, discord_message_id=$2, updated_at=now() WHERE id=1`, [channelId || null, messageId || null]);
-    } catch {}
+    }catch{}
   }
 
-  function sorteioPayload(open) {
-    const title = '🎉 SORTEIO DA LIVE — INSCRIÇÕES';
-
+  function sorteioPayload(open){
+    const title = open ? '🎉 Sorteio ABERTO' : '⛔ Sorteio FECHADO';
     const desc =
-      '📌 **Para participar do sorteio é obrigatório:**\n' +
-      '1) ter feito **DEPÓSITO HOJE**\n' +
-      '2) ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
-      '3) Aguarde o streamer liberar o sorteio na live.\n' +
-      '4) Quando estiver liberado, clique no botão abaixo.\n' +
-      '5) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
-      (open ? '🟢 **INSCRIÇÕES ABERTAS!**' : '🔴 **INSCRIÇÕES FECHADAS** — aguarde o streamer abrir.');
+      open
+        ? 'Clique no botão abaixo para se inscrever. Você precisa ter enviado o print do depósito de **hoje** no sistema.'
+        : 'Aguarde o streamer abrir o sorteio.';
 
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(desc)
-      .setColor(open ? 0x00ff99 : 0xff3333);
+      .setColor(open ? 0x2ecc71 : 0xe74c3c);
 
     const btn = new ButtonBuilder()
       .setCustomId('sorteio:join')
-      .setLabel(open ? 'Inscrever no Sorteio' : 'Sorteio Fechado')
+      .setLabel(open ? 'Entrar no sorteio' : 'Sorteio fechado')
       .setStyle(open ? ButtonStyle.Success : ButtonStyle.Secondary)
       .setDisabled(!open);
 
     const row = new ActionRowBuilder().addComponents(btn);
-    return { embeds: [embed], components: [row] };
+    return { embeds:[embed], components:[row] };
   }
 
-  async function findExistingSorteioMessage(ch) {
-    try {
-      const msgs = await ch.messages.fetch({ limit: 50 }).catch(() => null);
-      if (!msgs) return null;
-
-      const found = msgs.find(m => {
-        if (!m.author || m.author.id !== client.user.id) return false;
-        const hasBtn = (m.components || []).some(row =>
-          (row.components || []).some(c => c?.customId === 'sorteio:join')
-        );
-        return hasBtn;
-      });
-
-      return found || null;
-    } catch {
-      return null;
-    }
-  }
-
-  async function updateSorteioMessage(open) {
+  async function updateSorteioMessage(open){
     const st = await getSorteioState();
     const channelId = st.channelId || sorteioChannelId || entryChannelId;
     if (!channelId) return;
@@ -370,74 +329,84 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       }
     }
 
-    const existing = await findExistingSorteioMessage(ch);
-    if (existing?.id) {
-      await setSorteioMessageIds(String(channelId), String(existing.id));
-      await existing.edit(payload).catch(() => {});
-      return;
-    }
-
     const sent = await ch.send(payload).catch(() => null);
     if (sent?.id) {
       await setSorteioMessageIds(String(channelId), String(sent.id));
     }
   }
 
-  async function jaInscritoSorteio(twitchName) {
+  async function hasDepositoHoje(twitchName){
     const nn = normalizeTwitchName(twitchName);
-    try {
-      const r = await q(`SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=$1 LIMIT 1`, [nn]);
+    try{
+      const r = await q(
+        `SELECT 1 FROM extratos
+         WHERE tipo='deposito' AND lower(nome)=$1 AND ${dayEqTodaySql('created_at')}
+         LIMIT 1`,
+        [nn]
+      );
       return (r?.rows?.length || 0) > 0;
-    } catch {
+    }catch{
       return false;
     }
   }
 
-  async function inserirSorteio(twitchName) {
-    const nome = String(twitchName || '').trim().replace(/^@+/, '');
-    await q(`INSERT INTO sorteio_inscricoes (nome_twitch, mensagem) VALUES ($1, NULL)`, [nome]);
-  }
-
-  async function getPrintHojeInfo(twitchName) {
+  async function hasPrintHoje(twitchName){
     const nn = normalizeTwitchName(twitchName);
 
-    try {
+    try{
       const r = await q(
-        `SELECT status, reason
-         FROM cashback_submissions
-         WHERE lower(twitch_name)=$1
-           AND ${dayEqTodaySql('created_at')}
+        `SELECT 1 FROM cashback_submissions
+         WHERE lower(twitch_name)=$1 AND ${dayEqTodaySql('created_at')}
          ORDER BY created_at DESC
          LIMIT 1`,
         [nn]
       );
+      if ((r?.rows?.length || 0) > 0) return true;
+    }catch{}
 
-      const row = r?.rows?.[0] || null;
-      if (!row) return { found: false, status: null, reason: null };
+    try{
+      const r = await q(
+        `SELECT 1 FROM cashbacks
+         WHERE lower(twitch_nick)=$1 AND ${dayEqTodaySql('created_at')}
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [nn]
+      );
+      if ((r?.rows?.length || 0) > 0) return true;
+    }catch{}
 
-      const status = row.status ? String(row.status).toUpperCase() : null;
-      const reason = row.reason ? String(row.reason) : null;
+    return false;
+  }
 
-      return { found: true, status, reason };
-    } catch {
-      return { found: false, status: null, reason: null };
+  async function jaInscritoSorteio(twitchName){
+    const nn = normalizeTwitchName(twitchName);
+    try{
+      const r = await q(`SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=$1 LIMIT 1`, [nn]);
+      return (r?.rows?.length || 0) > 0;
+    }catch{
+      return false;
     }
   }
 
-  async function openSorteioModal(interaction) {
+  async function inserirSorteio(twitchName){
+    const nome = String(twitchName || '').trim().replace(/^@+/, '');
+    await q(`INSERT INTO sorteio_inscricoes (nome_twitch, mensagem) VALUES ($1, NULL)`, [nome]);
+  }
+
+  async function openSorteioModal(interaction){
     const st = await getSorteioState();
     if (!st.open) {
-      await interaction.reply({ ephemeral: true, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
       return;
     }
 
     const modal = new ModalBuilder()
       .setCustomId('sorteio:modal')
-      .setTitle('Inscrever no sorteio');
+      .setTitle('Entrar no sorteio');
 
     const inp = new TextInputBuilder()
       .setCustomId('twitch_name')
-      .setLabel('Seu nick da Twitch (sem @)')
+      .setLabel('Seu nick da Twitch')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setMaxLength(25)
@@ -446,79 +415,56 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     modal.addComponents(new ActionRowBuilder().addComponents(inp));
 
     await interaction.showModal(modal).catch(async () => {
-      await interaction.reply({ ephemeral: true, content: 'Não consegui abrir o formulário. Tenta de novo.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Não consegui abrir o formulário. Tenta de novo.' }).catch(() => {});
     });
   }
 
-  async function handleSorteioModal(interaction) {
+  async function handleSorteioModal(interaction){
     const raw = String(interaction.fields.getTextInputValue('twitch_name') || '');
     const nome = raw.trim().replace(/^@+/, '');
 
     if (!isValidTwitchName(nome)) {
-      await interaction.reply({ ephemeral: true, content: 'Nick inválido. Use 3–25 caracteres (letras, números e _).' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Nick inválido. Use 3–25 caracteres (letras, números e _).' }).catch(() => {});
       return;
     }
 
     const st = await getSorteioState();
     if (!st.open) {
-      await interaction.reply({ ephemeral: true, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Sorteio está fechado. Aguarde o streamer abrir.' }).catch(() => {});
       return;
     }
 
     if (await jaInscritoSorteio(nome)) {
-      await interaction.reply({ ephemeral: true, content: `@${nome} já está inscrito.` }).catch(() => {});
+      await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
       return;
     }
 
-    const info = await getPrintHojeInfo(nome);
+    const okPrint = await hasPrintHoje(nome);
+    const okDep = await hasDepositoHoje(nome);
 
-    if (!info.found) {
+    if (!okPrint || !okDep) {
       await interaction.reply({
-        ephemeral: true,
-        content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
+        flags: 64,
+        content: 'Para participar, você precisa ter feito o depósito **hoje** e enviado o print **hoje** no sistema.'
       }).catch(() => {});
       return;
     }
 
-    if (info.status === 'PENDENTE') {
-      await interaction.reply({
-        ephemeral: true,
-        content: 'Seu print de **hoje** foi recebido e está **PENDENTE**. Aguarde um admin aprovar e tente novamente.'
-      }).catch(() => {});
-      return;
-    }
-
-    if (info.status === 'REPROVADO') {
-      const motivo = info.reason ? `\nMotivo: **${info.reason}**` : '';
-      await interaction.reply({
-        ephemeral: true,
-        content: `Seu print de **hoje** foi **REPROVADO**.${motivo}`
-      }).catch(() => {});
-      return;
-    }
-
-    if (info.status !== 'APROVADO') {
-      await interaction.reply({
-        ephemeral: true,
-        content: `Seu print de hoje está com status: **${info.status || 'DESCONHECIDO'}**.`
-      }).catch(() => {});
-      return;
-    }
-
-    try {
+    try{
       await inserirSorteio(nome);
       if (typeof sseSendAll === 'function') {
-        sseSendAll('sorteio-changed', { action: 'join', nome_twitch: nome });
+        sseSendAll('sorteio-changed', { action:'join', nome_twitch: nome });
       }
-      await interaction.reply({ ephemeral: true, content: `Inscrição confirmada: @${nome}. Boa sorte! 🍀` }).catch(() => {});
-    } catch (e) {
+      await interaction.reply({ flags: 64, content: `Inscrição confirmada: @${nome}. Boa sorte!` }).catch(() => {});
+    }catch(e){
       if (e?.code === '23505') {
-        await interaction.reply({ ephemeral: true, content: `@${nome} já está inscrito.` }).catch(() => {});
+        await interaction.reply({ flags: 64, content: `@${nome} já está inscrito.` }).catch(() => {});
       } else {
-        await interaction.reply({ ephemeral: true, content: 'Erro ao inscrever. Tenta de novo.' }).catch(() => {});
+        await interaction.reply({ flags: 64, content: 'Erro ao inscrever. Tenta de novo.' }).catch(() => {});
       }
     }
   }
+
 
   async function logTicket(event) {
     if (!logChannelId) return;
@@ -533,6 +479,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       const ticketId = String(event?.ticketId || '');
       const submissionId = event?.submissionId ? String(event.submissionId) : '';
       const reason = event?.reason ? String(event.reason) : '';
+      const ts = Math.floor(Date.now() / 1000);
 
       const guild = await client.guilds.fetch(String(guildId)).catch(() => null);
 
@@ -587,7 +534,9 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           { name: 'Canal', value: channelText, inline: true },
           { name: 'Ticket ID', value: ticketId ? `\`${ticketId}\`` : '—', inline: false }
         )
-        .setTimestamp(new Date());
+
+        .setTimestamp(new Date())
+
 
       if (submissionId) {
         embed.addFields({ name: 'Submission ID', value: `\`${submissionId}\``, inline: true });
@@ -838,7 +787,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
 
   async function openTicket(interaction) {
     try {
-      await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      await interaction.deferReply({ flags: 64 }).catch(() => {});
     } catch {}
 
     const userId = interaction.user.id;
@@ -949,7 +898,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   async function handlePick(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
@@ -959,13 +908,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Sem permissão.' }).catch(() => {});
       return;
     }
 
     const val = interaction.values?.[0] || null;
     if (!['cpf', 'email', 'phone', 'random'].includes(val)) {
-      await interaction.reply({ ephemeral: true, content: 'Tipo Pix inválido.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Tipo Pix inválido.' }).catch(() => {});
       return;
     }
 
@@ -977,7 +926,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     await scheduleIdle(ticketId, t.channel_id, t.user_id);
 
     await interaction.reply({
-      ephemeral: true,
+      flags: 64,
       content: `✅ Tipo Pix selecionado: **${toTitlePixType(val)}**`
     }).catch(() => {});
   }
@@ -985,7 +934,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   async function handleFill(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
@@ -995,12 +944,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const staff = hasStaffRole(member);
 
     if (!isOwner && !staff) {
-      await interaction.reply({ ephemeral: true, content: 'Sem permissão.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Sem permissão.' }).catch(() => {});
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
       return;
     }
 
@@ -1033,12 +982,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   async function handleModal(interaction, ticketId) {
     const t = await getOpenTicketById(ticketId);
     if (!t) {
-      await interaction.reply({ ephemeral: true, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Esse ticket não está mais ativo.' }).catch(() => {});
       return;
     }
 
     if (!t.pix_type) {
-      await interaction.reply({ ephemeral: true, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Escolha o **Tipo Pix** primeiro.' }).catch(() => {});
       return;
     }
 
@@ -1049,7 +998,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const pixKey = String(pixRaw || '').trim();
 
     if (!isValidTwitchName(twitch)) {
-      await interaction.reply({ ephemeral: true, content: 'Nick da Twitch inválido.' }).catch(() => {});
+      await interaction.reply({ flags: 64, content: 'Nick da Twitch inválido.' }).catch(() => {});
       return;
     }
 
@@ -1069,7 +1018,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
         pixType === 'phone' ? 'Telefone inválido.' :
         pixType === 'random' ? 'Chave aleatória inválida (UUID).' :
         'Chave Pix inválida.';
-      await interaction.reply({ ephemeral: true, content: `❌ ${msg}` }).catch(() => {});
+      await interaction.reply({ flags: 64, content: `❌ ${msg}` }).catch(() => {});
       return;
     }
 
@@ -1084,7 +1033,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     scheduleWaitImage(ticketId);
 
     await interaction.reply({
-      ephemeral: true,
+      flags: 64,
       content: `✅ Dados recebidos. Agora envie **APENAS a imagem** do print aqui no ticket (PNG/JPG/WEBP). Você tem **${waitImageMin} min**.`
     }).catch(() => {});
 
@@ -1148,6 +1097,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       if (!t) return;
 
       if (String(msg.author.id) !== String(t.user_id)) return;
+
       if (String(t.status) !== 'WAIT_IMAGE') return;
 
       const imgs = Array.from(msg.attachments?.values?.() || []).filter(likelyImageAttachment);
@@ -1219,12 +1169,12 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
           await handleFill(interaction, ticketId);
           return;
         }
-
+      }
         if (interaction.customId === 'sorteio:join') {
           await openSorteioModal(interaction);
           return;
         }
-      }
+
 
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId.startsWith('dep:pick:')) {
@@ -1250,7 +1200,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
       onLog.error('InteractionCreate falhou:', e?.message || e);
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ ephemeral: true, content: 'Falha ao processar. Tenta de novo.' }).catch(() => {});
+          await interaction.reply({ flags: 64, content: 'Falha ao processar. Tenta de novo.' }).catch(() => {});
         }
       } catch {}
     }
@@ -1291,37 +1241,13 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
     await ensureTables(q);
     await ensureEntryMessage();
-
-    try {
-      const st = await getSorteioState();
-      await updateSorteioMessage(st.open);
-    } catch {}
-
+    try { const st = await getSorteioState(); await updateSorteioMessage(st.open); } catch {}
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  async function loginWithBackoff() {
-    let attempt = 0;
-    const maxDelay = 15 * 60 * 1000;
-
-    while (true) {
-      try {
-        await client.login(token);
-        return;
-      } catch (e) {
-        const msg = e?.message || String(e);
-        onLog.error('❌ Discord login falhou:', msg);
-
-        const delay = Math.min(30_000 * (2 ** attempt), maxDelay);
-        attempt = Math.min(attempt + 1, 10);
-
-        onLog.warn('Discord retry em ms=', delay);
-        await new Promise(r => setTimeout(r, delay));
-      }
-    }
-  }
-
-  loginWithBackoff();
+  client.login(token).catch((e) => {
+    onLog.error('❌ Discord login falhou:', e?.message || e);
+  });
 
   return { client, updateSorteioMessage };
 }
