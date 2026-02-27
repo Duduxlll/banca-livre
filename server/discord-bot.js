@@ -234,6 +234,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
   const entryChannelId = process.env.DISCORD_ENTRY_CHANNEL_ID;
   const sorteioChannelId = String(process.env.DISCORD_SORTEIO_CHANNEL_ID || entryChannelId || '').trim();
   const ticketsCategoryId = process.env.DISCORD_TICKETS_CATEGORY_ID;
+  const entryChannelMention = entryChannelId ? `<#${entryChannelId}>` : 'canal do print';
 
   if (!token || !guildId || !entryChannelId || !ticketsCategoryId) {
     onLog.error('❌ Variáveis faltando: DISCORD_TOKEN (ou DISCORD_BOT_KEY), DISCORD_GUILD_ID, DISCORD_ENTRY_CHANNEL_ID, DISCORD_TICKETS_CATEGORY_ID');
