@@ -16,7 +16,7 @@ import {
   Events
 } from 'discord.js';
 import crypto from 'node:crypto';
-
+import https from 'node:https';
 function asBool(v, def = false) {
   if (v == null) return def;
   const s = String(v).trim().toLowerCase();
@@ -229,7 +229,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     return null;
   }
 
-  const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_KEY;
+  const token = String(process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_KEY || '').trim();
   const guildId = process.env.DISCORD_GUILD_ID;
   const entryChannelId = process.env.DISCORD_ENTRY_CHANNEL_ID;
   const sorteioChannelId = String(process.env.DISCORD_SORTEIO_CHANNEL_ID || entryChannelId || '').trim();
@@ -1349,8 +1349,25 @@ if (info.status !== 'APROVADO') {
     setInterval(periodicCleanup, 5 * 60 * 1000);
   });
 
-  onLog.log('DISCORD attempting login. tokenLen=', String(token || '').trim().length);
+  onLog.log('DISCORD tokenLen=', token.length);
+onLog.log('DISCORD tokenHash=', crypto.createHash('sha256').update(token).digest('hex').slice(0, 10));
 onLog.log('DISCORD guildId=', String(guildId || '').trim(), 'entryChannelId=', String(entryChannelId || '').trim(), 'ticketsCategoryId=', String(ticketsCategoryId || '').trim());
+
+
+https.get('https://discord.com/api/v10/gateway', (res) => {
+  onLog.log('DISCORD gateway http status=', res.statusCode);
+  res.resume();
+}).on('error', (e) => {
+  onLog.error('DISCORD gateway http error=', e?.message || e);
+});
+
+setTimeout(() => {
+  try {
+    onLog.log('DISCORD ws status=', client.ws?.status);
+  } catch (e) {
+    onLog.error('DISCORD ws status read error=', e?.message || e);
+  }
+}, 15000);
 
   client.login(token).catch((e) => {
     onLog.error('❌ Discord login falhou:', e?.message || e);
