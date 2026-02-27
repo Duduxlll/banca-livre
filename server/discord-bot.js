@@ -311,7 +311,7 @@ export function initDiscordBot({ q, uid, onLog = console, sseSendAll } = {}) {
     const desc =
       '📌 **Para participar do sorteio é obrigatório:**\n' +
       '1) ter feito **DEPÓSITO HOJE**\n' +
-      '2) ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **<#1470084521423536249>**)\n\n' +
+      `2) ter enviado **HOJE** o **print do histórico de depósito** no sistema (bot: **${entryChannelMention}**)\n\n` +
       '3) Aguarde o streamer liberar o sorteio na live.\n' +
       '4) Quando estiver liberado, clique no botão abaixo.\n' +
       '5) Digite seu **nick da Twitch** (sem @) e confirme.\n\n' +
@@ -521,7 +521,7 @@ LIMIT 1
 if (!info.found) {
   await interaction.reply({
     flags: 64,
-    content: 'Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (<#1470084521423536249>).'
+    content: `Para participar, você precisa ter enviado **HOJE** o print do **histórico de depósito** no sistema (${entryChannelMention}).`
   }).catch(()=>{});
   return;
 }
