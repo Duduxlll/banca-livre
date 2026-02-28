@@ -21,6 +21,8 @@ function uid() {
 
 function sseSendAll() {}
 
+let bot = null;
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -63,12 +65,12 @@ async function main() {
   await pool.query('SELECT 1');
   console.log('🗄️ Postgres conectado no worker do Discord');
 
-  const bot = initDiscordBot({
-    q,
-    uid,
-    onLog: console,
-    sseSendAll
-  });
+  bot = initDiscordBot({
+  q,
+  uid,
+  onLog: console,
+  sseSendAll
+});
 
   if (!bot) {
     throw new Error('Discord bot não inicializado');
@@ -76,6 +78,36 @@ async function main() {
 
   await startSorteioSync(bot);
 }
+
+async function shutdown(signal) {
+  console.log(`🛑 Recebido ${signal}. Desativando "Enviar print"...`);
+
+  try {
+    await bot?.updateEntryMessage?.(false);
+    console.log('✅ Mensagem de enviar print desativada.');
+  } catch (e) {
+    console.error('❌ Falha ao desativar mensagem de enviar print:', e?.message || e);
+  }
+
+  try {
+    await bot?.client?.destroy?.();
+  } catch {}
+
+  try {
+    await pool.end();
+  } catch {}
+
+  process.exit(0);
+}
+
+process.on('SIGINT', () => {
+  shutdown('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+  shutdown('SIGTERM');
+});
+
 
 main().catch((err) => {
   console.error('❌ Falha ao iniciar worker do Discord:', err?.message || err);

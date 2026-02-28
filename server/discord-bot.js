@@ -787,26 +787,30 @@ if (info.status !== 'APROVADO') {
     return staffRoleIds.some(rid => member.roles?.cache?.has(rid));
   }
 
-  function buildEntryMessage() {
-    const embed = new EmbedBuilder()
-      .setTitle('📩 Enviar print do depósito')
-      .setDescription(
-        'Clique no botão abaixo para abrir um **ticket privado**.\n\n' +
-        'Dentro do ticket você vai:\n' +
-        '1) escolher o **Tipo Pix**\n' +
-        '2) preencher **Nick da Twitch + Chave Pix**\n' +
-        '3) anexar o **print do histórico de depósito** (PNG/JPG/WEBP)'
-      );
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('dep:open')
-        .setLabel('Enviar print do depósito')
-        .setStyle(ButtonStyle.Success)
+  function buildEntryMessage(enabled = true) {
+  const embed = new EmbedBuilder()
+    .setTitle('📩 Enviar print do depósito')
+    .setDescription(
+      enabled
+        ? 'Clique no botão abaixo para abrir um **ticket privado**.\n\n' +
+          'Dentro do ticket você vai:\n' +
+          '1) escolher o **Tipo Pix**\n' +
+          '2) preencher **Nick da Twitch + Chave Pix**\n' +
+          '3) anexar o **print do histórico de depósito** (PNG/JPG/WEBP)'
+        : '⚫ O sistema de envio de print está **temporariamente indisponível**.\n\n' +
+          'O bot está offline no momento. Aguarde ele voltar para enviar o print.'
     );
 
-    return { embeds: [embed], components: [row] };
-  }
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('dep:open')
+      .setLabel(enabled ? 'Enviar print do depósito' : 'Bot offline')
+      .setStyle(enabled ? ButtonStyle.Success : ButtonStyle.Secondary)
+      .setDisabled(!enabled)
+  );
+
+  return { embeds: [embed], components: [row] };
+}
 
   function buildTicketPanel(ticketId) {
     const embed = new EmbedBuilder()
@@ -884,6 +888,28 @@ if (info.status !== 'APROVADO') {
       await ch.send(buildEntryMessage()).catch(() => {});
     }
   }
+
+  async function updateEntryMessage(enabled = true) {
+  const ch = await client.channels.fetch(entryChannelId).catch(() => null);
+  if (!ch || !ch.isTextBased()) return;
+
+  const msgs = await ch.messages.fetch({ limit: 30 }).catch(() => null);
+  const existing = msgs?.find(m => {
+    if (!m.author || m.author.id !== client.user.id) return false;
+    return (m.components || []).some(row =>
+      (row.components || []).some(c => c.customId === 'dep:open')
+    );
+  });
+
+  const payload = buildEntryMessage(enabled);
+
+  if (existing) {
+    await existing.edit(payload).catch(() => {});
+    return;
+  }
+
+  await ch.send(payload).catch(() => {});
+}
 
   async function openTicket(interaction) {
     try {
@@ -1349,7 +1375,7 @@ client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
   client.once(Events.ClientReady, async () => {
     onLog.log(`🤖 Discord bot online: ${client.user.tag}`);
     await ensureTables(q);
-    await ensureEntryMessage();
+    await updateEntryMessage(true);
 
     try {
       const st = await getSorteioState();
@@ -1363,5 +1389,9 @@ client.on('shardReady', (id) => onLog.log('✅ [DISCORD] shardReady:', id));
     onLog.error('❌ Discord login falhou:', e?.message || e);
   });
 
-  return { client, updateSorteioMessage };
+  return {
+  client,
+  updateSorteioMessage,
+  updateEntryMessage
+};
 }
