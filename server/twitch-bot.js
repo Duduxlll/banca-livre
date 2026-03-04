@@ -47,6 +47,18 @@ export function initTwitchBot({
     return Math.max(4000, Math.min(n, 60000));
   })();
 
+    // ===== AUTO MENSAGEM (a cada X tempo) =====
+  const autoMsgEnabled =
+    String(process.env.TWITCH_AUTOMSG || "").trim().toLowerCase() === "true";
+
+  const autoMsgIntervalMs = (() => {
+    const n = Number(process.env.TWITCH_AUTOMSG_INTERVAL_MS || 300000); // 5 min
+    if (!Number.isFinite(n)) return 300000;
+    return Math.max(60000, n); // mínimo 60s só pra não virar spam sem querer
+  })();
+
+  const autoMsgText = String(process.env.TWITCH_AUTOMSG_TEXT || "").trim();
+
   const client = new tmi.Client({
     options: { debug: false },
     connection: { reconnect: true, secure: true },
@@ -261,6 +273,7 @@ export function initTwitchBot({
   }
 
   let pollTimer = null;
+    let autoMsgTimer = null;
   let lastAnnounceSig = "";
   let lastAnnounceAt = 0;
 
@@ -350,11 +363,30 @@ export function initTwitchBot({
       });
     }
   });
+      if (autoMsgEnabled && autoMsgText) {
+      if (autoMsgTimer) clearInterval(autoMsgTimer);
+
+      autoMsgTimer = setInterval(() => {
+        enqueue(async () => {
+          try {
+            await say(autoMsgText);
+          } catch (e) {
+            log.error("[twitch-bot] auto msg erro:", e?.message || e);
+          }
+        });
+      }, autoMsgIntervalMs);
+
+      enqueue(async () => { try { await say(autoMsgText); } catch {} });
+    }
 
   client.on("disconnected", () => {
     if (pollTimer) {
       clearInterval(pollTimer);
       pollTimer = null;
+    }
+    if (autoMsgTimer) {
+      clearInterval(autoMsgTimer);
+      autoMsgTimer = null;
     }
   });
 
