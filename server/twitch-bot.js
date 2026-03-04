@@ -344,40 +344,47 @@ export function initTwitchBot({
   }
 
   client.on("connected", () => {
-    log.log(`[twitch-bot] conectado em ${chan} como ${botUsername}`);
-    if (announceEnabled) {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(() => {
-        enqueue(async () => {
-          try {
-            await pollAnnounce();
-          } catch (e) {
-            log.error("[twitch-bot] poll announce erro:", e?.message || e);
-          }
-        });
-      }, announceIntervalMs);
+  log.log(`[twitch-bot] conectado em ${chan} como ${botUsername}`);
+
+  if (announceEnabled) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => {
       enqueue(async () => {
         try {
           await pollAnnounce();
-        } catch {}
+        } catch (e) {
+          log.error("[twitch-bot] poll announce erro:", e?.message || e);
+        }
       });
-    }
-  });
-      if (autoMsgEnabled && autoMsgText) {
-      if (autoMsgTimer) clearInterval(autoMsgTimer);
+    }, announceIntervalMs);
 
-      autoMsgTimer = setInterval(() => {
-        enqueue(async () => {
-          try {
-            await say(autoMsgText);
-          } catch (e) {
-            log.error("[twitch-bot] auto msg erro:", e?.message || e);
-          }
-        });
-      }, autoMsgIntervalMs);
+    enqueue(async () => {
+      try {
+        await pollAnnounce();
+      } catch {}
+    });
+  }
 
-      enqueue(async () => { try { await say(autoMsgText); } catch {} });
-    }
+  if (autoMsgEnabled && autoMsgText) {
+    if (autoMsgTimer) clearInterval(autoMsgTimer);
+
+    autoMsgTimer = setInterval(() => {
+      enqueue(async () => {
+        try {
+          await say(autoMsgText);
+        } catch (e) {
+          log.error("[twitch-bot] auto msg erro:", e?.message || e);
+        }
+      });
+    }, autoMsgIntervalMs);
+
+    enqueue(async () => {
+      try {
+        await say(autoMsgText);
+      } catch {}
+    });
+  }
+});
 
   client.on("disconnected", () => {
     if (pollTimer) {
