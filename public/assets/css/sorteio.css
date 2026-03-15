@@ -1,20 +1,16 @@
 #tab-sorteio{
-  --s-bg: rgba(8,12,14,.82);
-  --s-bg-2: rgba(10,16,13,.94);
-  --s-bg-soft: rgba(255,255,255,.035);
-  --s-line: rgba(110,255,196,.14);
-  --s-line-strong: rgba(110,255,196,.28);
-  --s-text: #ecfff6;
-  --s-muted: rgba(236,255,246,.66);
-  --s-green: #39f79d;
-  --s-green-2: #86ffd6;
-  --s-red: #ff6c8a;
-  --s-yellow: #ffd76a;
-  --s-blue: #89d8ff;
-  --s-shadow: 0 28px 90px rgba(0,0,0,.34), 0 8px 24px rgba(0,0,0,.18);
-  --s-shadow-soft: 0 16px 40px rgba(0,0,0,.22);
-  --s-radius: 22px;
-  position:relative;
+  --sx-bg: rgba(8,12,14,.84);
+  --sx-bg-2: rgba(6,15,11,.94);
+  --sx-line: rgba(76,255,162,.12);
+  --sx-line-strong: rgba(76,255,162,.24);
+  --sx-text: #eefcf4;
+  --sx-muted: rgba(238,252,244,.68);
+  --sx-green: #39f79d;
+  --sx-green-2: #86ffd6;
+  --sx-red: #ff6a8f;
+  --sx-shadow: 0 28px 80px rgba(0,0,0,.34);
+  --sx-shadow-soft: 0 14px 40px rgba(0,0,0,.22);
+  position: relative;
 }
 
 #tab-sorteio::before{
@@ -23,26 +19,29 @@
   inset:0;
   pointer-events:none;
   background:
-    radial-gradient(620px 220px at 0% 0%, rgba(57,247,157,.06), transparent 62%),
-    radial-gradient(520px 220px at 100% 0%, rgba(134,255,214,.045), transparent 62%);
-  opacity:.92;
+    radial-gradient(600px 220px at 0% 0%, rgba(57,247,157,.06), transparent 62%),
+    radial-gradient(520px 220px at 100% 0%, rgba(134,255,214,.04), transparent 62%);
+  opacity:.9;
 }
 
-#tab-sorteio > .card{
+#tab-sorteio .sorteio-header-card,
+#tab-sorteio .sorteio-wheel-card,
+#tab-sorteio .sorteio-list-card{
   position:relative;
   overflow:hidden;
-  margin-bottom:14px !important;
-  border:1px solid var(--s-line) !important;
-  border-radius:var(--s-radius) !important;
+  border:1px solid var(--sx-line);
+  border-radius:24px;
   background:
     linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
     linear-gradient(135deg, rgba(57,247,157,.025), rgba(134,255,214,.01) 35%, transparent 70%),
-    var(--s-bg) !important;
-  box-shadow:var(--s-shadow) !important;
-  backdrop-filter:blur(14px);
+    var(--sx-bg);
+  box-shadow: var(--sx-shadow);
+  backdrop-filter: blur(14px);
 }
 
-#tab-sorteio > .card::before{
+#tab-sorteio .sorteio-header-card::before,
+#tab-sorteio .sorteio-wheel-card::before,
+#tab-sorteio .sorteio-list-card::before{
   content:"";
   position:absolute;
   inset:0;
@@ -53,13 +52,147 @@
   opacity:.95;
 }
 
-#tab-sorteio > .card > *{
+#tab-sorteio .sorteio-header-card > *,
+#tab-sorteio .sorteio-wheel-card > *,
+#tab-sorteio .sorteio-list-card > *{
   position:relative;
   z-index:1;
 }
 
+#tab-sorteio .sorteio-header-admin{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:18px;
+  align-items:start;
+  padding:18px;
+}
+
+#tab-sorteio h2{
+  margin:0;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:clamp(1.7rem, 2.4vw, 2.35rem);
+  font-weight:900;
+  letter-spacing:-.03em;
+  line-height:1;
+  color:var(--sx-text);
+  text-shadow:0 4px 18px rgba(0,0,0,.22);
+}
+
+#tab-sorteio h2::after{
+  content:"SORTEIO";
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:0 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.05);
+  color:var(--sx-muted);
+  font-size:.68rem;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+
+#tab-sorteio .palpite-status-row{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:10px;
+}
+
+#tab-sorteio .p-status{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  min-height:38px;
+  padding:0 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02)),
+    rgba(10,12,14,.55);
+  color:var(--sx-text);
+  font-weight:900;
+  font-size:.78rem;
+  letter-spacing:.06em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+#tab-sorteio .p-status::before{
+  content:"";
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.38);
+  box-shadow:0 0 0 6px rgba(255,255,255,.06);
+  flex:0 0 auto;
+}
+
+#tab-sorteio .p-status.p-open{
+  border-color:rgba(57,247,157,.28);
+  background:
+    linear-gradient(180deg, rgba(57,247,157,.16), rgba(57,247,157,.07)),
+    rgba(8,18,14,.76);
+  color:#eafff4;
+  box-shadow:
+    inset 0 0 0 1px rgba(57,247,157,.08),
+    0 10px 24px rgba(20,130,74,.16);
+}
+
+#tab-sorteio .p-status.p-open::before{
+  background:var(--sx-green);
+  box-shadow:
+    0 0 0 6px rgba(57,247,157,.10),
+    0 0 18px rgba(57,247,157,.24);
+  animation:sorteioPulse 1.8s ease-in-out infinite;
+}
+
+#tab-sorteio .p-status.p-closed{
+  border-color:rgba(255,106,143,.24);
+  background:
+    linear-gradient(180deg, rgba(255,106,143,.12), rgba(255,106,143,.05)),
+    rgba(20,11,14,.72);
+  color:#ffe8ee;
+}
+
+#tab-sorteio .p-status.p-closed::before{
+  background:var(--sx-red);
+  box-shadow:
+    0 0 0 6px rgba(255,106,143,.09),
+    0 0 18px rgba(255,106,143,.18);
+}
+
+#tab-sorteio .p-status-text{
+  color:var(--sx-muted);
+  font-size:.98rem;
+  font-weight:600;
+  line-height:1.4;
+}
+
+#tab-sorteio .muted{
+  margin:8px 0 0;
+  color:var(--sx-muted);
+  font-size:.92rem;
+  line-height:1.45;
+}
+
+#tab-sorteio .sorteio-actions{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:10px;
+}
+
 #tab-sorteio .btn,
-#tab-sorteio button.btn{
+#tab-sorteio .btn-soft,
+#tab-sorteio .btn-girar,
+#tab-sorteio .btn-soft-mini,
+#tab-sorteio .btn-mini-del{
   transition:
     transform .16s ease,
     filter .18s ease,
@@ -69,17 +202,27 @@
     background .22s ease;
 }
 
-#tab-sorteio .btn:hover{
+#tab-sorteio .btn:hover,
+#tab-sorteio .btn-soft:hover,
+#tab-sorteio .btn-girar:hover,
+#tab-sorteio .btn-soft-mini:hover,
+#tab-sorteio .btn-mini-del:hover{
   transform:translateY(-2px);
   filter:brightness(1.04);
 }
 
-#tab-sorteio .btn:active{
+#tab-sorteio .btn:active,
+#tab-sorteio .btn-soft:active,
+#tab-sorteio .btn-girar:active,
+#tab-sorteio .btn-soft-mini:active,
+#tab-sorteio .btn-mini-del:active{
   transform:translateY(0);
   filter:brightness(.98);
 }
 
 #tab-sorteio .btn[disabled],
+#tab-sorteio .btn-soft[disabled],
+#tab-sorteio .btn-girar[disabled],
 #tab-sorteio button[disabled]{
   opacity:.45;
   cursor:not-allowed !important;
@@ -88,52 +231,234 @@
   pointer-events:none;
 }
 
-#tab-sorteio .input,
-#tab-sorteio select.input{
-  min-height:48px;
-  border-radius:16px !important;
-  border:1px solid rgba(57,247,157,.12) !important;
+#tab-sorteio #btnSorteioOpen{
+  min-height:42px;
+  padding:0 18px;
+  border-radius:14px;
+  border:none;
+  background:linear-gradient(135deg, rgba(57,247,157,1), rgba(134,255,214,.92));
+  color:#082114;
+  font-weight:900;
+  box-shadow:
+    0 16px 36px rgba(57,247,157,.26),
+    0 8px 24px rgba(0,0,0,.18);
+}
+
+#tab-sorteio #btnSorteioClose{
+  min-height:42px;
+  padding:0 18px;
+  border-radius:14px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01)),
-    rgba(6,15,11,.92) !important;
-  color:var(--s-text) !important;
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+    rgba(22,19,22,.82);
+  border:1px solid rgba(255,255,255,.10);
+  color:#f3f7f5;
+  font-weight:800;
+}
+
+#tab-sorteio .btn-soft{
+  min-height:42px;
+  padding:0 16px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.10);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+    rgba(10,14,12,.78);
+  color:#effcf5;
+  font-weight:800;
+  cursor:pointer;
+}
+
+#tab-sorteio .btn-soft.danger,
+#tab-sorteio #btnSorteioLimpar{
+  background:
+    linear-gradient(180deg, rgba(255,106,143,.12), rgba(255,106,143,.06)),
+    rgba(32,15,21,.84);
+  border-color:rgba(255,106,143,.22);
+  color:#ffe6ed;
+}
+
+#tab-sorteio #btnSorteioAtualizar{
+  border-color:rgba(57,247,157,.16);
+}
+
+#tab-sorteio .sorteio-layout{
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);
+  gap:18px;
+  align-items:start;
+}
+
+#tab-sorteio .sorteio-wheel-card{
+  padding:18px;
+}
+
+#tab-sorteio .wheel-wrapper{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:540px;
+  padding:18px 12px 22px;
+  border-radius:22px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255,255,255,.045), transparent 58%),
+    linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.18));
+  border:1px solid rgba(255,255,255,.05);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+#tab-sorteio #sorteioWheel{
+  display:block;
+  width:min(100%, 500px);
+  max-width:500px;
+  height:auto;
+  aspect-ratio:1 / 1;
+  margin:0 auto;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255,255,255,.06), rgba(255,255,255,.01) 34%, rgba(0,0,0,.16) 75%, rgba(0,0,0,.28) 100%);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.34),
+    inset 0 0 0 1px rgba(255,255,255,.05),
+    inset 0 0 40px rgba(255,255,255,.02);
+}
+
+#tab-sorteio .wheel-pointer{
+  position:absolute;
+  top:-1px;
+  left:50%;
+  transform:translateX(-50%);
+  width:0;
+  height:0;
+  border-left:12px solid transparent;
+  border-right:12px solid transparent;
+  border-bottom:24px solid #73ffd1;
+  filter:drop-shadow(0 6px 14px rgba(115,255,209,.24));
+  z-index:3;
+}
+
+#tab-sorteio .btn-girar{
+  margin-top:16px;
+  width:100%;
+  min-height:54px;
+  border:none;
+  border-radius:18px;
+  background:
+    linear-gradient(135deg, rgba(57,247,157,1), rgba(134,255,214,.92));
+  color:#082114;
+  font-weight:900;
+  font-size:1rem;
+  letter-spacing:.01em;
+  cursor:pointer;
+  box-shadow:
+    0 18px 40px rgba(57,247,157,.22),
+    0 8px 24px rgba(0,0,0,.16);
+}
+
+#tab-sorteio .btn-girar.is-spinning{
+  box-shadow:
+    0 22px 48px rgba(57,247,157,.28),
+    0 0 0 10px rgba(57,247,157,.05);
+}
+
+#tab-sorteio .winner-box{
+  margin-top:12px;
+  min-height:68px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:16px 18px;
+  border-radius:18px;
+  border:1px solid rgba(57,247,157,.12);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.012)),
+    rgba(5,16,11,.88);
+  color:#f7fff9;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
 }
 
-#tab-sorteio .input::placeholder{
-  color:rgba(236,255,246,.38);
+#tab-sorteio #sorteioWinnerLabel{
+  font-size:1.04rem;
+  font-weight:800;
+  color:#ffffff;
 }
 
-#tab-sorteio .input:focus,
-#tab-sorteio select.input:focus{
-  border-color:rgba(57,247,157,.34) !important;
-  box-shadow:
-    0 0 0 4px rgba(57,247,157,.10),
-    0 12px 28px rgba(16,24,18,.16) !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)),
-    rgba(9,19,14,.96) !important;
-}
-
-#tab-sorteio select.input{
+#tab-sorteio .btn-soft-mini{
+  min-height:34px;
+  padding:0 12px;
+  border-radius:12px;
+  border:1px solid rgba(57,247,157,.16);
+  background:rgba(57,247,157,.08);
+  color:#ecfff6;
+  font-size:.82rem;
+  font-weight:800;
   cursor:pointer;
-  appearance:none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, rgba(236,255,246,.78) 50%),
-    linear-gradient(135deg, rgba(236,255,246,.78) 50%, transparent 50%),
-    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-  background-position:
-    calc(100% - 20px) calc(50% - 2px),
-    calc(100% - 14px) calc(50% - 2px),
-    0 0;
-  background-size:6px 6px, 6px 6px, 100% 100%;
-  background-repeat:no-repeat;
-  padding-right:40px;
 }
 
-#tab-sorteio .muted{
-  color:var(--s-muted);
-  font-size:.86rem;
+#tab-sorteio .winner-box.flash{
+  animation:winnerFlash .48s ease both;
+}
+
+#tab-sorteio .sorteio-list-card{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+}
+
+#tab-sorteio .sorteio-list-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 18px 10px;
+  color:#f5fff9;
+  font-size:1.02rem;
+  font-weight:900;
+  letter-spacing:-.01em;
+}
+
+#tab-sorteio #sorteioTotalInscritos{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(57,247,157,.18);
+  background:rgba(57,247,157,.08);
+  color:rgba(120,255,214,.96);
+  font-size:.84rem;
+  font-weight:900;
+}
+
+#tab-sorteio .sorteio-list{
+  margin:0 12px 12px;
+  min-height:620px;
+  max-height:620px;
+  overflow:auto;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.06);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008)),
+    rgba(0,0,0,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+#tab-sorteio .sorteio-list::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+
+#tab-sorteio .sorteio-list::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+#tab-sorteio .sorteio-list::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.14);
+  border-radius:999px;
 }
 
 #tab-sorteio .table{
@@ -151,7 +476,7 @@
   color:#d9ffee;
   font-size:15px;
   font-weight:700;
-  border-bottom:1px solid var(--s-line);
+  border-bottom:1px solid var(--sx-line);
   background:rgba(7,19,12,.84);
   backdrop-filter:blur(10px);
   background-clip:padding-box;
@@ -179,650 +504,23 @@
   border-bottom:1px solid rgba(255,255,255,.06);
 }
 
-#tab-sorteio .table-wrap{
-  position:relative;
-  max-height:560px;
-  min-height:420px;
-  overflow:auto;
-  border-radius:18px;
-  overscroll-behavior:contain;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008)),
-    rgba(0,0,0,.18);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
-}
-
-#tab-sorteio .table-wrap::-webkit-scrollbar{
-  width:8px;
-  height:8px;
-}
-
-#tab-sorteio .table-wrap::-webkit-scrollbar-track{
-  background:transparent;
-}
-
-#tab-sorteio .table-wrap::-webkit-scrollbar-thumb{
-  background:rgba(255,255,255,.14);
-  border-radius:999px;
-}
-
-#tab-sorteio > .card:first-of-type{
-  padding:16px 18px 18px;
-}
-
-#tab-sorteio > .card:first-of-type > div:first-child{
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) auto !important;
-  gap:18px !important;
-  align-items:start !important;
-}
-
-#tab-sorteio h2{
-  margin:0 !important;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-size:clamp(1.55rem, 2.3vw, 2.1rem);
-  font-weight:900;
-  letter-spacing:-.03em;
-  line-height:1;
-  color:var(--s-text);
-  text-shadow:0 4px 18px rgba(0,0,0,.22);
-}
-
-#tab-sorteio h2::after{
-  content:"SORTEIO";
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:24px;
-  padding:0 10px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.05);
-  color:var(--s-muted);
-  font-size:.68rem;
-  font-weight:800;
-  letter-spacing:.08em;
-}
-
-#tab-sorteio > .card:first-of-type p{
-  margin:8px 0 0 !important;
-  color:var(--s-muted);
-  line-height:1.4;
-}
-
-#tab-sorteio .sorteio-status,
-#tab-sorteio .status-sorteio,
-#tab-sorteio #sorteioStatus{
-  display:flex;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:10px;
-  margin-top:10px;
-  color:var(--s-text);
-  font-weight:800;
-}
-
-#tab-sorteio .sorteio-status-badge,
-#tab-sorteio .badge-sorteio,
-#tab-sorteio .badge-status{
-  position:relative;
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
-  min-height:38px;
-  padding:0 14px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.08);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02)),
-    rgba(10,12,14,.55);
-  color:var(--s-text);
-  font-weight:900;
-  font-size:.78rem;
-  letter-spacing:.06em;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
-}
-
-#tab-sorteio .sorteio-status-badge::before,
-#tab-sorteio .badge-sorteio::before,
-#tab-sorteio .badge-status::before{
-  content:"";
-  width:10px;
-  height:10px;
-  border-radius:999px;
-  background:rgba(255,255,255,.38);
-  box-shadow:0 0 0 6px rgba(255,255,255,.06);
-  flex:0 0 auto;
-}
-
-#tab-sorteio .is-open .sorteio-status-badge,
-#tab-sorteio .is-open .badge-sorteio,
-#tab-sorteio .status-open,
-#tab-sorteio .aberto{
-  border-color:rgba(57,247,157,.28);
-  background:
-    linear-gradient(180deg, rgba(57,247,157,.16), rgba(57,247,157,.07)),
-    rgba(8,18,14,.76);
-  color:#eafff4;
-  box-shadow:
-    inset 0 0 0 1px rgba(57,247,157,.08),
-    0 10px 24px rgba(20,130,74,.16);
-}
-
-#tab-sorteio .is-open .sorteio-status-badge::before,
-#tab-sorteio .is-open .badge-sorteio::before,
-#tab-sorteio .status-open::before,
-#tab-sorteio .aberto::before{
-  background:var(--s-green);
-  box-shadow:
-    0 0 0 6px rgba(57,247,157,.10),
-    0 0 18px rgba(57,247,157,.24);
-  animation:sorteioPulse 1.8s ease-in-out infinite;
-}
-
-#tab-sorteio .is-closed .sorteio-status-badge,
-#tab-sorteio .is-closed .badge-sorteio,
-#tab-sorteio .status-closed,
-#tab-sorteio .fechado{
-  border-color:rgba(255,108,138,.24);
-  background:
-    linear-gradient(180deg, rgba(255,108,138,.12), rgba(255,108,138,.05)),
-    rgba(20,11,14,.72);
-  color:#ffe8ee;
-}
-
-#tab-sorteio .is-closed .sorteio-status-badge::before,
-#tab-sorteio .is-closed .badge-sorteio::before,
-#tab-sorteio .status-closed::before,
-#tab-sorteio .fechado::before{
-  background:var(--s-red);
-  box-shadow:
-    0 0 0 6px rgba(255,108,138,.09),
-    0 0 18px rgba(255,108,138,.18);
-}
-
-#tab-sorteio .sorteio-actions,
-#tab-sorteio .acoes-sorteio,
-#tab-sorteio > .card:first-of-type > div:last-child{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  gap:10px;
-  align-self:start;
-}
-
-#tab-sorteio #btnSorteioOpen,
-#tab-sorteio [data-action="open-sorteio"],
-#tab-sorteio .btn-open-sorteio{
-  background:
-    linear-gradient(135deg, rgba(57,247,157,1), rgba(134,255,214,.92)) !important;
-  color:#082114 !important;
-  border:none !important;
-  box-shadow:
-    0 16px 36px rgba(57,247,157,.26),
-    0 8px 24px rgba(0,0,0,.18) !important;
-}
-
-#tab-sorteio #btnSorteioOpen:hover,
-#tab-sorteio [data-action="open-sorteio"]:hover,
-#tab-sorteio .btn-open-sorteio:hover{
-  box-shadow:
-    0 18px 40px rgba(57,247,157,.30),
-    0 10px 28px rgba(0,0,0,.20) !important;
-}
-
-#tab-sorteio #btnSorteioClose,
-#tab-sorteio [data-action="close-sorteio"],
-#tab-sorteio .btn-close-sorteio{
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
-    rgba(22,19,22,.82) !important;
-  border:1px solid rgba(255,255,255,.10) !important;
-  color:#f3f7f5 !important;
-}
-
-#tab-sorteio #btnSorteioClose:hover,
-#tab-sorteio [data-action="close-sorteio"]:hover,
-#tab-sorteio .btn-close-sorteio:hover{
-  border-color:rgba(255,108,138,.22) !important;
-  box-shadow:0 12px 28px rgba(255,108,138,.10);
-}
-
-#tab-sorteio #btnSorteioRefresh,
-#tab-sorteio [data-action="refresh-sorteio"],
-#tab-sorteio .btn-refresh-sorteio{
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)),
-    rgba(6,18,13,.78) !important;
-  border:1px solid rgba(57,247,157,.18) !important;
-  color:#eafff5 !important;
-}
-
-#tab-sorteio #btnSorteioRefresh:hover,
-#tab-sorteio [data-action="refresh-sorteio"]:hover,
-#tab-sorteio .btn-refresh-sorteio:hover{
-  box-shadow:0 12px 28px rgba(57,247,157,.12);
-}
-
-#tab-sorteio #btnSorteioClear,
-#tab-sorteio [data-action="clear-sorteio"],
-#tab-sorteio .btn-clear-sorteio{
-  background:
-    linear-gradient(180deg, rgba(255,108,138,.12), rgba(255,108,138,.06)),
-    rgba(32,15,21,.84) !important;
-  border:1px solid rgba(255,108,138,.22) !important;
-  color:#ffe6ed !important;
-}
-
-#tab-sorteio #btnSorteioClear:hover,
-#tab-sorteio [data-action="clear-sorteio"]:hover,
-#tab-sorteio .btn-clear-sorteio:hover{
-  box-shadow:0 12px 28px rgba(255,108,138,.12);
-}
-
-#tab-sorteio > .card:nth-of-type(2){
-  padding:0 !important;
-  background:transparent !important;
-  border:none !important;
-  box-shadow:none !important;
-  backdrop-filter:none !important;
-}
-
-#tab-sorteio > .card:nth-of-type(2)::before{
-  display:none;
-}
-
-#tab-sorteio > .card:nth-of-type(2) > div,
-#tab-sorteio .sorteio-grid,
-#tab-sorteio .grid-sorteio{
-  display:grid !important;
-  grid-template-columns:minmax(0,1.2fr) minmax(360px,.9fr) !important;
-  gap:18px !important;
-}
-
-#tab-sorteio .sorteio-main,
-#tab-sorteio .sorteio-left,
-#tab-sorteio .sorteio-roleta-card{
-  position:relative;
-  overflow:hidden;
-  min-width:0;
-  border:1px solid var(--s-line) !important;
-  border-radius:24px !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
-    linear-gradient(135deg, rgba(57,247,157,.025), rgba(134,255,214,.01) 35%, transparent 70%),
-    var(--s-bg) !important;
-  box-shadow:var(--s-shadow) !important;
-  backdrop-filter:blur(14px);
-}
-
-#tab-sorteio .sorteio-main::before,
-#tab-sorteio .sorteio-left::before,
-#tab-sorteio .sorteio-roleta-card::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  background:
-    linear-gradient(120deg, rgba(255,255,255,.05), transparent 30%),
-    radial-gradient(circle at top right, rgba(57,247,157,.08), transparent 28%);
-  opacity:.92;
-}
-
-#tab-sorteio .sorteio-main > *,
-#tab-sorteio .sorteio-left > *,
-#tab-sorteio .sorteio-roleta-card > *{
-  position:relative;
-  z-index:1;
-}
-
-#tab-sorteio .sorteio-main,
-#tab-sorteio .sorteio-left{
-  padding:18px;
-  display:flex;
-  flex-direction:column;
-}
-
-#tab-sorteio .sorteio-roleta-wrap,
-#tab-sorteio .roleta-wrap,
-#tab-sorteio .wheel-wrap{
-  position:relative;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height:520px;
-  padding:8px 8px 16px;
-  border-radius:22px;
-  background:
-    radial-gradient(circle at 50% 20%, rgba(255,255,255,.045), transparent 58%),
-    linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.18));
-  border:1px solid rgba(255,255,255,.05);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
-}
-
-#tab-sorteio .sorteio-roleta-wrap::before,
-#tab-sorteio .roleta-wrap::before,
-#tab-sorteio .wheel-wrap::before{
-  content:"";
-  position:absolute;
-  top:-1px;
-  left:50%;
-  transform:translateX(-50%);
-  width:0;
-  height:0;
-  border-left:12px solid transparent;
-  border-right:12px solid transparent;
-  border-top:0;
-  border-bottom:22px solid #73ffd1;
-  filter:drop-shadow(0 6px 14px rgba(115,255,209,.24));
-  z-index:4;
-}
-
-#tab-sorteio canvas,
-#tab-sorteio svg,
-#tab-sorteio #wheelCanvas,
-#tab-sorteio #sorteioWheel,
-#tab-sorteio #canvasWheel,
-#tab-sorteio .roleta-canvas,
-#tab-sorteio .wheel-canvas{
-  display:block;
-  width:min(100%, 500px) !important;
-  max-width:500px !important;
-  height:auto !important;
-  aspect-ratio:1 / 1;
-  margin:0 auto;
-  border-radius:50%;
-  background:
-    radial-gradient(circle at 50% 35%, rgba(255,255,255,.06), rgba(255,255,255,.01) 34%, rgba(0,0,0,.16) 75%, rgba(0,0,0,.28) 100%);
-  box-shadow:
-    0 20px 60px rgba(0,0,0,.34),
-    inset 0 0 0 1px rgba(255,255,255,.05),
-    inset 0 0 40px rgba(255,255,255,.02);
-}
-
-#tab-sorteio .sorteio-roleta-wrap::after,
-#tab-sorteio .roleta-wrap::after,
-#tab-sorteio .wheel-wrap::after{
-  content:"";
-  position:absolute;
-  width:110px;
-  height:110px;
-  border-radius:50%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255,255,255,.08), transparent 45%),
-    linear-gradient(180deg, rgba(9,26,18,.98), rgba(4,14,10,.98));
-  border:2px solid rgba(57,247,157,.55);
-  box-shadow:
-    0 0 0 10px rgba(57,247,157,.06),
-    0 16px 40px rgba(0,0,0,.30),
-    inset 0 1px 0 rgba(255,255,255,.06);
-  left:50%;
-  top:50%;
-  transform:translate(-50%, -50%);
-  z-index:3;
-}
-
-#tab-sorteio .sorteio-roleta-center,
-#tab-sorteio .wheel-center,
-#tab-sorteio .roleta-center{
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%, -50%);
-  width:110px;
-  height:110px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  z-index:4;
-  color:#eafff4;
-  font-weight:900;
-  letter-spacing:.02em;
-  text-transform:uppercase;
-  pointer-events:none;
-}
-
-#tab-sorteio .sorteio-roleta-controls,
-#tab-sorteio .roleta-controls,
-#tab-sorteio .wheel-controls{
-  display:grid;
-  gap:12px;
-  margin-top:16px;
-}
-
-#tab-sorteio .btn-spin,
-#tab-sorteio #btnGirarRoleta,
-#tab-sorteio #btnSpinSorteio,
-#tab-sorteio [data-action="spin-roleta"]{
-  min-height:54px;
-  border-radius:18px !important;
-  background:
-    linear-gradient(135deg, rgba(57,247,157,1), rgba(134,255,214,.92)) !important;
-  color:#082114 !important;
-  border:none !important;
-  box-shadow:
-    0 18px 40px rgba(57,247,157,.22),
-    0 8px 24px rgba(0,0,0,.16) !important;
-  font-weight:900 !important;
-  letter-spacing:.01em;
-}
-
-#tab-sorteio .btn-spin:hover,
-#tab-sorteio #btnGirarRoleta:hover,
-#tab-sorteio #btnSpinSorteio:hover,
-#tab-sorteio [data-action="spin-roleta"]:hover{
-  box-shadow:
-    0 20px 44px rgba(57,247,157,.28),
-    0 10px 28px rgba(0,0,0,.18) !important;
-}
-
-#tab-sorteio .sorteio-vencedor,
-#tab-sorteio .winner-box,
-#tab-sorteio #sorteioWinner,
-#tab-sorteio #winnerBox{
-  min-height:66px;
-  display:flex;
-  align-items:center;
-  padding:16px 18px;
-  border-radius:18px;
-  border:1px solid rgba(57,247,157,.12);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.012)),
-    rgba(5,16,11,.88);
-  color:#f7fff9;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
-  font-size:1.04rem;
-  font-weight:800;
-}
-
-#tab-sorteio .sorteio-vencedor strong,
-#tab-sorteio .winner-box strong,
-#tab-sorteio #sorteioWinner strong,
-#tab-sorteio #winnerBox strong{
-  color:#ffffff;
-}
-
-#tab-sorteio .sorteio-lista,
-#tab-sorteio .sorteio-right,
-#tab-sorteio .inscritos-card{
-  position:relative;
-  overflow:hidden;
-  min-width:0;
-  border:1px solid var(--s-line) !important;
-  border-radius:24px !important;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
-    linear-gradient(135deg, rgba(57,247,157,.025), rgba(134,255,214,.01) 35%, transparent 70%),
-    var(--s-bg) !important;
-  box-shadow:var(--s-shadow) !important;
-  backdrop-filter:blur(14px);
-}
-
-#tab-sorteio .sorteio-lista::before,
-#tab-sorteio .sorteio-right::before,
-#tab-sorteio .inscritos-card::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  background:
-    linear-gradient(120deg, rgba(255,255,255,.05), transparent 30%),
-    radial-gradient(circle at top right, rgba(57,247,157,.08), transparent 28%);
-  opacity:.92;
-}
-
-#tab-sorteio .sorteio-lista > *,
-#tab-sorteio .sorteio-right > *,
-#tab-sorteio .inscritos-card > *{
-  position:relative;
-  z-index:1;
-}
-
-#tab-sorteio .sorteio-lista-head,
-#tab-sorteio .inscritos-head,
-#tab-sorteio .sorteio-right > h3{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin:0;
-  padding:16px 18px 10px;
-  color:#f5fff9;
-  font-size:1.05rem;
-  font-weight:900;
-  letter-spacing:-.01em;
-}
-
-#tab-sorteio .sorteio-lista-head .count,
-#tab-sorteio .inscritos-head .count{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-width:34px;
-  min-height:34px;
-  padding:0 10px;
-  border-radius:999px;
-  border:1px solid rgba(57,247,157,.18);
-  background:rgba(57,247,157,.08);
-  color:rgba(120,255,214,.96);
-  font-size:.82rem;
-  font-weight:900;
-}
-
-#tab-sorteio .sorteio-lista .table-wrap,
-#tab-sorteio .sorteio-right .table-wrap,
-#tab-sorteio .inscritos-card .table-wrap{
-  min-height:560px;
-  max-height:560px;
-  margin:0 12px 12px;
-  border-radius:18px;
-  border:1px solid rgba(255,255,255,.06);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008)),
-    rgba(0,0,0,.18);
-}
-
-#tab-sorteio .sorteio-lista .table tbody td:first-child,
-#tab-sorteio .sorteio-right .table tbody td:first-child,
-#tab-sorteio .inscritos-card .table tbody td:first-child{
+#tab-sorteio .table tbody td:first-child{
   font-weight:800;
   color:#f7fff9;
 }
 
-#tab-sorteio .sorteio-lista .table tbody td:last-child .btn,
-#tab-sorteio .sorteio-right .table tbody td:last-child .btn,
-#tab-sorteio .inscritos-card .table tbody td:last-child .btn{
+#tab-sorteio .btn-mini-del{
   min-height:34px;
-  padding:6px 10px;
+  padding:6px 12px;
   border-radius:12px;
-}
-
-#tab-sorteio .sorteio-lista .table tbody td:last-child .btn--danger,
-#tab-sorteio .sorteio-right .table tbody td:last-child .btn--danger,
-#tab-sorteio .inscritos-card .table tbody td:last-child .btn--danger{
+  border:1px solid rgba(255,106,143,.22);
   background:
-    linear-gradient(180deg, rgba(255,108,138,.12), rgba(255,108,138,.06)),
-    rgba(32,15,21,.84) !important;
-  border:1px solid rgba(255,108,138,.22) !important;
-  color:#ffe6ed !important;
-}
-
-#tab-sorteio .sorteio-empty,
-#tab-sorteio .lista-vazia,
-#tab-sorteio .sem-inscritos{
-  display:grid;
-  place-items:center;
-  min-height:240px;
-  padding:26px;
-  text-align:center;
-  color:rgba(236,255,246,.46);
-  font-weight:700;
-}
-
-#tab-sorteio .sorteio-empty::before,
-#tab-sorteio .lista-vazia::before,
-#tab-sorteio .sem-inscritos::before{
-  content:"Nenhum inscrito ainda";
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:56px;
-  padding:0 20px;
-  border-radius:999px;
-  border:1px dashed rgba(255,255,255,.10);
-  background:rgba(255,255,255,.015);
-}
-
-#tab-sorteio .is-spinning .sorteio-roleta-wrap,
-#tab-sorteio .is-spinning .roleta-wrap,
-#tab-sorteio .is-spinning .wheel-wrap{
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.04),
-    0 0 0 1px rgba(57,247,157,.10),
-    0 0 0 10px rgba(57,247,157,.04);
-}
-
-#tab-sorteio .is-spinning canvas,
-#tab-sorteio .is-spinning svg,
-#tab-sorteio .is-spinning #wheelCanvas,
-#tab-sorteio .is-spinning #sorteioWheel,
-#tab-sorteio .is-spinning #canvasWheel{
-  filter:saturate(1.04) drop-shadow(0 0 20px rgba(57,247,157,.12));
-}
-
-#tab-sorteio .winner-highlight,
-#tab-sorteio .sorteio-vencedor.is-showing,
-#tab-sorteio #sorteioWinner.is-showing,
-#tab-sorteio #winnerBox.is-showing{
-  animation:sorteioWinnerShow .48s ease both;
-}
-
-#tab-sorteio .winner-pill{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  min-height:34px;
-  padding:0 12px;
-  border-radius:999px;
-  border:1px solid rgba(57,247,157,.18);
-  background:rgba(57,247,157,.08);
-  color:#eafff5;
+    linear-gradient(180deg, rgba(255,106,143,.12), rgba(255,106,143,.06)),
+    rgba(32,15,21,.84);
+  color:#ffe6ed;
   font-size:.82rem;
-  font-weight:900;
-}
-
-#tab-sorteio .winner-name{
-  color:#ffffff;
-  font-weight:900;
-}
-
-#tab-sorteio .winner-meta{
-  color:var(--s-muted);
-  font-weight:700;
+  font-weight:800;
+  cursor:pointer;
 }
 
 @keyframes sorteioPulse{
@@ -838,175 +536,113 @@
   }
 }
 
-@keyframes sorteioWinnerShow{
+@keyframes winnerFlash{
   0%{
-    opacity:0;
     transform:translateY(10px) scale(.985);
+    opacity:0;
   }
   100%{
-    opacity:1;
     transform:translateY(0) scale(1);
+    opacity:1;
   }
 }
 
 @media (max-width: 1180px){
-  #tab-sorteio > .card:nth-of-type(2) > div,
-  #tab-sorteio .sorteio-grid,
-  #tab-sorteio .grid-sorteio{
-    grid-template-columns:minmax(0,1fr) 360px !important;
+  #tab-sorteio .sorteio-layout{
+    grid-template-columns:minmax(0,1fr) 360px;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap,
-  #tab-sorteio .roleta-wrap,
-  #tab-sorteio .wheel-wrap{
+  #tab-sorteio .wheel-wrapper{
     min-height:500px;
   }
 }
 
 @media (max-width: 980px){
-  #tab-sorteio > .card:first-of-type > div:first-child{
-    grid-template-columns:1fr !important;
+  #tab-sorteio .sorteio-header-admin{
+    grid-template-columns:1fr;
   }
 
-  #tab-sorteio .sorteio-actions,
-  #tab-sorteio .acoes-sorteio,
-  #tab-sorteio > .card:first-of-type > div:last-child{
+  #tab-sorteio .sorteio-actions{
     justify-content:flex-start;
   }
 
-  #tab-sorteio > .card:nth-of-type(2) > div,
-  #tab-sorteio .sorteio-grid,
-  #tab-sorteio .grid-sorteio{
-    grid-template-columns:1fr !important;
+  #tab-sorteio .sorteio-layout{
+    grid-template-columns:1fr;
   }
 
-  #tab-sorteio .sorteio-lista .table-wrap,
-  #tab-sorteio .sorteio-right .table-wrap,
-  #tab-sorteio .inscritos-card .table-wrap{
+  #tab-sorteio .sorteio-list{
     min-height:420px;
     max-height:420px;
   }
 }
 
 @media (max-width: 720px){
-  #tab-sorteio > .card{
-    border-radius:18px !important;
+  #tab-sorteio .sorteio-header-card,
+  #tab-sorteio .sorteio-wheel-card,
+  #tab-sorteio .sorteio-list-card{
+    border-radius:20px;
   }
 
-  #tab-sorteio > .card:first-of-type{
+  #tab-sorteio .sorteio-header-admin{
     padding:14px;
+    gap:14px;
   }
 
-  #tab-sorteio .sorteio-actions,
-  #tab-sorteio .acoes-sorteio,
-  #tab-sorteio > .card:first-of-type > div:last-child{
+  #tab-sorteio .sorteio-actions{
     display:grid;
     grid-template-columns:1fr;
   }
 
-  #tab-sorteio .sorteio-actions .btn,
-  #tab-sorteio .acoes-sorteio .btn,
-  #tab-sorteio > .card:first-of-type > div:last-child .btn{
+  #tab-sorteio .sorteio-actions > *{
     width:100%;
   }
 
-  #tab-sorteio .sorteio-main,
-  #tab-sorteio .sorteio-left,
-  #tab-sorteio .sorteio-lista,
-  #tab-sorteio .sorteio-right,
-  #tab-sorteio .inscritos-card{
-    border-radius:20px !important;
+  #tab-sorteio .sorteio-wheel-card{
+    padding:14px;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap,
-  #tab-sorteio .roleta-wrap,
-  #tab-sorteio .wheel-wrap{
+  #tab-sorteio .wheel-wrapper{
     min-height:420px;
-    padding:10px 6px 12px;
+    padding:12px 8px 14px;
   }
 
-  #tab-sorteio canvas,
-  #tab-sorteio svg,
-  #tab-sorteio #wheelCanvas,
-  #tab-sorteio #sorteioWheel,
-  #tab-sorteio #canvasWheel,
-  #tab-sorteio .roleta-canvas,
-  #tab-sorteio .wheel-canvas{
-    width:min(100%, 380px) !important;
-    max-width:380px !important;
+  #tab-sorteio #sorteioWheel{
+    width:min(100%, 380px);
+    max-width:380px;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap::after,
-  #tab-sorteio .roleta-wrap::after,
-  #tab-sorteio .wheel-wrap::after,
-  #tab-sorteio .sorteio-roleta-center,
-  #tab-sorteio .wheel-center,
-  #tab-sorteio .roleta-center{
-    width:92px;
-    height:92px;
-  }
-
-  #tab-sorteio .sorteio-lista-head,
-  #tab-sorteio .inscritos-head,
-  #tab-sorteio .sorteio-right > h3{
+  #tab-sorteio .sorteio-list-header{
     padding:14px 14px 10px;
   }
 
-  #tab-sorteio .sorteio-lista .table-wrap,
-  #tab-sorteio .sorteio-right .table-wrap,
-  #tab-sorteio .inscritos-card .table-wrap{
+  #tab-sorteio .sorteio-list{
     margin:0 10px 10px;
   }
 }
 
 @media (max-width: 560px){
   #tab-sorteio h2{
-    font-size:1.4rem;
+    font-size:1.42rem;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap,
-  #tab-sorteio .roleta-wrap,
-  #tab-sorteio .wheel-wrap{
+  #tab-sorteio .wheel-wrapper{
     min-height:360px;
   }
 
-  #tab-sorteio canvas,
-  #tab-sorteio svg,
-  #tab-sorteio #wheelCanvas,
-  #tab-sorteio #sorteioWheel,
-  #tab-sorteio #canvasWheel,
-  #tab-sorteio .roleta-canvas,
-  #tab-sorteio .wheel-canvas{
-    width:min(100%, 310px) !important;
-    max-width:310px !important;
+  #tab-sorteio #sorteioWheel{
+    width:min(100%, 310px);
+    max-width:310px;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap::before,
-  #tab-sorteio .roleta-wrap::before,
-  #tab-sorteio .wheel-wrap::before{
+  #tab-sorteio .wheel-pointer{
     border-left-width:10px;
     border-right-width:10px;
     border-bottom-width:18px;
   }
 
-  #tab-sorteio .sorteio-roleta-wrap::after,
-  #tab-sorteio .roleta-wrap::after,
-  #tab-sorteio .wheel-wrap::after,
-  #tab-sorteio .sorteio-roleta-center,
-  #tab-sorteio .wheel-center,
-  #tab-sorteio .roleta-center{
-    width:80px;
-    height:80px;
-    font-size:.9rem;
-  }
-
-  #tab-sorteio .sorteio-vencedor,
-  #tab-sorteio .winner-box,
-  #tab-sorteio #sorteioWinner,
-  #tab-sorteio #winnerBox{
-    min-height:58px;
+  #tab-sorteio .winner-box{
     padding:14px;
-    font-size:.96rem;
+    min-height:58px;
   }
 
   #tab-sorteio .table thead th,
