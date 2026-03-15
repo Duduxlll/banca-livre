@@ -8,18 +8,20 @@
     "start": "cross-env NODE_ENV=production node server.js"
   },
   "dependencies": {
-    "axios": "^1.7.7",
+    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "discord.js": "^14.25.1",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "express-rate-limit": "^8.2.1",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.3.1",
     "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3",
-    "qrcode": "^1.5.3"
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.20.0",
+    "qrcode": "^1.5.4",
+    "tmi.js": "^1.8.5"
   },
   "devDependencies": {
     "cross-env": "^10.1.0"
