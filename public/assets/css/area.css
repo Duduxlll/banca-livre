@@ -1184,3 +1184,313 @@ dialog.pix-modal::backdrop{
     width:100%;
   }
 }
+
+/* ===== AJUSTES VISUAIS DO PAINEL ===== */
+
+.layout{
+  width:min(1280px, 94vw);
+  grid-template-columns:300px minmax(0, 1fr);
+  gap:28px;
+  align-items:start;
+}
+
+.sidebar{
+  top:18px;
+}
+
+.brand{
+  padding:18px;
+  border-radius:24px;
+}
+
+.brand strong{
+  font-size:1.1rem;
+}
+
+.nav{
+  margin-top:16px;
+  padding:16px;
+  gap:10px;
+  border-radius:24px;
+}
+
+.nav-btn{
+  display:flex;
+  align-items:center;
+  width:100%;
+  min-height:56px;
+  padding:0 18px 0 44px;
+  border-radius:16px;
+  font-size:15px;
+  line-height:1.2;
+  letter-spacing:.01em;
+}
+
+.nav-btn::before{
+  left:18px;
+  width:9px;
+  height:9px;
+}
+
+.nav-btn:hover{
+  transform:translateX(4px);
+}
+
+.nav-btn.active{
+  border-color:rgba(57,247,157,.34);
+  box-shadow:
+    inset 0 0 0 1px rgba(57,247,157,.08),
+    0 10px 24px rgba(0,0,0,.20);
+}
+
+#logoutBtn{
+  margin-top:10px !important;
+  min-height:52px;
+  border-radius:16px;
+}
+
+.content{
+  min-width:0;
+}
+
+.tab.show{
+  width:100%;
+}
+
+.bar{
+  flex-wrap:wrap;
+  gap:14px;
+}
+
+.busca-nome{
+  flex:1 1 280px;
+  max-width:360px;
+}
+
+.totais{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-left:auto;
+}
+
+.totais-pill{
+  min-height:42px;
+  padding:10px 16px;
+  font-size:14px;
+  border-radius:999px;
+}
+
+.card{
+  border-radius:22px;
+  overflow:hidden;
+}
+
+.card .table-wrap{
+  max-height:560px;
+  min-height:360px;
+}
+
+.table thead th{
+  padding:16px;
+  font-size:15px;
+}
+
+.table tbody td{
+  padding:16px;
+  vertical-align:middle;
+}
+
+.table tbody tr:hover{
+  background:rgba(255,255,255,.025);
+}
+
+.input{
+  min-height:44px;
+  border-radius:14px;
+}
+
+.input.input-money{
+  min-width:140px;
+}
+
+.btn{
+  min-height:42px;
+  border-radius:12px;
+}
+
+.btn--small{
+  min-height:34px;
+  padding:6px 10px;
+}
+
+.th-acoes{
+  gap:12px;
+}
+
+.toast{
+  right:18px;
+  bottom:18px;
+  z-index:9999;
+}
+
+.hero{
+  min-height:190px;
+}
+
+.hero-wrap{
+  width:min(1280px, 94vw);
+  padding:26px 30px 30px;
+  border-radius:28px 28px 0 0;
+}
+
+.hero-logo{
+  width:68px;
+  height:68px;
+  border-radius:20px;
+}
+
+.hero-sub{
+  max-width:900px;
+}
+
+/* extratos / filtros */
+.extratos-filtros-grid{
+  grid-template-columns:repeat(4, minmax(160px, 1fr));
+}
+
+.extratos-busca-acao{
+  gap:12px;
+}
+
+/* responsivo */
+@media (max-width: 1180px){
+  .layout{
+    grid-template-columns:280px minmax(0, 1fr);
+    gap:22px;
+  }
+
+  .hero-wrap{
+    width:min(1180px, 94vw);
+  }
+}
+
+@media (max-width: 980px){
+  .layout{
+    grid-template-columns:1fr;
+  }
+
+  .sidebar{
+    position:relative;
+    top:0;
+  }
+
+  .nav{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+
+  #logoutBtn{
+    grid-column:1 / -1;
+  }
+
+  .busca-nome{
+    max-width:none;
+    width:100%;
+  }
+
+  .totais{
+    margin-left:0;
+    width:100%;
+  }
+
+  .extratos-filtros-grid{
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px){
+  .hero{
+    min-height:auto;
+    padding-top:10px;
+  }
+
+  .hero-wrap{
+    padding:20px 18px 22px;
+    gap:14px;
+    align-items:flex-start;
+  }
+
+  .hero-logo{
+    width:54px;
+    height:54px;
+    border-radius:16px;
+  }
+
+  .hero-title{
+    font-size:2rem;
+  }
+
+  .hero-sub{
+    font-size:.92rem;
+  }
+
+  .layout{
+    width:min(100%, 94vw);
+    margin:18px auto 24px;
+    gap:18px;
+  }
+
+  .brand{
+    padding:14px 16px;
+  }
+
+  .nav{
+    grid-template-columns:1fr;
+    padding:12px;
+  }
+
+  .nav-btn{
+    min-height:52px;
+    padding-left:42px;
+    font-size:14px;
+  }
+
+  .nav-btn::before{
+    left:16px;
+    width:8px;
+    height:8px;
+  }
+
+  .bar{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  .totais{
+    width:100%;
+  }
+
+  .totais-pill{
+    width:100%;
+    justify-content:center;
+  }
+
+  .table thead th,
+  .table tbody td{
+    padding:12px;
+    font-size:14px;
+  }
+
+  .card .table-wrap{
+    min-height:280px;
+  }
+
+  .extratos-filtros-grid{
+    grid-template-columns:1fr;
+  }
+
+  .extratos-busca-acao{
+    flex-direction:column;
+    align-items:stretch;
+  }
+}

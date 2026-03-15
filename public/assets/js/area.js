@@ -722,13 +722,13 @@ function renderCupons(){
 
 let tabChangeFrame = 0;
 
-async function setTab(tab){
-  if (TAB === tab) return;
+async function setTab(tab) {
+  if (!tab || TAB === tab) return;
 
   TAB = tab;
   localStorage.setItem('area_tab', tab);
 
-  qsa('.nav-btn').forEach(btn => {
+  qsa('.nav-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
@@ -736,60 +736,70 @@ async function setTab(tab){
     document.activeElement.blur();
   }
 
-  await refresh();
-
   if (tabChangeFrame) cancelAnimationFrame(tabChangeFrame);
 
-  tabChangeFrame = requestAnimationFrame(() => {
-    const anchor = qs('.layout') || qs('.hero') || document.body;
-    const y = Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - 12);
-    window.scrollTo({ top: y, behavior: 'auto' });
+  tabChangeFrame = requestAnimationFrame(async () => {
+    try {
+      await refresh();
+    } catch (err) {
+      console.error('Erro ao trocar aba:', err);
+    } finally {
+      if (TAB !== 'bancas') hideTotaisPopup();
+    }
   });
-
-  if (TAB !== 'bancas') hideTotaisPopup();
 }
 
-  requestAnimationFrame(goTop);
-  setTimeout(goTop, 80);
-  setTimeout(goTop, 180);
-
-  if (TAB !== 'bancas') hideTotaisPopup();
-
-
-async function refresh(){
-  if (TAB==='bancas'){
+async function refresh() {
+  if (TAB === 'bancas') {
     await loadBancas();
-  } else if (TAB==='pagamentos'){
+
+  } else if (TAB === 'pagamentos') {
     await loadPagamentos();
-  } else if (TAB==='extratos'){
+
+  } else if (TAB === 'extratos') {
     await loadExtratos();
-  } else if (TAB==='cupons'){
+
+  } else if (TAB === 'cupons') {
     await loadCupons();
-  } else if (TAB==='sorteio') {
 
-  } else if (TAB==='cashbacks') {
+  } else if (TAB === 'cashbacks') {
     if (window.CashbackAdmin && typeof window.CashbackAdmin.refresh === 'function') {
-      try { await window.CashbackAdmin.refresh(); } catch(e){ console.error(e); }
+      try {
+        await window.CashbackAdmin.refresh();
+      } catch (e) {
+        console.error(e);
+      }
     }
 
-    } else if (TAB === 'gorjeta') {
-  tabGorjetaEl?.classList.add('show');
+  } else if (TAB === 'gorjeta') {
+    if (window.GorjetaAdmin && typeof window.GorjetaAdmin.onTabShown === 'function') {
+      try {
+        window.GorjetaAdmin.onTabShown();
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
-  if (window.GorjetaAdmin && typeof window.GorjetaAdmin.onTabShown === 'function') {
-    try { window.GorjetaAdmin.onTabShown(); } catch(e){ console.error(e); }
-  }
-  
-  } else if (TAB==='palpite') {
+  } else if (TAB === 'palpite') {
     if (window.PalpiteAdmin && typeof window.PalpiteAdmin.refresh === 'function') {
-      try { await window.PalpiteAdmin.refresh(); } catch(e){ console.error(e); }
+      try {
+        await window.PalpiteAdmin.refresh();
+      } catch (e) {
+        console.error(e);
+      }
     }
+
   } else if (TAB === 'torneio') {
     if (window.TorneioAdmin && typeof window.TorneioAdmin.refresh === 'function') {
-      try { await window.TorneioAdmin.refresh(); } catch(e){ console.error(e); }
+      try {
+        await window.TorneioAdmin.refresh();
+      } catch (e) {
+        console.error(e);
+      }
     }
   }
 
-  render();
+  await render();
 }
 
 function getBancaInputById(id){
