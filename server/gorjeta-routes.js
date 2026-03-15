@@ -428,47 +428,47 @@ export function registerGorjetaRoutes({
   const winnersCount = Math.min(winnersCountReq, maxAffordable);
 
   const eligibleEntriesQ = await q(
-    `SELECT
-       e.twitch_name,
-       e.twitch_name_lc,
-       COALESCE(cs.pix_type, cb.pix_type) as pix_type,
-       COALESCE(
-         NULLIF(TRIM(cs.pix_key), ''),
-         NULLIF(TRIM(cb.pix_key), '')
-       ) as pix_key
-     FROM gorjeta_entries e
-     LEFT JOIN LATERAL (
-       SELECT pix_type, pix_key, updated_at, created_at
-         FROM cashback_submissions
-        WHERE twitch_name_lc = e.twitch_name_lc
-          AND upper(status) = 'APROVADO'
-        ORDER BY
-          CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
-          updated_at DESC NULLS LAST,
-          created_at DESC
-        LIMIT 1
-     ) cs ON true
-     LEFT JOIN LATERAL (
-       SELECT pix_type, pix_key, updated_at, created_at
-         FROM cashbacks
-        WHERE lower(twitch_nick) = e.twitch_name_lc
-          AND lower(status) = 'aprovado'
-        ORDER BY
-          CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
-          updated_at DESC NULLS LAST,
-          created_at DESC
-        LIMIT 1
-     ) cb ON true
-     WHERE e.round_id = $1
-       AND COALESCE(
-         NULLIF(TRIM(COALESCE(cs.pix_key, '')), ''),
-         NULLIF(TRIM(COALESCE(cb.pix_key, '')), '')
-       ) IS NOT NULL`,
-    [roundId]
-  );
+  `SELECT
+     e.twitch_name,
+     e.twitch_name_lc,
+     COALESCE(cs.pix_type, cb.pix_type) as pix_type,
+     COALESCE(
+       NULLIF(TRIM(cs.pix_key), ''),
+       NULLIF(TRIM(cb.pix_key), '')
+     ) as pix_key
+   FROM gorjeta_entries e
+   LEFT JOIN LATERAL (
+     SELECT pix_type, pix_key, updated_at, created_at
+       FROM cashback_submissions
+      WHERE twitch_name_lc = e.twitch_name_lc
+        AND upper(status) = 'APROVADO'
+      ORDER BY
+        CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
+        updated_at DESC NULLS LAST,
+        created_at DESC
+      LIMIT 1
+   ) cs ON true
+   LEFT JOIN LATERAL (
+     SELECT pix_type, pix_key, updated_at, created_at
+       FROM cashbacks
+      WHERE lower(twitch_nick) = e.twitch_name_lc
+        AND lower(status) = 'aprovado'
+      ORDER BY
+        CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
+        updated_at DESC NULLS LAST,
+        created_at DESC
+      LIMIT 1
+   ) cb ON true
+   WHERE e.round_id = $1
+     AND COALESCE(
+       NULLIF(TRIM(COALESCE(cs.pix_key, '')), ''),
+       NULLIF(TRIM(COALESCE(cb.pix_key, '')), '')
+     ) IS NOT NULL`,
+  [roundId]
+);
 
   const eligibleEntries = eligibleEntriesQ.rows;
-  if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participantes_aprovados" });
+if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participantes" });
 
   const chosen = pickRandomUnique(eligibleEntries, winnersCount);
   const batchId = crypto.randomUUID();
@@ -500,11 +500,17 @@ export function registerGorjetaRoutes({
         );
       };
 
-      if (!pixKey) {
-        await addResult("DESCLASSIFICADO", "sem Pix cadastrado");
-        disqualified.push({ twitchName: nick, reason: "sem Pix cadastrado", valorCents: perWinnerCents });
-        continue;
-      }
+      if (!e.is_approved) {
+  await addResult("DESCLASSIFICADO", "não aprovado");
+  disqualified.push({ twitchName: nick, reason: "não aprovado", valorCents: perWinnerCents });
+  continue;
+}
+
+if (!pixKey) {
+  await addResult("DESCLASSIFICADO", "sem Pix cadastrado");
+  disqualified.push({ twitchName: nick, reason: "sem Pix cadastrado", valorCents: perWinnerCents });
+  continue;
+}
 
       const pagamentoId = crypto.randomUUID();
       const message = `Gorjeta • Rodada ${roundId}`;
