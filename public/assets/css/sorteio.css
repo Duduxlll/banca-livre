@@ -326,16 +326,17 @@
 
 #tab-sorteio .wheel-pointer{
   position:absolute;
-  top:-1px;
+  top:14px;
   left:50%;
   transform:translateX(-50%);
   width:0;
   height:0;
   border-left:12px solid transparent;
   border-right:12px solid transparent;
-  border-bottom:24px solid #73ffd1;
+  border-top:24px solid #73ffd1;
   filter:drop-shadow(0 6px 14px rgba(115,255,209,.24));
   z-index:3;
+  animation:wheelPointerFloat 1.8s ease-in-out infinite;
 }
 
 #tab-sorteio .btn-girar{
@@ -476,7 +477,7 @@
   color:#d9ffee;
   font-size:15px;
   font-weight:700;
-  border-bottom:1px solid var(--sx-line);
+  border-top:1px solid var(--sx-line);
   background:rgba(7,19,12,.84);
   backdrop-filter:blur(10px);
   background-clip:padding-box;
@@ -635,10 +636,10 @@
   }
 
   #tab-sorteio .wheel-pointer{
-    border-left-width:10px;
-    border-right-width:10px;
-    border-bottom-width:18px;
-  }
+  border-left-width:10px;
+  border-right-width:10px;
+  border-top-width:18px;
+}
 
   #tab-sorteio .winner-box{
     padding:14px;
@@ -659,5 +660,17 @@
     animation:none !important;
     transition:none !important;
     scroll-behavior:auto !important;
+  }
+}
+
+
+@keyframes wheelPointerFloat{
+  0%,100%{
+    transform:translateX(-50%) translateY(0);
+    filter:drop-shadow(0 6px 14px rgba(115,255,209,.24));
+  }
+  50%{
+    transform:translateX(-50%) translateY(3px);
+    filter:drop-shadow(0 10px 18px rgba(115,255,209,.30));
   }
 }
