@@ -1,0 +1,672 @@
+#tab-gorjeta {
+  --g-bg: linear-gradient(180deg, rgba(4, 10, 12, 0.96) 0%, rgba(3, 8, 10, 0.98) 100%);
+  --g-card: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.025) 100%);
+  --g-card-2: linear-gradient(135deg, rgba(0, 255, 140, 0.08) 0%, rgba(0, 160, 120, 0.02) 100%);
+  --g-border: rgba(72, 255, 164, 0.14);
+  --g-border-strong: rgba(72, 255, 164, 0.28);
+  --g-text: #f5fffb;
+  --g-muted: rgba(225, 255, 239, 0.74);
+  --g-soft: rgba(225, 255, 239, 0.52);
+  --g-green: #49ff9f;
+  --g-green-2: #12d46f;
+  --g-red: #ff7373;
+  --g-red-2: #ff4f6d;
+  --g-blue: #69c8ff;
+  --g-gold: #ffd668;
+  --g-shadow: 0 16px 38px rgba(0, 0, 0, 0.34);
+  --g-shadow-strong: 0 24px 60px rgba(0, 0, 0, 0.46);
+  --g-radius: 22px;
+  --g-radius-sm: 16px;
+  gap: 18px;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  isolation: isolate;
+}
+
+#tab-gorjeta.show {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#tab-gorjeta.show::before,
+#tab-gorjeta.show::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+}
+
+#tab-gorjeta.show::before {
+  width: 300px;
+  height: 300px;
+  top: -30px;
+  left: 4%;
+  background: radial-gradient(circle, rgba(0, 255, 140, 0.18), transparent 68%);
+}
+
+#tab-gorjeta.show::after {
+  width: 260px;
+  height: 260px;
+  right: 5%;
+  bottom: -40px;
+  background: radial-gradient(circle, rgba(56, 181, 255, 0.16), transparent 70%);
+}
+
+#tab-gorjeta > * {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+#tab-gorjeta > .card {
+  border: 1px solid var(--g-border);
+  border-radius: var(--g-radius);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
+    rgba(3, 11, 9, 0.92);
+  box-shadow: var(--g-shadow);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+#tab-gorjeta > .card:first-child {
+  grid-column: 1 / -1;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+    linear-gradient(135deg, rgba(0,255,140,0.08), rgba(0,0,0,0)),
+    rgba(3, 11, 9, 0.95);
+  border-color: rgba(72, 255, 164, 0.18);
+  box-shadow: var(--g-shadow-strong);
+}
+
+#tab-gorjeta > .card:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(73,255,159,0.12), transparent 28%),
+    linear-gradient(110deg, rgba(255,255,255,0.04), transparent 32%, transparent 70%, rgba(73,255,159,0.04));
+  pointer-events: none;
+}
+
+#tab-gorjeta > .card:nth-child(2),
+#tab-gorjeta > .card:nth-child(3),
+#tab-gorjeta > .card:nth-child(4) {
+  padding: 18px 18px 16px;
+  min-height: 470px;
+}
+
+#tab-gorjeta > .card:nth-child(2) {
+  border-color: rgba(73,255,159,0.18);
+}
+
+#tab-gorjeta > .card:nth-child(3) {
+  border-color: rgba(105,200,255,0.18);
+}
+
+#tab-gorjeta > .card:nth-child(4) {
+  border-color: rgba(255,214,104,0.18);
+}
+
+#tab-gorjeta h2,
+#tab-gorjeta h3 {
+  margin: 0;
+  color: var(--g-text);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+#tab-gorjeta h2 {
+  font-size: clamp(1.7rem, 2vw, 2.35rem);
+  line-height: 1.04;
+}
+
+#tab-gorjeta h3 {
+  font-size: 1.35rem;
+  line-height: 1.1;
+  margin-bottom: 14px;
+}
+
+#tab-gorjeta > .card:nth-child(2) h3::after,
+#tab-gorjeta > .card:nth-child(3) h3::after,
+#tab-gorjeta > .card:nth-child(4) h3::after {
+  content: "";
+  display: block;
+  width: 62px;
+  height: 3px;
+  border-radius: 999px;
+  margin-top: 10px;
+}
+
+#tab-gorjeta > .card:nth-child(2) h3::after {
+  background: linear-gradient(90deg, var(--g-green), transparent);
+}
+
+#tab-gorjeta > .card:nth-child(3) h3::after {
+  background: linear-gradient(90deg, var(--g-blue), transparent);
+}
+
+#tab-gorjeta > .card:nth-child(4) h3::after {
+  background: linear-gradient(90deg, var(--g-gold), transparent);
+}
+
+#tab-gorjeta .g-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+
+#tab-gorjeta .g-top h2 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#tab-gorjeta .g-top h2::before {
+  content: "Painel da gorjeta";
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(73, 255, 159, 0.1);
+  border: 1px solid rgba(73, 255, 159, 0.18);
+  color: var(--g-green);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#tab-gorjeta .g-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+#tab-gorjeta .g-saldo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(73, 255, 159, 0.22);
+  background:
+    linear-gradient(135deg, rgba(73,255,159,0.14), rgba(18,212,111,0.05)),
+    rgba(255,255,255,0.02);
+  color: var(--g-muted);
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+#tab-gorjeta .g-saldo::before {
+  content: "Saldo";
+  color: var(--g-soft);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#tab-gorjeta .g-saldo span {
+  color: var(--g-text);
+  font-size: clamp(1.18rem, 1.7vw, 1.5rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 16px rgba(73,255,159,0.16);
+}
+
+#tab-gorjeta .g-meta {
+  margin-top: 16px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+  color: var(--g-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+#tab-gorjeta #gorjetaCreateWrap,
+#tab-gorjeta #gorjetaDrawWrap {
+  margin-top: 18px !important;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018)),
+    rgba(0,0,0,0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+}
+
+#tab-gorjeta #gorjetaCreateWrap {
+  border-color: rgba(73,255,159,0.12);
+}
+
+#tab-gorjeta #gorjetaDrawWrap {
+  border-color: rgba(105,200,255,0.12);
+}
+
+#tab-gorjeta .g-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+#tab-gorjeta #gorjetaCreateWrap .g-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#tab-gorjeta .g-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+#tab-gorjeta .g-field span {
+  color: var(--g-muted);
+  font-size: 0.93rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+#tab-gorjeta .g-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 16px;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)),
+    rgba(0,0,0,0.22);
+  color: var(--g-text);
+  font-size: 1rem;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+#tab-gorjeta .g-input::placeholder {
+  color: rgba(255,255,255,0.28);
+}
+
+#tab-gorjeta .g-input:focus {
+  border-color: rgba(73,255,159,0.3);
+  box-shadow: 0 0 0 4px rgba(73,255,159,0.1);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025)),
+    rgba(0,0,0,0.24);
+}
+
+#tab-gorjeta .g-btn {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+    rgba(255,255,255,0.02);
+  color: var(--g-text);
+  font-size: 0.96rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 12px 22px rgba(0,0,0,0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, filter 0.18s ease;
+}
+
+#tab-gorjeta .g-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(0,0,0,0.24);
+  border-color: rgba(255,255,255,0.18);
+}
+
+#tab-gorjeta .g-btn:active {
+  transform: translateY(0);
+}
+
+#tab-gorjeta .g-btn.primary {
+  border-color: rgba(73,255,159,0.24);
+  background:
+    linear-gradient(135deg, rgba(73,255,159,0.2), rgba(18,212,111,0.06)),
+    rgba(255,255,255,0.03);
+  box-shadow: 0 14px 28px rgba(73,255,159,0.08), 0 12px 22px rgba(0,0,0,0.18);
+}
+
+#tab-gorjeta .g-btn.primary:hover {
+  border-color: rgba(73,255,159,0.38);
+  filter: brightness(1.03);
+}
+
+#tab-gorjeta .g-btn.danger {
+  border-color: rgba(255,115,115,0.22);
+  background:
+    linear-gradient(135deg, rgba(255,115,115,0.16), rgba(255,79,109,0.05)),
+    rgba(255,255,255,0.03);
+}
+
+#tab-gorjeta .g-btn.danger:hover {
+  border-color: rgba(255,115,115,0.36);
+}
+
+#gorjetaEntries,
+#gorjetaBatches,
+#gorjetaResults {
+  min-height: 330px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 6px;
+  scroll-behavior: smooth;
+}
+
+#gorjetaEntries::-webkit-scrollbar,
+#gorjetaBatches::-webkit-scrollbar,
+#gorjetaResults::-webkit-scrollbar {
+  width: 8px;
+}
+
+#gorjetaEntries::-webkit-scrollbar-thumb,
+#gorjetaBatches::-webkit-scrollbar-thumb,
+#gorjetaResults::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(73,255,159,0.28), rgba(105,200,255,0.28));
+  border-radius: 999px;
+}
+
+#gorjetaEntries::-webkit-scrollbar-track,
+#gorjetaBatches::-webkit-scrollbar-track,
+#gorjetaResults::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.035);
+  border-radius: 999px;
+}
+
+#tab-gorjeta .g-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.02);
+  color: var(--g-muted);
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+#tab-gorjeta .g-empty code {
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(73,255,159,0.1);
+  border: 1px solid rgba(73,255,159,0.12);
+  color: var(--g-green);
+}
+
+#tab-gorjeta .g-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#tab-gorjeta .g-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 14px;
+  border-radius: 17px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.018)),
+    rgba(255,255,255,0.02);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+#tab-gorjeta .g-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 14px 24px rgba(0,0,0,0.2);
+}
+
+#tab-gorjeta .g-item.ok {
+  border-color: rgba(73,255,159,0.14);
+  box-shadow: inset 3px 0 0 rgba(73,255,159,0.75);
+}
+
+#tab-gorjeta .g-item.bad {
+  border-color: rgba(255,115,115,0.14);
+  box-shadow: inset 3px 0 0 rgba(255,115,115,0.75);
+}
+
+#tab-gorjeta .g-left,
+#tab-gorjeta .g-right {
+  min-width: 0;
+}
+
+#tab-gorjeta .g-right {
+  text-align: right;
+}
+
+#tab-gorjeta .g-name {
+  color: var(--g-text);
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#tab-gorjeta .g-sub {
+  margin-top: 5px;
+  color: var(--g-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+#tab-gorjeta .g-money {
+  color: var(--g-text);
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+#tab-gorjeta .g-mini {
+  margin-top: 5px;
+  color: var(--g-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+#tab-gorjeta .g-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 118px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: var(--g-text);
+  font-size: 0.84rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+#tab-gorjeta .g-pill.ok {
+  border-color: rgba(73,255,159,0.18);
+  background: rgba(73,255,159,0.1);
+  color: #9dffd0;
+}
+
+#tab-gorjeta .g-pill.bad {
+  border-color: rgba(255,115,115,0.18);
+  background: rgba(255,115,115,0.1);
+  color: #ffb2b2;
+}
+
+#tab-gorjeta .g-batches {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#tab-gorjeta .g-batch {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 14px 14px 13px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.018)),
+    rgba(255,255,255,0.02);
+  color: var(--g-text);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+#tab-gorjeta .g-batch:hover,
+#tab-gorjeta .g-batch.is-active,
+#tab-gorjeta .g-batch.active {
+  transform: translateY(-1px);
+  border-color: rgba(105,200,255,0.22);
+  box-shadow: 0 14px 24px rgba(0,0,0,0.22);
+  background:
+    linear-gradient(180deg, rgba(105,200,255,0.08), rgba(255,255,255,0.02)),
+    rgba(255,255,255,0.03);
+}
+
+#tab-gorjeta .g-batch-top,
+#tab-gorjeta .g-batch-mid,
+#tab-gorjeta .g-batch-bot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#tab-gorjeta .g-batch-mid,
+#tab-gorjeta .g-batch-bot {
+  margin-top: 10px;
+}
+
+#tab-gorjeta .g-batch-id {
+  color: var(--g-text);
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+#tab-gorjeta .g-batch-date {
+  color: var(--g-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+#tab-gorjeta .g-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: var(--g-text);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+#tab-gorjeta .g-tag.ok {
+  border-color: rgba(73,255,159,0.16);
+  background: rgba(73,255,159,0.1);
+  color: #9dffd0;
+}
+
+#tab-gorjeta .g-tag.bad {
+  border-color: rgba(255,115,115,0.16);
+  background: rgba(255,115,115,0.1);
+  color: #ffb2b2;
+}
+
+#tab-gorjeta .g-tag.warn {
+  border-color: rgba(255,214,104,0.16);
+  background: rgba(255,214,104,0.1);
+  color: #ffe9a4;
+}
+
+@media (max-width: 1240px) {
+  #tab-gorjeta.show {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #tab-gorjeta > .card:first-child {
+    grid-column: 1 / -1;
+  }
+
+  #tab-gorjeta > .card:nth-child(4) {
+    grid-column: 1 / -1;
+    min-height: 390px;
+  }
+}
+
+@media (max-width: 860px) {
+  #tab-gorjeta.show {
+    grid-template-columns: 1fr;
+  }
+
+  #tab-gorjeta > .card:first-child,
+  #tab-gorjeta > .card:nth-child(2),
+  #tab-gorjeta > .card:nth-child(3),
+  #tab-gorjeta > .card:nth-child(4) {
+    grid-column: auto;
+    min-height: auto;
+  }
+
+  #tab-gorjeta .g-top {
+    grid-template-columns: 1fr;
+  }
+
+  #tab-gorjeta .g-actions {
+    justify-content: flex-start;
+  }
+
+  #tab-gorjeta .g-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #gorjetaEntries,
+  #gorjetaBatches,
+  #gorjetaResults {
+    max-height: 340px;
+    min-height: 240px;
+  }
+
+  #tab-gorjeta .g-item {
+    grid-template-columns: 1fr;
+  }
+
+  #tab-gorjeta .g-right {
+    text-align: left;
+  }
+
+  #tab-gorjeta .g-pill {
+    width: fit-content;
+  }
+}
