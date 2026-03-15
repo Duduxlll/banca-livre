@@ -28,14 +28,12 @@ html{
 }
 
 body{
-  min-height:100%;
+  min-height:100vh;
   margin:0;
   font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial;
   color:var(--text);
   background:
-    radial-gradient(1000px 700px at -10% -10%, rgba(57,247,157,.16), transparent 60%),
-    radial-gradient(1000px 700px at 110% 0%, rgba(134,255,214,.08), transparent 60%),
-    linear-gradient(180deg, #040d09 0%, #020705 100%);
+    linear-gradient(180deg, #0e1110 0%, #0b0d0c 45%, #090a0a 100%);
   overflow-x:hidden;
 }
 
@@ -45,8 +43,8 @@ body::before{
   inset:0;
   pointer-events:none;
   background:
-    radial-gradient(900px 420px at 15% 12%, rgba(57,247,157,.06), transparent 65%),
-    radial-gradient(800px 420px at 85% 0%, rgba(134,255,214,.04), transparent 65%);
+    radial-gradient(700px 320px at 12% 8%, rgba(57,247,157,.035), transparent 70%),
+    radial-gradient(700px 320px at 88% 0%, rgba(134,255,214,.025), transparent 70%);
   z-index:0;
 }
 
@@ -75,8 +73,7 @@ body::-webkit-scrollbar-thumb{
   position:absolute;
   inset:0;
   background:
-    radial-gradient(900px 340px at 60% -30%, rgba(57,247,157,.18), transparent 60%),
-    linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    linear-gradient(180deg, rgba(255,255,255,.015), rgba(255,255,255,0));
   pointer-events:none;
 }
 
@@ -123,15 +120,11 @@ body::-webkit-scrollbar-thumb{
   line-height:1.45;
 }
 
-.layout{
+.content{
+  align-self:start;
   position:relative;
-  z-index:1;
-  width:min(1200px,92vw);
-  margin:24px auto 28px;
-  display:grid;
-  grid-template-columns:280px minmax(0,1fr);
-  gap:24px;
-  align-items:start;
+  min-height:0;
+  padding-bottom:0;
 }
 
 .sidebar{
@@ -542,25 +535,18 @@ body::-webkit-scrollbar-thumb{
 }
 
 .tab{
-  position:absolute;
-  inset:0;
+  display:none;
   opacity:0;
-  transform:translateY(12px) scale(.985);
+  transform:translateY(10px);
   pointer-events:none;
-  filter:blur(6px);
-  transition:
-    opacity .28s ease,
-    transform .28s ease,
-    filter .28s ease;
 }
 
 .tab.show{
-  position:relative;
+  display:block;
   opacity:1;
-  transform:translateY(0) scale(1);
+  transform:translateY(0);
   pointer-events:auto;
-  filter:none;
-  animation:panelEnter .28s ease both;
+  animation:panelEnter .22s ease both;
 }
 
 @keyframes panelEnter{
