@@ -338,6 +338,16 @@ async function main() {
     sseSendAll
   });
 
+
+  for (let i = 0; i < 60; i++) {
+  if (bot?.client?.isReady?.()) break;
+  await sleep(1000);
+}
+
+if (!bot?.client?.isReady?.()) {
+  throw new Error('Discord não entrou em ready no worker após 60s');
+}
+
   if (!bot) {
     throw new Error('Discord bot não inicializado');
   }
