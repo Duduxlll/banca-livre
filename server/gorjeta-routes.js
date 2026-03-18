@@ -427,7 +427,7 @@ export function registerGorjetaRoutes({
   const maxAffordable = Math.max(1, Math.floor(remaining / perWinnerCents));
   const winnersCount = Math.min(winnersCountReq, maxAffordable);
 
-  const eligibleEntriesQ = await q(
+  const entriesQ = await q(
   `SELECT
      e.twitch_name,
      e.twitch_name_lc,
@@ -435,35 +435,18 @@ export function registerGorjetaRoutes({
      COALESCE(
        NULLIF(TRIM(cs.pix_key), ''),
        NULLIF(TRIM(cb.pix_key), '')
-     ) as pix_key
+     ) as pix_key,
+     CASE
+       WHEN UPPER(COALESCE(cs.status, '')) = 'APROVADO' THEN true
+       WHEN UPPER(COALESCE(cb.status, '')) = 'APROVADO' THEN true
+       ELSE false
+     END as is_approved
    FROM gorjeta_entries e
-   LEFT JOIN LATERAL (
-     SELECT pix_type, pix_key, updated_at, created_at
-       FROM cashback_submissions
-      WHERE twitch_name_lc = e.twitch_name_lc
-        AND upper(status) = 'APROVADO'
-      ORDER BY
-        CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
-        updated_at DESC NULLS LAST,
-        created_at DESC
-      LIMIT 1
-   ) cs ON true
-   LEFT JOIN LATERAL (
-     SELECT pix_type, pix_key, updated_at, created_at
-       FROM cashbacks
-      WHERE lower(twitch_nick) = e.twitch_name_lc
-        AND lower(status) = 'aprovado'
-      ORDER BY
-        CASE WHEN NULLIF(TRIM(COALESCE(pix_key, '')), '') IS NULL THEN 1 ELSE 0 END,
-        updated_at DESC NULLS LAST,
-        created_at DESC
-      LIMIT 1
-   ) cb ON true
-   WHERE e.round_id = $1
-     AND COALESCE(
-       NULLIF(TRIM(COALESCE(cs.pix_key, '')), ''),
-       NULLIF(TRIM(COALESCE(cb.pix_key, '')), '')
-     ) IS NOT NULL`,
+   LEFT JOIN cashback_submissions cs
+     ON LOWER(cs.twitch_name) = e.twitch_name_lc
+   LEFT JOIN cashbacks cb
+     ON LOWER(cb.twitch_name) = e.twitch_name_lc
+   WHERE e.round_id = $1`,
   [roundId]
 );
 
@@ -486,40 +469,38 @@ if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participa
     );
 
     for (const e of chosen) {
-      const nick = e.twitch_name;
-      const nickLc = e.twitch_name_lc;
-      const pixKey = String(e.pix_key || "").trim();
-      const pixType = String(e.pix_type || "").trim() || null;
+  const nick = e.twitch_name;
+  const pixKey = String(e.pix_key || "").trim();
+  const pixType = String(e.pix_type || "").trim() || null;
 
-      const addResult = async (status, reason, pixTypeValue = null, pixKeyValue = null, pagamentoId = null) => {
-        await q(
-          `INSERT INTO gorjeta_batch_results
-             (batch_id, round_id, twitch_name, twitch_name_lc, status, reason, valor_cents, pix_type, pix_key, pagamento_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [batchId, roundId, nick, nickLc, status, reason, perWinnerCents, pixTypeValue, pixKeyValue, pagamentoId]
-        );
-      };
+  if (!e.is_approved || !pixKey) {
+    await addResult("DESCLASSIFICADO", "não aprovado");
+    disqualified.push({
+      twitchName: nick,
+      reason: !e.is_approved ? "não aprovado" : "sem Pix cadastrado",
+      valorCents: perWinnerCents
+    });
+    continue;
+  }
 
-      
+  const pagamentoId = crypto.randomUUID();
+  const message = `Gorjeta • Rodada ${roundId}`;
 
-if (!pixKey) {
-  await addResult("DESCLASSIFICADO", "sem Pix cadastrado");
-  disqualified.push({ twitchName: nick, reason: "sem Pix cadastrado", valorCents: perWinnerCents });
-  continue;
+  await q(
+    `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
+    [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
+  );
+
+  await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
+  confirmed.push({
+    twitchName: nick,
+    valorCents: perWinnerCents,
+    pagamentoId,
+    pixType,
+    pixKey
+  });
 }
-
-const pagamentoId = crypto.randomUUID();
-const message = `Gorjeta • Rodada ${roundId}`;
-
-await q(
-  `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
-   VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
-  [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
-);
-
-await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
-confirmed.push({ twitchName: nick, valorCents: perWinnerCents, pagamentoId, pixType, pixKey });
-    }
 
     const spentCents = confirmed.length * perWinnerCents;
     const newRemaining = Math.max(0, remaining - spentCents);
