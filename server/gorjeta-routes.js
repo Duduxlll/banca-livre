@@ -239,52 +239,52 @@ export function registerGorjetaRoutes({
   });
 
   app.post("/api/gorjeta/rounds/:id/close", ...areaAuth, async (req, res) => {
-  await q(
-    `UPDATE gorjeta_rounds
-        SET is_open=false,
-            closed_at=now(),
-            updated_at=now()
-      WHERE id=$1`,
-    [req.params.id]
-  );
+    await q(
+      `UPDATE gorjeta_rounds
+          SET is_open=false,
+              closed_at=now(),
+              updated_at=now()
+        WHERE id=$1`,
+      [req.params.id]
+    );
 
-  try {
-    await discordBot?.clearGorjetaSorteioMessages?.();
-  } catch {}
+    try {
+      await discordBot?.clearGorjetaSorteioMessages?.();
+    } catch {}
 
-  sseSendAll?.("gorjeta-changed", { reason: "close", id: req.params.id });
-  res.json({ ok: true });
-});
+    sseSendAll?.("gorjeta-changed", { reason: "close", id: req.params.id });
+    res.json({ ok: true });
+  });
 
   app.get("/api/gorjeta/rounds/:id/entries", ...areaAuth, async (req, res) => {
-  const { rows } = await q(
-    `SELECT
-       e.twitch_name as "twitchName",
-       e.joined_at as "joinedAt",
-       e.source,
-       CASE
-         WHEN EXISTS (
-           SELECT 1
-             FROM cashback_submissions cs
-            WHERE cs.twitch_name_lc = e.twitch_name_lc
-              AND upper(cs.status) = 'APROVADO'
-         ) OR EXISTS (
-           SELECT 1
-             FROM cashbacks cb
-            WHERE lower(cb.twitch_nick) = e.twitch_name_lc
-              AND lower(cb.status) = 'aprovado'
-         )
-         THEN 'APROVADO'
-         ELSE 'NAO_APROVADO'
-       END as "approvalStatus"
-     FROM gorjeta_entries e
-    WHERE e.round_id = $1
-    ORDER BY e.joined_at ASC`,
-    [req.params.id]
-  );
+    const { rows } = await q(
+      `SELECT
+         e.twitch_name as "twitchName",
+         e.joined_at as "joinedAt",
+         e.source,
+         CASE
+           WHEN EXISTS (
+             SELECT 1
+               FROM cashback_submissions cs
+              WHERE cs.twitch_name_lc = e.twitch_name_lc
+                AND upper(cs.status) = 'APROVADO'
+           ) OR EXISTS (
+             SELECT 1
+               FROM cashbacks cb
+              WHERE lower(cb.twitch_nick) = e.twitch_name_lc
+                AND lower(cb.status) = 'aprovado'
+           )
+           THEN 'APROVADO'
+           ELSE 'NAO_APROVADO'
+         END as "approvalStatus"
+       FROM gorjeta_entries e
+      WHERE e.round_id = $1
+      ORDER BY e.joined_at ASC`,
+      [req.params.id]
+    );
 
-  res.json(rows);
-});
+    res.json(rows);
+  });
 
   app.get("/api/gorjeta/rounds/:id/batches", ...areaAuth, async (req, res) => {
     const { rows } = await q(
@@ -360,37 +360,37 @@ export function registerGorjetaRoutes({
   }
 
   app.post("/api/gorjeta/join", RL_PUBLIC, requireAppKey, async (req, res) => {
-  const user = normalizeTwitchName(req.body?.user || req.body?.twitch || "");
-  if (!user) return res.status(400).json({ error: "user_invalido" });
+    const user = normalizeTwitchName(req.body?.user || req.body?.twitch || "");
+    if (!user) return res.status(400).json({ error: "user_invalido" });
 
-  const r = await q(`SELECT id, total_cents, remaining_cents FROM gorjeta_rounds WHERE is_open=true ORDER BY created_at DESC LIMIT 1`);
-  if (!r.rows.length) return res.status(400).json({ error: "rodada_fechada" });
+    const r = await q(`SELECT id, total_cents, remaining_cents FROM gorjeta_rounds WHERE is_open=true ORDER BY created_at DESC LIMIT 1`);
+    if (!r.rows.length) return res.status(400).json({ error: "rodada_fechada" });
 
-  const roundId = r.rows[0].id;
+    const roundId = r.rows[0].id;
 
-  const ins = await q(
-    `INSERT INTO gorjeta_entries (round_id, twitch_name, twitch_name_lc, source)
-     VALUES ($1,$2,$3,'twitch')
-     ON CONFLICT (round_id, twitch_name_lc) DO NOTHING
-     RETURNING id`,
-    [roundId, user, user]
-  );
+    const ins = await q(
+      `INSERT INTO gorjeta_entries (round_id, twitch_name, twitch_name_lc, source)
+       VALUES ($1,$2,$3,'twitch')
+       ON CONFLICT (round_id, twitch_name_lc) DO NOTHING
+       RETURNING id`,
+      [roundId, user, user]
+    );
 
-  const alreadyJoined = !ins.rows.length;
+    const alreadyJoined = !ins.rows.length;
 
-  if (!alreadyJoined) {
-    try {
-      const c = await q(`SELECT COUNT(*)::int as n FROM gorjeta_entries WHERE round_id=$1`, [roundId]);
-      const total = Number(r.rows[0].total_cents || 0);
-      const rem = Number(r.rows[0].remaining_cents || 0);
-      const n = c.rows[0]?.n || 0;
-      const text = `🎁 **GORJETA ABERTA**\nRodada: \`${roundId}\`\nSaldo: R$ ${(rem / 100).toFixed(2)} / Total: R$ ${(total / 100).toFixed(2)}\nParticipantes: **${n}**\nPara entrar: \`!gorjeta\``;
-      await discordUpsertPublic(roundId, text);
-    } catch {}
-  }
+    if (!alreadyJoined) {
+      try {
+        const c = await q(`SELECT COUNT(*)::int as n FROM gorjeta_entries WHERE round_id=$1`, [roundId]);
+        const total = Number(r.rows[0].total_cents || 0);
+        const rem = Number(r.rows[0].remaining_cents || 0);
+        const n = c.rows[0]?.n || 0;
+        const text = `🎁 **GORJETA ABERTA**\nRodada: \`${roundId}\`\nSaldo: R$ ${(rem / 100).toFixed(2)} / Total: R$ ${(total / 100).toFixed(2)}\nParticipantes: **${n}**\nPara entrar: \`!gorjeta\``;
+        await discordUpsertPublic(roundId, text);
+      } catch {}
+    }
 
-  res.json({ ok: true, roundId, alreadyJoined });
-});
+    res.json({ ok: true, roundId, alreadyJoined });
+  });
 
   app.get("/api/gorjeta/status", RL_PUBLIC, requireAppKey, async (req, res) => {
     const r = await q(`SELECT id, total_cents, remaining_cents FROM gorjeta_rounds WHERE is_open=true ORDER BY created_at DESC LIMIT 1`);
@@ -409,197 +409,218 @@ export function registerGorjetaRoutes({
   });
 
   app.post("/api/gorjeta/rounds/:id/draw", ...areaAuth, async (req, res) => {
-  const roundId = req.params.id;
-  const perWinnerCents = asInt(req.body?.perWinnerCents, 0);
-  const winnersCountReq = Math.max(1, asInt(req.body?.winnersCount, 1));
+    const roundId = req.params.id;
+    const perWinnerCents = asInt(req.body?.perWinnerCents, 0);
+    const winnersCountReq = Math.max(1, asInt(req.body?.winnersCount, 1));
 
-  if (perWinnerCents <= 0) return res.status(400).json({ error: "valores_invalidos" });
+    if (perWinnerCents <= 0) return res.status(400).json({ error: "valores_invalidos" });
 
-  const roundQ = await q(`SELECT id, is_open, total_cents, remaining_cents FROM gorjeta_rounds WHERE id=$1`, [roundId]);
-  if (!roundQ.rows.length) return res.status(404).json({ error: "not_found" });
+    const roundQ = await q(`SELECT id, is_open, total_cents, remaining_cents FROM gorjeta_rounds WHERE id=$1`, [roundId]);
+    if (!roundQ.rows.length) return res.status(404).json({ error: "not_found" });
 
-  const round = roundQ.rows[0];
-  if (!round.is_open) return res.status(400).json({ error: "rodada_fechada" });
+    const round = roundQ.rows[0];
+    if (!round.is_open) return res.status(400).json({ error: "rodada_fechada" });
 
-  const remaining = Number(round.remaining_cents || 0);
-  if (remaining <= 0) return res.status(400).json({ error: "saldo_zerado" });
+    const remaining = Number(round.remaining_cents || 0);
+    if (remaining <= 0) return res.status(400).json({ error: "saldo_zerado" });
 
-  const maxAffordable = Math.max(1, Math.floor(remaining / perWinnerCents));
-  const winnersCount = Math.min(winnersCountReq, maxAffordable);
+    const maxAffordable = Math.max(1, Math.floor(remaining / perWinnerCents));
+    const winnersCount = Math.min(winnersCountReq, maxAffordable);
 
-  const entriesQ = await q(
-  `SELECT
-     e.twitch_name,
-     e.twitch_name_lc,
-     COALESCE(cs.pix_type, cb.pix_type) AS pix_type,
-     COALESCE(
-       NULLIF(TRIM(cs.pix_key), ''),
-       NULLIF(TRIM(cb.pix_key), '')
-     ) AS pix_key,
-     CASE
-       WHEN UPPER(COALESCE(cs.status, '')) = 'APROVADO' THEN true
-       WHEN LOWER(COALESCE(cb.status, '')) = 'aprovado' THEN true
-       ELSE false
-     END AS is_approved
-   FROM gorjeta_entries e
-   LEFT JOIN LATERAL (
-     SELECT twitch_name_lc, pix_type, pix_key, status, updated_at, created_at
-       FROM cashback_submissions
-      WHERE twitch_name_lc = e.twitch_name_lc
-      ORDER BY updated_at DESC NULLS LAST, created_at DESC
-      LIMIT 1
-   ) cs ON true
-   LEFT JOIN LATERAL (
-     SELECT twitch_nick, pix_type, pix_key, status, updated_at, created_at
-       FROM cashbacks
-      WHERE lower(twitch_nick) = e.twitch_name_lc
-      ORDER BY updated_at DESC NULLS LAST, created_at DESC
-      LIMIT 1
-   ) cb ON true
-   WHERE e.round_id = $1`,
-  [roundId]
-);
-
-const entries = entriesQ.rows;
-
-const eligibleEntries = entriesQ.rows;
-  
-if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participantes" });
-
-  const chosen = pickRandomUnique(eligibleEntries, winnersCount);
-  const batchId = crypto.randomUUID();
-
-  const confirmed = [];
-  const disqualified = [];
-
-  await q("BEGIN");
-  try {
-    await q(
-      `INSERT INTO gorjeta_batches
-         (id, round_id, per_winner_cents, winners_count, picked_count, confirmed_count, disqualified_count, spent_cents, remaining_after_cents)
-       VALUES ($1,$2,$3,$4,$5,0,0,0,$6)`,
-      [batchId, roundId, perWinnerCents, winnersCountReq, chosen.length, remaining]
+    const entriesQ = await q(
+      `SELECT
+         e.twitch_name,
+         e.twitch_name_lc,
+         COALESCE(cs.pix_type, cb.pix_type) AS pix_type,
+         COALESCE(
+           NULLIF(TRIM(cs.pix_key), ''),
+           NULLIF(TRIM(cb.pix_key), '')
+         ) AS pix_key,
+         CASE
+           WHEN UPPER(COALESCE(cs.status, '')) = 'APROVADO' THEN true
+           WHEN LOWER(COALESCE(cb.status, '')) = 'aprovado' THEN true
+           ELSE false
+         END AS is_approved
+       FROM gorjeta_entries e
+       LEFT JOIN LATERAL (
+         SELECT twitch_name_lc, pix_type, pix_key, status, updated_at, created_at
+           FROM cashback_submissions
+          WHERE twitch_name_lc = e.twitch_name_lc
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC
+          LIMIT 1
+       ) cs ON true
+       LEFT JOIN LATERAL (
+         SELECT twitch_nick, pix_type, pix_key, status, updated_at, created_at
+           FROM cashbacks
+          WHERE lower(twitch_nick) = e.twitch_name_lc
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC
+          LIMIT 1
+       ) cb ON true
+       WHERE e.round_id = $1`,
+      [roundId]
     );
 
-    for (const e of chosen) {
-  const nick = e.twitch_name;
-  const pixKey = String(e.pix_key || "").trim();
-  const pixType = String(e.pix_type || "").trim() || null;
+    const entries = entriesQ.rows;
+    if (!entries.length) return res.status(400).json({ error: "sem_participantes" });
 
-  if (!e.is_approved || !pixKey) {
-    await addResult("DESCLASSIFICADO", "não aprovado");
-    disqualified.push({
-      twitchName: nick,
-      reason: !e.is_approved ? "não aprovado" : "sem Pix cadastrado",
-      valorCents: perWinnerCents
-    });
-    continue;
-  }
+    const chosen = pickRandomUnique(entries, winnersCount);
+    const batchId = crypto.randomUUID();
 
-  const pagamentoId = crypto.randomUUID();
-  const message = `Gorjeta • Rodada ${roundId}`;
+    const confirmed = [];
+    const disqualified = [];
 
-  await q(
-    `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
-    [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
-  );
-
-  await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
-  confirmed.push({
-    twitchName: nick,
-    valorCents: perWinnerCents,
-    pagamentoId,
-    pixType,
-    pixKey
-  });
-}
-
-    const spentCents = confirmed.length * perWinnerCents;
-    const newRemaining = Math.max(0, remaining - spentCents);
-
-    await q(
-      `UPDATE gorjeta_batches
-          SET confirmed_count=$2,
-              disqualified_count=$3,
-              spent_cents=$4,
-              remaining_after_cents=$5
-        WHERE id=$1`,
-      [batchId, confirmed.length, disqualified.length, spentCents, newRemaining]
-    );
-
-    await q(`UPDATE gorjeta_rounds SET remaining_cents=$2, updated_at=now() WHERE id=$1`, [roundId, newRemaining]);
-
-    if (newRemaining <= 0) {
-      await q(`UPDATE gorjeta_rounds SET is_open=false, closed_at=now(), updated_at=now() WHERE id=$1`, [roundId]);
-    }
-
-    await q("COMMIT");
-
-    sseSendAll?.("gorjeta-changed", { reason: "draw", id: roundId, batchId });
-
+    await q("BEGIN");
     try {
-      const publicChannelId = String(process.env.DISCORD_GORJETA_PUBLIC_CHANNEL_ID || "").trim();
-      const payChannelId = String(process.env.DISCORD_GORJETA_PAGAMENTOS_CHANNEL_ID || "").trim();
+      await q(
+        `INSERT INTO gorjeta_batches
+           (id, round_id, per_winner_cents, winners_count, picked_count, confirmed_count, disqualified_count, spent_cents, remaining_after_cents)
+         VALUES ($1,$2,$3,$4,$5,0,0,0,$6)`,
+        [batchId, roundId, perWinnerCents, winnersCountReq, chosen.length, remaining]
+      );
 
-      const fmtBRL = (c) => (Number(c || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      for (const e of chosen) {
+        const nick = e.twitch_name;
+        const nickLc = e.twitch_name_lc;
+        const pixKey = String(e.pix_key || "").trim();
+        const pixType = String(e.pix_type || "").trim() || null;
 
-      if (discordBot?.client && publicChannelId) {
-        const ch = await discordBot.client.channels.fetch(publicChannelId).catch(() => null);
-        if (ch) {
-          const text =
-            `🎁 **GORJETA — SORTEIO**\nRodada: \`${roundId}\` • Lote: \`${batchId}\`\n` +
-            `Por ganhador: ${fmtBRL(perWinnerCents)} • Pedidos: ${winnersCountReq}\n` +
-            `Confirmados: **${confirmed.length}** • Desclassificados: **${disqualified.length}**\n` +
-            `Gasto: ${fmtBRL(spentCents)} • Saldo: ${fmtBRL(newRemaining)}`;
-          await ch.send({ content: text }).catch(() => null);
+        const addResult = async (status, reason = null, pixTypeValue = null, pixKeyValue = null, pagamentoId = null) => {
+          await q(
+            `INSERT INTO gorjeta_batch_results
+               (batch_id, round_id, twitch_name, twitch_name_lc, status, reason, valor_cents, pix_type, pix_key, pagamento_id)
+             VALUES
+               ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [
+              batchId,
+              roundId,
+              nick,
+              nickLc,
+              status,
+              reason,
+              perWinnerCents,
+              pixTypeValue,
+              pixKeyValue,
+              pagamentoId,
+            ]
+          );
+        };
+
+        if (!e.is_approved || !pixKey) {
+          const reason = !e.is_approved ? "não aprovado" : "sem Pix cadastrado";
+          await addResult("DESCLASSIFICADO", reason);
+          disqualified.push({
+            twitchName: nick,
+            reason,
+            valorCents: perWinnerCents,
+          });
+          continue;
         }
+
+        const pagamentoId = crypto.randomUUID();
+        const message = `Gorjeta • Rodada ${roundId}`;
+
+        await q(
+          `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
+           VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
+          [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
+        );
+
+        await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
+        confirmed.push({
+          twitchName: nick,
+          valorCents: perWinnerCents,
+          pagamentoId,
+          pixType,
+          pixKey,
+        });
       }
 
-      if (discordBot?.client && payChannelId) {
-        const ch = await discordBot.client.channels.fetch(payChannelId).catch(() => null);
-        if (ch) {
-          for (const w of confirmed) {
-            const payload = buildPixBRCode({
-              chave: w.pixKey,
-              tipo: w.pixType,
-              valorCents: w.valorCents,
-              nome: w.twitchName,
-              cidade: "BRASILIA",
-              txid: "***"
-            });
+      const spentCents = confirmed.length * perWinnerCents;
+      const newRemaining = Math.max(0, remaining - spentCents);
 
-            const png = await QRCode.toBuffer(payload, { width: 360, margin: 1 });
+      await q(
+        `UPDATE gorjeta_batches
+            SET confirmed_count=$2,
+                disqualified_count=$3,
+                spent_cents=$4,
+                remaining_after_cents=$5
+          WHERE id=$1`,
+        [batchId, confirmed.length, disqualified.length, spentCents, newRemaining]
+      );
 
-            await ch.send({
-              content:
-                `💸 **Gorjeta aprovada**\n` +
-                `Nick: **${w.twitchName}**\n` +
-                `Valor: **${fmtBRL(w.valorCents)}**\n` +
-                `Pagamento ID: \`${w.pagamentoId}\`\n` +
-                `PIX copia e cola:\n\`\`\`\n${payload}\n\`\`\``,
-              files: [{ attachment: png, name: `gorjeta-${w.twitchName}.png` }]
-            }).catch(() => null);
+      await q(`UPDATE gorjeta_rounds SET remaining_cents=$2, updated_at=now() WHERE id=$1`, [roundId, newRemaining]);
+
+      if (newRemaining <= 0) {
+        await q(`UPDATE gorjeta_rounds SET is_open=false, closed_at=now(), updated_at=now() WHERE id=$1`, [roundId]);
+      }
+
+      await q("COMMIT");
+
+      sseSendAll?.("gorjeta-changed", { reason: "draw", id: roundId, batchId });
+
+      try {
+        const publicChannelId = String(process.env.DISCORD_GORJETA_PUBLIC_CHANNEL_ID || "").trim();
+        const payChannelId = String(process.env.DISCORD_GORJETA_PAGAMENTOS_CHANNEL_ID || "").trim();
+
+        const fmtBRL = (c) =>
+          (Number(c || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+        if (discordBot?.client && publicChannelId) {
+          const ch = await discordBot.client.channels.fetch(publicChannelId).catch(() => null);
+          if (ch) {
+            const text =
+              `🎁 **GORJETA — SORTEIO**\nRodada: \`${roundId}\` • Lote: \`${batchId}\`\n` +
+              `Por ganhador: ${fmtBRL(perWinnerCents)} • Pedidos: ${winnersCountReq}\n` +
+              `Confirmados: **${confirmed.length}** • Desclassificados: **${disqualified.length}**\n` +
+              `Gasto: ${fmtBRL(spentCents)} • Saldo: ${fmtBRL(newRemaining)}`;
+            await ch.send({ content: text }).catch(() => null);
           }
         }
-      }
-    } catch {}
 
-    return res.json({
-      ok: true,
-      batchId,
-      picked: chosen.length,
-      confirmedCount: confirmed.length,
-      disqualifiedCount: disqualified.length,
-      spentCents,
-      remainingCents: newRemaining,
-      confirmed,
-      disqualified
-    });
-  } catch (e) {
-    await q("ROLLBACK");
-    console.error("gorjeta draw:", e);
-    return res.status(500).json({ error: "draw_failed" });
-  }
-});
+        if (discordBot?.client && payChannelId) {
+          const ch = await discordBot.client.channels.fetch(payChannelId).catch(() => null);
+          if (ch) {
+            for (const w of confirmed) {
+              const payload = buildPixBRCode({
+                chave: w.pixKey,
+                tipo: w.pixType,
+                valorCents: w.valorCents,
+                nome: w.twitchName,
+                cidade: "BRASILIA",
+                txid: "***",
+              });
+
+              const png = await QRCode.toBuffer(payload, { width: 360, margin: 1 });
+
+              await ch.send({
+                content:
+                  `💸 **Gorjeta aprovada**\n` +
+                  `Nick: **${w.twitchName}**\n` +
+                  `Valor: **${fmtBRL(w.valorCents)}**\n` +
+                  `Pagamento ID: \`${w.pagamentoId}\`\n` +
+                  `PIX copia e cola:\n\`\`\`\n${payload}\n\`\`\``,
+                files: [{ attachment: png, name: `gorjeta-${w.twitchName}.png` }],
+              }).catch(() => null);
+            }
+          }
+        }
+      } catch {}
+
+      return res.json({
+        ok: true,
+        batchId,
+        picked: chosen.length,
+        confirmedCount: confirmed.length,
+        disqualifiedCount: disqualified.length,
+        spentCents,
+        remainingCents: newRemaining,
+        confirmed,
+        disqualified,
+      });
+    } catch (e) {
+      await q("ROLLBACK");
+      console.error("gorjeta draw:", e);
+      return res.status(500).json({ error: "draw_failed" });
+    }
+  });
 }
