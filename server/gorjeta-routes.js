@@ -431,26 +431,39 @@ export function registerGorjetaRoutes({
   `SELECT
      e.twitch_name,
      e.twitch_name_lc,
-     COALESCE(cs.pix_type, cb.pix_type) as pix_type,
+     COALESCE(cs.pix_type, cb.pix_type) AS pix_type,
      COALESCE(
        NULLIF(TRIM(cs.pix_key), ''),
        NULLIF(TRIM(cb.pix_key), '')
-     ) as pix_key,
+     ) AS pix_key,
      CASE
        WHEN UPPER(COALESCE(cs.status, '')) = 'APROVADO' THEN true
-       WHEN UPPER(COALESCE(cb.status, '')) = 'APROVADO' THEN true
+       WHEN LOWER(COALESCE(cb.status, '')) = 'aprovado' THEN true
        ELSE false
-     END as is_approved
+     END AS is_approved
    FROM gorjeta_entries e
-   LEFT JOIN cashback_submissions cs
-     ON LOWER(cs.twitch_name) = e.twitch_name_lc
-   LEFT JOIN cashbacks cb
-     ON LOWER(cb.twitch_name) = e.twitch_name_lc
+   LEFT JOIN LATERAL (
+     SELECT twitch_name_lc, pix_type, pix_key, status, updated_at, created_at
+       FROM cashback_submissions
+      WHERE twitch_name_lc = e.twitch_name_lc
+      ORDER BY updated_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+   ) cs ON true
+   LEFT JOIN LATERAL (
+     SELECT twitch_nick, pix_type, pix_key, status, updated_at, created_at
+       FROM cashbacks
+      WHERE lower(twitch_nick) = e.twitch_name_lc
+      ORDER BY updated_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+   ) cb ON true
    WHERE e.round_id = $1`,
   [roundId]
 );
 
-  const eligibleEntries = eligibleEntriesQ.rows;
+const entries = entriesQ.rows;
+
+const eligibleEntries = entriesQ.rows;
+  
 if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participantes" });
 
   const chosen = pickRandomUnique(eligibleEntries, winnersCount);
