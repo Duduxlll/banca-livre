@@ -163,18 +163,17 @@
         ${rows
           .map((r) => {
             const ok = r.status === "CONFIRMADO";
-            return `
-              <div class="g-item ${ok ? "ok" : "bad"}">
-                <div class="g-left">
-                  <div class="g-name">${r.twitchName}</div>
-                  <div class="g-sub">${ok ? "✅ Confirmado" : `❌ ${r.reason || "Desclassificado"}`}</div>
-                </div>
-                <div class="g-right">
-                  <div class="g-money">${fmtBRL(r.valorCents)}</div>
-                  ${ok ? `<div class="g-mini">pagamento: ${r.pagamentoId || "—"}</div>` : ""}
-                </div>
-              </div>
-            `;
+return `
+  <div class="g-item ${ok ? "ok" : "bad"}">
+    <div class="g-left">
+      <div class="g-name">${r.twitchName}</div>
+      <div class="g-sub">${ok ? "✅ Aprovado" : `❌ ${r.reason || "Não aprovado"}`}</div>
+    </div>
+    <div class="g-right">
+      <div class="g-money">${fmtBRL(r.valorCents)}</div>
+    </div>
+  </div>
+`;
           })
           .join("")}
       </div>
