@@ -500,11 +500,7 @@ if (!eligibleEntries.length) return res.status(400).json({ error: "sem_participa
         );
       };
 
-      if (!e.is_approved) {
-  await addResult("DESCLASSIFICADO", "não aprovado");
-  disqualified.push({ twitchName: nick, reason: "não aprovado", valorCents: perWinnerCents });
-  continue;
-}
+      
 
 if (!pixKey) {
   await addResult("DESCLASSIFICADO", "sem Pix cadastrado");
@@ -512,17 +508,17 @@ if (!pixKey) {
   continue;
 }
 
-      const pagamentoId = crypto.randomUUID();
-      const message = `Gorjeta • Rodada ${roundId}`;
+const pagamentoId = crypto.randomUUID();
+const message = `Gorjeta • Rodada ${roundId}`;
 
-      await q(
-        `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
-        [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
-      );
+await q(
+  `INSERT INTO pagamentos (id, nome, pagamento_cents, pix_type, pix_key, message, status, created_at, paid_at)
+   VALUES ($1,$2,$3,$4,$5,$6,'nao_pago', now(), null)`,
+  [pagamentoId, nick, perWinnerCents, pixType, pixKey, message]
+);
 
-      await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
-      confirmed.push({ twitchName: nick, valorCents: perWinnerCents, pagamentoId, pixType, pixKey });
+await addResult("CONFIRMADO", null, pixType, pixKey, pagamentoId);
+confirmed.push({ twitchName: nick, valorCents: perWinnerCents, pagamentoId, pixType, pixKey });
     }
 
     const spentCents = confirmed.length * perWinnerCents;
