@@ -20,6 +20,7 @@ import { ensureTorneioTables, registerTorneioRoutes } from "./torneio-routes.js"
 
 import { ensureCashbackTables, registerCashbackRoutes } from './cashback-routes.js';
 import { ensureGorjetaTables, registerGorjetaRoutes } from "./gorjeta-routes.js";
+import { ensureBatalhaBonusTables, registerBatalhaBonusRoutes } from "./batalha-bonus-routes.js";
 
 import { initTwitchBot } from "./twitch-bot.js";
 
@@ -1341,6 +1342,18 @@ registerGorjetaRoutes({
   discordBot
 });
 
+registerBatalhaBonusRoutes({
+  app,
+  q,
+  uid,
+  requireAppKey,
+  requireAdmin,
+  sseSendAll,
+  announce: async (msg) => {
+    if (twitchBot?.enabled) await twitchBot.say(msg);
+  }
+});
+
 const areaAuth = [requireAuth];
 
 app.get('/api/bancas', areaAuth, async (req, res) => {
@@ -2348,7 +2361,9 @@ app.listen(PORT, async () => {
   try { await ensureGorjetaTables(q); console.log("✅ gorjeta tables ok"); }
 catch (e) { console.error("❌ gorjeta tables fail:", e); }
 
-  
+  try { await ensureBatalhaBonusTables(q); console.log("✅ batalha bonus tables ok"); }
+catch (e) { console.error("❌ batalha bonus tables fail:", e); }
+
   try{
     await q('select 1');
     await ensureMessageColumns();
@@ -2360,6 +2375,7 @@ catch (e) { console.error("❌ gorjeta tables fail:", e); }
     await palpiteLoadFromDB();
     await ensureCashbackTables(q);
     await ensureTorneioTables(q);
+    await ensureBatalhaBonusTables(q);
     await ensureExtratosOrigemColumn();
     discordBot = initDiscordBot({ q, uid, onLog: console, sseSendAll });
     console.log('🧩 Discord init retornou:', discordBot ? 'OK' : 'NULL');

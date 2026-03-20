@@ -178,6 +178,7 @@ const tabPalpiteEl    = qs('#tab-palpite');
 const tabGorjetaEl    = qs('#tab-gorjeta');
 const tabCashbacksEl  = qs('#tab-cashbacks');
 const tabTorneioEl    = qs('#tab-torneio');
+const tabBatalhaBonusEl = qs('#tab-batalha-bonus');
 
 const tbodyBancas     = qs('#tblBancas tbody');
 const tbodyPags       = qs('#tblPagamentos tbody');
@@ -479,6 +480,7 @@ async function render(){
     tabPalpiteEl,
     tabTorneioEl,
     tabGorjetaEl,
+    tabBatalhaBonusEl,
     tabCashbacksEl
   ];
 
@@ -525,6 +527,13 @@ async function render(){
   if (window.GorjetaAdmin && typeof window.GorjetaAdmin.onTabShown === 'function') {
     try { window.GorjetaAdmin.onTabShown(); } catch (e) { console.error(e); }
   }
+
+  } else if (TAB === 'batalha-bonus') {
+    tabBatalhaBonusEl?.classList.add('show');
+
+    if (window.BatalhaBonusAdmin && typeof window.BatalhaBonusAdmin.onTabShown === 'function') {
+      try { window.BatalhaBonusAdmin.onTabShown(); } catch(e){ console.error(e); }
+    }
 
   } else if (TAB === 'cashbacks') {
     tabCashbacksEl?.classList.add('show');
@@ -766,6 +775,15 @@ async function refresh() {
     if (window.CashbackAdmin && typeof window.CashbackAdmin.refresh === 'function') {
       try {
         await window.CashbackAdmin.refresh();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+  } else if (TAB === 'batalha-bonus') {
+    if (window.BatalhaBonusAdmin && typeof window.BatalhaBonusAdmin.refresh === 'function') {
+      try {
+        await window.BatalhaBonusAdmin.refresh();
       } catch (e) {
         console.error(e);
       }
