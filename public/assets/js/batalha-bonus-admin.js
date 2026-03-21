@@ -194,7 +194,7 @@
         renderBattle();
       });
     }
-
+    ensureOverlay();
     return tab;
   }
 
@@ -294,25 +294,58 @@
     };
   }
 
-  function setBattleMode(enabled) {
-    document.body.classList.toggle('mbb-battle-active', !!enabled);
-    const tab = qs('#tab-batalha-bonus');
-    if (tab) tab.classList.toggle('mbb-tab-fullscreen', !!enabled);
-    if (enabled) window.scrollTo({ top: 0, behavior: 'auto' });
+
+  function ensureOverlay() {
+  let overlay = document.getElementById('mbbFullscreenOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'mbbFullscreenOverlay';
+    overlay.innerHTML = `<div class="mbb-fullscreen-shell"></div>`;
+    document.body.appendChild(overlay);
   }
+  return overlay;
+}
+
+  function setBattleMode(enabled) {
+  const overlay = ensureOverlay();
+  const shell = overlay.querySelector('.mbb-fullscreen-shell');
+  const tab = qs('#tab-batalha-bonus');
+  const root = qs('#mbbRoot', tab);
+  const battleStage = document.getElementById('mbbBattleStage');
+
+  document.body.classList.toggle('mbb-battle-active', !!enabled);
+
+  if (!battleStage || !root || !shell) return;
+
+  if (enabled) {
+    overlay.classList.add('is-open');
+    if (battleStage.parentElement !== shell) {
+      shell.appendChild(battleStage);
+    }
+    battleStage.style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  } else {
+    overlay.classList.remove('is-open');
+    if (battleStage.parentElement !== root) {
+      root.appendChild(battleStage);
+    }
+    battleStage.style.display = 'none';
+  }
+}
 
   function renderBattle() {
-    const createStage = qs('#mbbCreateStage');
-    const battleStage = qs('#mbbBattleStage');
-    const activeResume = qs('#mbbActiveResume');
-    const hasBattle = !!state?.battle;
-    const boardOpen = hasBattle && shouldOpenBoard();
+  const createStage = qs('#mbbCreateStage');
+  const activeResume = qs('#mbbActiveResume');
+  const hasBattle = !!state?.battle;
+  const boardOpen = hasBattle && shouldOpenBoard();
 
-    if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
-    if (battleStage) battleStage.style.display = boardOpen ? '' : 'none';
-    if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
-    setBattleMode(boardOpen);
-    if (!boardOpen) return;
+  if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
+  if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
+
+  setBattleMode(boardOpen);
+
+  const battleStage = document.getElementById('mbbBattleStage');
+  if (!boardOpen || !battleStage) return;
 
     const rounds = Array.isArray(state?.rounds) ? state.rounds : [];
     const stage = qs('#mbbBracketStage');
