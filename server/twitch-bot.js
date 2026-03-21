@@ -248,72 +248,9 @@ export function initTwitchBot({
     return { ok: true, data };
   }
 
-  async function getBatalhaBonusState() {
-  try {
-    const url = `http://127.0.0.1:${port}/api/batalha-bonus/state?key=${encodeURIComponent(APP_KEY)}`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        "X-APP-KEY": APP_KEY
-      }
-    });
+ 
 
-    let data = null;
-    try {
-      data = await res.json();
-    } catch {}
 
-    if (!res.ok) {
-      console.log("[BATALHA] state non-ok:", res.status, data);
-      return { error: data?.error || `http_${res.status}` };
-    }
-
-    console.log("[BATALHA] state ok:", data);
-    return { ok: true, data };
-  } catch (e) {
-    console.log("[BATALHA] state fetch exception:", e?.message || e);
-    return { error: `fetch_exception:${e?.message || e}` };
-  }
-}
-
-async function batalhaBonusJoin(userTag, displayName) {
-  const url = `http://127.0.0.1:${port}/api/batalha-bonus/join?key=${encodeURIComponent(APP_KEY)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-APP-KEY": APP_KEY
-    },
-    body: JSON.stringify({ user: userTag, displayName })
-  });
-
-  let data = null;
-  try { data = await res.json(); } catch {}
-
-  if (!res.ok) return { error: data?.error || `http_${res.status}`, data };
-  return { ok: true, data };
-}
-
-  async function batalhaBonusSendBonus(userTag, displayName, bonusName) {
-    const url = `http://127.0.0.1:${port}/api/batalha-bonus/bonus?key=${encodeURIComponent(APP_KEY)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-APP-KEY": APP_KEY
-      },
-      body: JSON.stringify({ user: userTag, displayName, bonusName })
-    });
-
-    let data = null;
-    try { data = await res.json(); } catch {}
-
-    if (!res.ok) return { error: data?.error || `http_${res.status}`, data };
-    return { ok: true, data };
-  }
 
   async function gorjetaJoin(userTag, displayName) {
     const url = `http://127.0.0.1:${port}/api/gorjeta/join?key=${encodeURIComponent(APP_KEY)}`;
@@ -527,25 +464,19 @@ async function batalhaBonusJoin(userTag, displayName) {
     if (!user) return;
 
     let cmd = parseCommand(message);
-    const rawCommandText = String(message || "").trim();
-    if (!cmd && rawCommandText.startsWith('!')) {
-      cmd = { type: 'bonus_battle_raw', payload: rawCommandText };
-    }
-    if (!cmd) return;
+if (!cmd) return;
 
     const userKey = userTag || user;
     const cmdKey =
-      cmd.type === "guess"
-        ? `guess:${cmd.payload || ""}`
-        : cmd.type === "time"
-          ? `time:${cmd.payload || ""}`
-          : cmd.type === "gorjeta_join"
-            ? "gorjeta_join"
-            : cmd.type === "gorjeta_status"
-              ? "gorjeta_status"
-              : cmd.type === "bonus_battle_raw"
-                ? `bonus_battle_raw:${cmd.payload || ""}`
-                : cmd.type;
+  cmd.type === "guess"
+    ? `guess:${cmd.payload || ""}`
+    : cmd.type === "time"
+      ? `time:${cmd.payload || ""}`
+      : cmd.type === "gorjeta_join"
+        ? "gorjeta_join"
+        : cmd.type === "gorjeta_status"
+          ? "gorjeta_status"
+          : cmd.type;
 
     if (isDuplicate(userKey, cmdKey)) return;
 
@@ -557,97 +488,7 @@ async function batalhaBonusJoin(userTag, displayName) {
         return;
       }
 
-      if (cmd.type === "bonus_battle_raw") {
-  const raw = String(cmd.payload || "").trim();
-  console.log("[BATALHA] msg recebida:", raw, "user:", userTag || user);
-
-  const st = await getBatalhaBonusState();
-
-  if (st.error) {
-    console.log("[BATALHA] erro state:", st);
-    await say(`${mention} não consegui verificar a batalha agora: ${st.error}`);
-    return;
-  }
-
-  if (!st.data?.active || !st.data?.battle) {
-    console.log("[BATALHA] sem batalha ativa:", st);
-    await say(`${mention} não há batalha ativa agora.`);
-    return;
-  }
-
-  const battle = st.data.battle;
-  const activeCommand = String(battle.entryCommand || "").trim().toLowerCase();
-  const lowerRaw = raw.toLowerCase();
-
-  console.log("[BATALHA] comparando:", { lowerRaw, activeCommand, status: battle.status });
-
-  if (battle.status === "REGISTRATION_OPEN" && activeCommand && lowerRaw === activeCommand) {
-    const r = await batalhaBonusJoin(userTag || user, display || user);
-    console.log("[BATALHA] join:", r);
-
-    if (r.error === "inscricoes_fechadas") {
-      await say(`${mention} inscrições fechadas.`);
-      return;
-    }
-    if (r.error === "limite_atingido") {
-      await say(`${mention} vagas encerradas.`);
-      return;
-    }
-    if (r.error) {
-      await say(`${mention} não consegui te colocar na batalha agora: ${r.error}`);
-      return;
-    }
-    if (r.data?.alreadyJoined) {
-      await say(`${mention} você já está na batalha ✅`);
-      return;
-    }
-
-    const total = Number(r.data?.total || 0);
-    const maxPlayers = Number(r.data?.maxPlayers || 0);
-
-    if (r.data?.autoClosed) {
-      await say(`${mention} entrou na batalha ✅ vagas ${maxPlayers}/${maxPlayers}.`);
-      return;
-    }
-
-    await say(`${mention} entrou na batalha ✅ vagas ${total}/${maxPlayers}.`);
-    return;
-  }
-
-  if (battle.status === "CHOICES_OPEN" && /^!bonus\b/i.test(raw)) {
-    const bonusName = raw.replace(/^!bonus\b/i, "").trim();
-
-    if (!bonusName) {
-      await say(`${mention} use !bonus NOME_DO_BONUS`);
-      return;
-    }
-
-    const r = await batalhaBonusSendBonus(userTag || user, display || user, bonusName);
-    console.log("[BATALHA] bonus:", r);
-
-    if (r.error === "escolhas_fechadas") {
-      await say(`${mention} escolhas fechadas.`);
-      return;
-    }
-    if (r.error === "nao_classificado") {
-      await say(`${mention} você não está classificado para esta fase.`);
-      return;
-    }
-    if (r.error) {
-      await say(`${mention} não consegui salvar seu bônus agora: ${r.error}`);
-      return;
-    }
-    if (r.data?.alreadyChosen) {
-      await say(`${mention} seu bônus desta fase já foi salvo ✅`);
-      return;
-    }
-
-    await say(`${mention} bônus salvo ✅ ${bonusName}`);
-    return;
-  }
-
-  return;
-}
+      
 
       if (cmd.type === "gorjeta_join") {
   const r = await gorjetaJoin(userTag || user, display || user);

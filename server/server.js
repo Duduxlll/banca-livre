@@ -527,9 +527,7 @@ app.use('/api', (req, res, next) => {
     '/api/gorjeta/join',
     '/api/gorjeta/status',
     '/api/sorteio/state-public',
-    '/api/batalha-bonus/state',
-    '/api/batalha-bonus/join',
-    '/api/batalha-bonus/bonus',
+    
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
@@ -1350,9 +1348,7 @@ registerBatalhaBonusRoutes({
   requireAppKey,
   requireAdmin,
   sseSendAll,
-  announce: async (msg) => {
-    if (twitchBot?.enabled) await twitchBot.say(msg);
-  }
+  announce: async () => {}
 });
 
 const areaAuth = [requireAuth];
