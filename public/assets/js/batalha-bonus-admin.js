@@ -137,9 +137,13 @@
     `;
 
     qs('#mbbCreateBtn', tab)?.addEventListener('click', createBattle);
-    qs('#mbbGoActiveBtn', tab)?.addEventListener('click', () => {
+    qs('#mbbGoActiveBtn', tab)?.addEventListener('click', async () => {
+      try {
+        await refresh();
+      } catch {}
       setBoardOpen(true);
-      renderBattle();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      requestAnimationFrame(() => renderBattle());
     });
 
     tab.addEventListener('change', (ev) => {
@@ -294,6 +298,7 @@
     document.body.classList.toggle('mbb-battle-active', !!enabled);
     const tab = qs('#tab-batalha-bonus');
     if (tab) tab.classList.toggle('mbb-tab-fullscreen', !!enabled);
+    if (enabled) window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
   function renderBattle() {
@@ -408,9 +413,10 @@
         method: 'POST',
         body: JSON.stringify({ name, maxPlayers })
       });
-      setBoardOpen(true);
-      notify('Batalha criada.', 'ok');
       await refresh();
+      setBoardOpen(true);
+      requestAnimationFrame(() => renderBattle());
+      notify('Batalha criada.', 'ok');
     } catch (e) {
       notify(e.message || 'Erro ao criar batalha.', 'error');
     }

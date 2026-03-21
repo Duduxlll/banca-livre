@@ -194,13 +194,59 @@
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
 }
 
-body.mbb-battle-active { overflow: hidden; }
-#tab-batalha-bonus.mbb-tab-fullscreen { position: static !important; }
+body.mbb-battle-active {
+  overflow: hidden !important;
+}
+
+body.mbb-battle-active .hero,
+body.mbb-battle-active .layout > .sidebar {
+  display: none !important;
+}
+
+body.mbb-battle-active .layout {
+  width: 100vw !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+body.mbb-battle-active .layout > .content,
+body.mbb-battle-active .content {
+  width: 100vw !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#tab-batalha-bonus.mbb-tab-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  animation: none !important;
+  z-index: 6000 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+#tab-batalha-bonus.mbb-tab-fullscreen::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 6, 0.76);
+  backdrop-filter: blur(4px);
+  z-index: 0;
+}
 
 .mbb-battle-stage {
-  position: fixed;
+  position: absolute;
   inset: 14px 18px 18px 18px;
-  z-index: 5000;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   border-radius: 34px;
