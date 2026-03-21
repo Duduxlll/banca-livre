@@ -525,10 +525,11 @@ app.use('/api', (req, res, next) => {
     '/api/torneio/state',
     '/api/torneio/join',
     '/api/gorjeta/join',
-'/api/gorjeta/status',
+    '/api/gorjeta/status',
     '/api/sorteio/state-public',
-
-
+    '/api/batalha-bonus/state',
+    '/api/batalha-bonus/join',
+    '/api/batalha-bonus/bonus',
   ];
 
   if (openRoutes.some(r => req.path.startsWith(r.replace('/api','')))) {
