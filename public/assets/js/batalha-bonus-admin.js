@@ -2,6 +2,8 @@
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
   const qsa = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const LOCAL_VIEW_KEY = 'mbb:viewOpen';
+  const LOCAL_ACTIVE_KEY = 'mbb:activeBattleId';
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\\^])/g, '\\$1') + '=([^;]*)'));
@@ -63,6 +65,19 @@
     return String(state?.battle?.status || '').toUpperCase() === 'FINISHED';
   }
 
+  function shouldOpenBoard() {
+    return localStorage.getItem(LOCAL_VIEW_KEY) === '1' && !!state?.battle;
+  }
+
+  function setBoardOpen(open) {
+    if (open && state?.battle?.id) {
+      localStorage.setItem(LOCAL_VIEW_KEY, '1');
+      localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
+    } else {
+      localStorage.removeItem(LOCAL_VIEW_KEY);
+    }
+  }
+
   let state = null;
   let poll = null;
   let initialized = false;
@@ -81,8 +96,8 @@
           <div class="mbb-create-noise"></div>
           <div class="mbb-create-card">
             <div class="mbb-create-badge">BATALHA BÔNUS</div>
-            <h2 class="mbb-create-title">Monta a chave manual e resolve tudo no site.</h2>
-            <p class="mbb-create-copy">Escolhe 8, 16 ou 32 vagas. Depois a chave abre em tela cheia para tu preencher nome, bônus, valor e WIN ou LOSE diretamente em cada confronto.</p>
+            <h2 class="mbb-create-title">Cria a chave manual e resolve tudo no site.</h2>
+            <p class="mbb-create-copy">Escolhe 8, 16 ou 32 vagas. Depois a batalha abre em tela cheia, com a estrutura inteira do campeonato, para preencher nomes, bônus, valores e WIN ou LOSE.</p>
             <div class="mbb-create-form">
               <label class="mbb-field">
                 <span>Nome da batalha</span>
@@ -98,11 +113,20 @@
               </label>
               <button id="mbbCreateBtn" class="mbb-btn mbb-btn--primary">Criar batalha</button>
             </div>
+
+            <div id="mbbActiveResume" class="mbb-active-resume" style="display:none">
+              <div class="mbb-active-resume__text">
+                <strong>Tem uma batalha ativa agora.</strong>
+                <span>Abre a estrutura em tela cheia para continuar de onde parou.</span>
+              </div>
+              <button id="mbbGoActiveBtn" class="mbb-btn mbb-btn--ghost">Ir pra batalha ativa</button>
+            </div>
           </div>
         </section>
 
         <section id="mbbBattleStage" class="mbb-battle-stage" style="display:none">
           <div class="mbb-board-actions">
+            <button id="mbbBackBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="back">Voltar</button>
             <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
           </div>
           <div class="mbb-bracket-wrap" id="mbbBracketWrap">
@@ -113,6 +137,10 @@
     `;
 
     qs('#mbbCreateBtn', tab)?.addEventListener('click', createBattle);
+    qs('#mbbGoActiveBtn', tab)?.addEventListener('click', () => {
+      setBoardOpen(true);
+      renderBattle();
+    });
 
     tab.addEventListener('change', (ev) => {
       const target = ev.target;
@@ -148,6 +176,10 @@
       if (!btn) return;
       if (btn.dataset.mbbAction === 'finalize') {
         await finalizeBattle();
+      }
+      if (btn.dataset.mbbAction === 'back') {
+        setBoardOpen(false);
+        renderBattle();
       }
     });
 
@@ -200,21 +232,21 @@
 
   function getBoardPreset(firstRoundCount) {
     if (firstRoundCount <= 4) {
-      return { cardWidth: 480, cardHeight: 176, laneGap: 122, baseGap: 30, minScale: 0.84 };
+      return { cardWidth: 560, cardHeight: 184, laneGap: 136, baseGap: 34, minScale: 0.9 };
     }
     if (firstRoundCount <= 8) {
-      return { cardWidth: 450, cardHeight: 162, laneGap: 112, baseGap: 22, minScale: 0.76 };
+      return { cardWidth: 530, cardHeight: 170, laneGap: 124, baseGap: 24, minScale: 0.8 };
     }
-    return { cardWidth: 420, cardHeight: 148, laneGap: 100, baseGap: 16, minScale: 0.66 };
+    return { cardWidth: 500, cardHeight: 158, laneGap: 112, baseGap: 18, minScale: 0.68 };
   }
 
   function computeBoardGeometry(rounds) {
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
     const preset = getBoardPreset(firstRoundCount);
     const { cardWidth, cardHeight, laneGap, baseGap } = preset;
-    const leftPadding = 32;
-    const topPadding = 64;
-    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 30;
+    const leftPadding = 44;
+    const topPadding = 76;
+    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 48;
     const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
 
     const roundMeta = rounds.map((round, roundIdx) => {
@@ -267,11 +299,15 @@
   function renderBattle() {
     const createStage = qs('#mbbCreateStage');
     const battleStage = qs('#mbbBattleStage');
+    const activeResume = qs('#mbbActiveResume');
     const hasBattle = !!state?.battle;
-    if (createStage) createStage.style.display = hasBattle ? 'none' : '';
-    if (battleStage) battleStage.style.display = hasBattle ? '' : 'none';
-    setBattleMode(hasBattle);
-    if (!hasBattle) return;
+    const boardOpen = hasBattle && shouldOpenBoard();
+
+    if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
+    if (battleStage) battleStage.style.display = boardOpen ? '' : 'none';
+    if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
+    setBattleMode(boardOpen);
+    if (!boardOpen) return;
 
     const rounds = Array.isArray(state?.rounds) ? state.rounds : [];
     const stage = qs('#mbbBracketStage');
@@ -287,10 +323,10 @@
     }
 
     const geo = computeBoardGeometry(rounds);
-    const availableWidth = Math.max(860, wrap.clientWidth - 40);
+    const availableWidth = Math.max(1080, wrap.clientWidth - 56);
     const widthScale = availableWidth / geo.totalWidth;
     const scale = Math.min(1, Math.max(geo.minScale, widthScale));
-    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 24;
+    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 34;
 
     stage.style.height = `${scaledHeight}px`;
     stage.innerHTML = `
@@ -349,6 +385,14 @@
     ensureUI();
     const res = await apiFetch('/api/batalha-bonus/admin/state');
     state = res?.state || null;
+    if (!state?.battle) setBoardOpen(false);
+    if (state?.battle?.id) {
+      const remembered = localStorage.getItem(LOCAL_ACTIVE_KEY);
+      if (remembered && remembered !== String(state.battle.id)) setBoardOpen(false);
+      localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
+    } else {
+      localStorage.removeItem(LOCAL_ACTIVE_KEY);
+    }
     renderBattle();
   }
 
@@ -364,6 +408,7 @@
         method: 'POST',
         body: JSON.stringify({ name, maxPlayers })
       });
+      setBoardOpen(true);
       notify('Batalha criada.', 'ok');
       await refresh();
     } catch (e) {
@@ -374,6 +419,7 @@
   async function finalizeBattle() {
     try {
       await apiFetch('/api/batalha-bonus/admin/finalize', { method: 'POST', body: '{}' });
+      setBoardOpen(false);
       notify('Batalha finalizada.', 'ok');
       await refresh();
     } catch (e) {

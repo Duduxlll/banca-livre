@@ -39,7 +39,7 @@
 .mbb-create-card {
   position: relative;
   z-index: 1;
-  width: min(780px, calc(100% - 48px));
+  width: min(860px, calc(100% - 48px));
   margin: 42px auto;
   padding: 34px;
   border-radius: 28px;
@@ -72,17 +72,43 @@
 
 .mbb-create-copy {
   margin: 0;
-  max-width: 680px;
+  max-width: 720px;
   color: rgba(226, 232, 240, 0.78);
   line-height: 1.7;
 }
 
 .mbb-create-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.7fr) auto;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.7fr) auto;
   gap: 14px;
   margin-top: 26px;
   align-items: end;
+}
+
+.mbb-active-resume {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  background: rgba(7, 18, 14, 0.88);
+}
+
+.mbb-active-resume__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mbb-active-resume__text strong {
+  font-size: 1rem;
+}
+
+.mbb-active-resume__text span {
+  color: rgba(226, 232, 240, 0.72);
 }
 
 .mbb-field {
@@ -146,14 +172,8 @@
   transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
 }
 
-.mbb-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.mbb-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
+.mbb-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.mbb-btn:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .mbb-btn--primary {
   color: #062116;
@@ -167,13 +187,15 @@
   box-shadow: 0 14px 28px rgba(16, 185, 129, 0.16);
 }
 
-body.mbb-battle-active {
-  overflow: hidden;
+.mbb-btn--ghost {
+  color: #dffaf0;
+  background: rgba(8, 24, 18, 0.92);
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
 }
 
-#tab-batalha-bonus.mbb-tab-fullscreen {
-  position: static !important;
-}
+body.mbb-battle-active { overflow: hidden; }
+#tab-batalha-bonus.mbb-tab-fullscreen { position: static !important; }
 
 .mbb-battle-stage {
   position: fixed;
@@ -184,10 +206,10 @@ body.mbb-battle-active {
   border-radius: 34px;
   border: 1px solid rgba(36, 108, 76, 0.38);
   background:
-    radial-gradient(circle at 15% 18%, rgba(17, 94, 70, 0.14), transparent 18%),
-    radial-gradient(circle at 84% 22%, rgba(21, 128, 61, 0.08), transparent 20%),
-    radial-gradient(circle at 50% 78%, rgba(6, 95, 70, 0.08), transparent 22%),
-    linear-gradient(180deg, rgba(4, 8, 8, 0.992), rgba(5, 13, 10, 0.996));
+    radial-gradient(circle at 15% 18%, rgba(17, 94, 70, 0.1), transparent 18%),
+    radial-gradient(circle at 84% 22%, rgba(21, 128, 61, 0.06), transparent 20%),
+    radial-gradient(circle at 50% 78%, rgba(6, 95, 70, 0.06), transparent 22%),
+    linear-gradient(180deg, rgba(4, 8, 8, 0.995), rgba(5, 13, 10, 0.998));
   box-shadow: 0 40px 120px rgba(0, 0, 0, 0.56);
   overflow: hidden;
 }
@@ -197,8 +219,8 @@ body.mbb-battle-active {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at center, rgba(16, 185, 129, 0.06), transparent 42%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 0, rgba(255,255,255,0) 16%, rgba(255,255,255,0) 84%, rgba(255,255,255,0.016) 100%);
+    radial-gradient(circle at center, rgba(16, 185, 129, 0.04), transparent 42%),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 0, rgba(255,255,255,0) 16%, rgba(255,255,255,0) 84%, rgba(255,255,255,0.012) 100%);
   pointer-events: none;
 }
 
@@ -206,7 +228,7 @@ body.mbb-battle-active {
   position: relative;
   z-index: 3;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 16px 16px 6px;
   background: linear-gradient(180deg, rgba(5, 9, 8, 0.78), rgba(5, 9, 8, 0));
   backdrop-filter: blur(6px);
@@ -223,37 +245,18 @@ body.mbb-battle-active {
   position: relative;
   z-index: 2;
   flex: 1;
-  padding: 10px 16px 18px;
+  padding: 10px 18px 20px;
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(34, 197, 94, 0.45) rgba(255,255,255,0.06);
 }
 
-.mbb-bracket-wrap::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
+.mbb-bracket-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
+.mbb-bracket-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 999px; }
+.mbb-bracket-wrap::-webkit-scrollbar-thumb { background: rgba(34, 197, 94, 0.34); border-radius: 999px; }
 
-.mbb-bracket-wrap::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.04);
-  border-radius: 999px;
-}
-
-.mbb-bracket-wrap::-webkit-scrollbar-thumb {
-  background: rgba(34, 197, 94, 0.34);
-  border-radius: 999px;
-}
-
-.mbb-bracket-stage {
-  position: relative;
-  min-height: 620px;
-}
-
-.mbb-board {
-  position: relative;
-  transform-origin: top left;
-  will-change: transform;
-}
+.mbb-bracket-stage { position: relative; min-height: 620px; }
+.mbb-board { position: relative; transform-origin: top left; will-change: transform; }
 
 .mbb-board-lines {
   position: absolute;
@@ -274,14 +277,14 @@ body.mbb-battle-active {
 
 .mbb-round-title {
   position: absolute;
-  top: 8px;
+  top: 10px;
   text-align: center;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #c7ffe6;
-  text-shadow: 0 0 16px rgba(16, 185, 129, 0.22);
+  text-shadow: 0 0 16px rgba(16, 185, 129, 0.16);
 }
 
 .mbb-match-card {
@@ -298,20 +301,18 @@ body.mbb-battle-active {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), transparent 42%, rgba(20, 184, 166, 0.04));
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent 42%, rgba(20, 184, 166, 0.03));
   pointer-events: none;
 }
 
-.mbb-match-card.is-resolved {
-  box-shadow: 0 20px 52px rgba(16, 185, 129, 0.12), 0 18px 40px rgba(0, 0, 0, 0.4);
-}
+.mbb-match-card.is-resolved { box-shadow: 0 20px 52px rgba(16, 185, 129, 0.1), 0 18px 40px rgba(0, 0, 0, 0.4); }
 
 .mbb-match-card-bg {
   position: absolute;
   inset: 0;
   background:
     radial-gradient(circle at top right, rgba(110, 231, 183, 0.04), transparent 22%),
-    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.07), transparent 26%);
+    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.05), transparent 26%);
   pointer-events: none;
 }
 
@@ -319,73 +320,68 @@ body.mbb-battle-active {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px 74px;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 64px 66px;
+  gap: 8px;
   align-items: center;
   margin: 12px 12px 0;
-  padding: 10px 10px 11px;
+  padding: 10px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.028);
   border: 1px solid rgba(255, 255, 255, 0.035);
 }
 
-.mbb-side-row:last-child {
-  margin-bottom: 12px;
-}
+.mbb-side-row:last-child { margin-bottom: 12px; }
 
 .mbb-side-row.is-win {
-  background: linear-gradient(135deg, rgba(20, 120, 78, 0.22), rgba(11, 78, 56, 0.18));
+  background: linear-gradient(135deg, rgba(20, 120, 78, 0.2), rgba(11, 78, 56, 0.16));
   border-color: rgba(78, 220, 145, 0.24);
   box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.04), 0 12px 28px rgba(16, 185, 129, 0.08);
 }
 
 .mbb-player-stack {
   display: grid;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 8px;
   min-width: 0;
 }
 
 .mbb-mini-input,
 .mbb-mini-select {
-  min-height: 46px;
+  min-height: 38px;
   border-radius: 14px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 13px;
   font-weight: 800;
 }
 
 .mbb-mini-input--name {
-  font-size: 18px;
+  min-height: 44px;
+  font-size: 17px;
   font-weight: 950;
   letter-spacing: 0.01em;
-  padding-top: 11px;
-  padding-bottom: 11px;
 }
 
 .mbb-mini-input--bonus {
-  font-size: 12px;
+  min-height: 34px;
+  font-size: 11px;
   color: #c4ffe5;
-  min-height: 42px;
-  padding-top: 9px;
-  padding-bottom: 9px;
 }
 
 .mbb-mini-input--value {
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 950;
-  min-height: 94px;
-  padding: 0 10px;
+  min-height: 86px;
+  padding: 0 8px;
 }
 
 .mbb-mini-select {
   text-align: center;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 950;
-  min-height: 94px;
-  padding: 0 8px;
+  min-height: 86px;
+  padding: 0 6px;
 }
 
 .mbb-mini-select.is-win {
@@ -416,6 +412,11 @@ body.mbb-battle-active {
 
   .mbb-create-form {
     grid-template-columns: 1fr;
+  }
+
+  .mbb-active-resume {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .mbb-battle-stage {
