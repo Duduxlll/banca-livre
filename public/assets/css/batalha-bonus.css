@@ -351,18 +351,19 @@ min-height: 100%;
   pointer-events: none;
 }
 
-.mbb-side-row {
+
+  .mbb-side-row {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px 66px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 54px 54px;
+  gap: 6px;
   align-items: center;
-  margin: 12px 12px 0;
-  padding: 10px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.028);
-  border: 1px solid rgba(255, 255, 255, 0.035);
+  margin: 8px 8px 0;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.024);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .mbb-side-row:last-child { margin-bottom: 12px; }
@@ -376,7 +377,7 @@ min-height: 100%;
 .mbb-player-stack {
   display: grid;
   grid-template-rows: auto auto;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
