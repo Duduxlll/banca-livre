@@ -13,24 +13,24 @@
   min-height: 520px;
   overflow: hidden;
   border-radius: 30px;
-  border: 1px solid rgba(52, 211, 153, 0.16);
+  border: 1px solid rgba(28, 94, 65, 0.34);
   background:
-    radial-gradient(circle at 12% 16%, rgba(16, 185, 129, 0.18), transparent 26%),
-    radial-gradient(circle at 80% 18%, rgba(34, 197, 94, 0.16), transparent 28%),
-    radial-gradient(circle at 52% 88%, rgba(20, 184, 166, 0.14), transparent 34%),
-    linear-gradient(145deg, rgba(2, 14, 10, 0.98), rgba(5, 38, 24, 0.98));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+    radial-gradient(circle at 12% 16%, rgba(20, 120, 78, 0.14), transparent 26%),
+    radial-gradient(circle at 80% 18%, rgba(17, 94, 89, 0.1), transparent 28%),
+    radial-gradient(circle at 52% 88%, rgba(20, 184, 166, 0.06), transparent 34%),
+    linear-gradient(145deg, rgba(3, 8, 7, 0.99), rgba(6, 16, 12, 0.99));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
 }
 
 .mbb-create-noise {
   position: absolute;
   inset: -30%;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    radial-gradient(circle at 30% 70%, rgba(16, 185, 129, 0.12), transparent 18%),
-    radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.12), transparent 18%);
+    radial-gradient(circle, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 30% 70%, rgba(16, 185, 129, 0.08), transparent 18%),
+    radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.06), transparent 18%);
   background-size: 22px 22px, auto, auto;
-  opacity: 0.55;
+  opacity: 0.45;
   filter: blur(0.3px);
   animation: mbbPulse 12s linear infinite;
   pointer-events: none;
@@ -43,10 +43,10 @@
   margin: 42px auto;
   padding: 34px;
   border-radius: 28px;
-  border: 1px solid rgba(52, 211, 153, 0.14);
-  background: linear-gradient(180deg, rgba(4, 24, 16, 0.82), rgba(5, 30, 20, 0.74));
+  border: 1px solid rgba(35, 120, 84, 0.28);
+  background: linear-gradient(180deg, rgba(5, 14, 11, 0.92), rgba(8, 18, 14, 0.88));
   backdrop-filter: blur(18px);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.4);
 }
 
 .mbb-create-badge {
@@ -59,8 +59,8 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #9cf6d2;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(52, 211, 153, 0.2);
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.18);
 }
 
 .mbb-create-title {
@@ -103,10 +103,10 @@
 .mbb-select,
 .mbb-mini-input,
 .mbb-mini-select {
-  border: 1px solid rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(38, 103, 74, 0.46);
   outline: none;
   color: #f8fbff;
-  background: rgba(2, 18, 12, 0.86);
+  background: rgba(2, 10, 8, 0.96);
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
 }
 
@@ -123,14 +123,14 @@
 .mbb-select:focus,
 .mbb-mini-input:focus,
 .mbb-mini-select:focus {
-  border-color: rgba(52, 211, 153, 0.72);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+  border-color: rgba(52, 211, 153, 0.62);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
   transform: translateY(-1px);
 }
 
 .mbb-input::placeholder,
 .mbb-mini-input::placeholder {
-  color: rgba(203, 213, 225, 0.42);
+  color: rgba(203, 213, 225, 0.34);
 }
 
 .mbb-btn {
@@ -157,54 +157,96 @@
 
 .mbb-btn--primary {
   color: #062116;
-  background: linear-gradient(135deg, #6ee7b7, #34d399);
-  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.24);
+  background: linear-gradient(135deg, #5ee7b0, #1f9f6c);
+  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.16);
 }
 
 .mbb-btn--danger {
-  color: #f4fff9;
-  background: linear-gradient(135deg, #15803d, #22c55e);
-  box-shadow: 0 18px 34px rgba(34, 197, 94, 0.24);
+  color: #eefcf5;
+  background: linear-gradient(135deg, #157347, #1d8f5b);
+  box-shadow: 0 14px 28px rgba(16, 185, 129, 0.16);
 }
 
-.mbb-battle-stage {
-  border-radius: 32px;
-  border: 1px solid rgba(52, 211, 153, 0.16);
-  background:
-    radial-gradient(circle at 12% 20%, rgba(16, 185, 129, 0.14), transparent 18%),
-    radial-gradient(circle at 78% 18%, rgba(34, 197, 94, 0.12), transparent 22%),
-    radial-gradient(circle at 50% 88%, rgba(20, 184, 166, 0.12), transparent 20%),
-    linear-gradient(180deg, rgba(2, 18, 12, 0.985), rgba(4, 34, 22, 0.99));
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
+body.mbb-battle-active {
   overflow: hidden;
 }
 
+#tab-batalha-bonus.mbb-tab-fullscreen {
+  position: static !important;
+}
+
+.mbb-battle-stage {
+  position: fixed;
+  inset: 14px 18px 18px 18px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  border-radius: 34px;
+  border: 1px solid rgba(36, 108, 76, 0.38);
+  background:
+    radial-gradient(circle at 15% 18%, rgba(17, 94, 70, 0.14), transparent 18%),
+    radial-gradient(circle at 84% 22%, rgba(21, 128, 61, 0.08), transparent 20%),
+    radial-gradient(circle at 50% 78%, rgba(6, 95, 70, 0.08), transparent 22%),
+    linear-gradient(180deg, rgba(4, 8, 8, 0.992), rgba(5, 13, 10, 0.996));
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.56);
+  overflow: hidden;
+}
+
+.mbb-battle-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(16, 185, 129, 0.06), transparent 42%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.016) 0, rgba(255,255,255,0) 16%, rgba(255,255,255,0) 84%, rgba(255,255,255,0.016) 100%);
+  pointer-events: none;
+}
+
 .mbb-board-actions {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 3;
   display: flex;
   justify-content: flex-end;
-  padding: 14px 14px 2px;
-  background: linear-gradient(180deg, rgba(2, 18, 12, 0.8), rgba(2, 18, 12, 0));
-  backdrop-filter: blur(5px);
+  padding: 16px 16px 6px;
+  background: linear-gradient(180deg, rgba(5, 9, 8, 0.78), rgba(5, 9, 8, 0));
+  backdrop-filter: blur(6px);
 }
 
 .mbb-board-actions .mbb-btn {
-  padding: 10px 16px;
-  min-height: 40px;
+  padding: 10px 15px;
+  min-height: 38px;
   border-radius: 14px;
   font-size: 13px;
 }
 
 .mbb-bracket-wrap {
-  padding: 6px 0 18px;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  padding: 10px 16px 18px;
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 197, 94, 0.45) rgba(255,255,255,0.06);
+}
+
+.mbb-bracket-wrap::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.mbb-bracket-wrap::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+  border-radius: 999px;
+}
+
+.mbb-bracket-wrap::-webkit-scrollbar-thumb {
+  background: rgba(34, 197, 94, 0.34);
+  border-radius: 999px;
 }
 
 .mbb-bracket-stage {
   position: relative;
-  min-height: 520px;
+  min-height: 620px;
 }
 
 .mbb-board {
@@ -223,32 +265,32 @@
 
 .mbb-board-lines path {
   fill: none;
-  stroke: rgba(167, 243, 208, 0.58);
-  stroke-width: 2.4;
+  stroke: rgba(123, 211, 163, 0.44);
+  stroke-width: 2.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.12));
+  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.08));
 }
 
 .mbb-round-title {
   position: absolute;
-  top: 10px;
+  top: 8px;
   text-align: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #9cf6d2;
-  text-shadow: 0 0 18px rgba(52, 211, 153, 0.28);
+  color: #c7ffe6;
+  text-shadow: 0 0 16px rgba(16, 185, 129, 0.22);
 }
 
 .mbb-match-card {
   position: absolute;
   overflow: hidden;
-  border-radius: 22px;
-  border: 1px solid rgba(52, 211, 153, 0.14);
-  background: linear-gradient(180deg, rgba(3, 22, 14, 0.94), rgba(2, 12, 8, 0.96));
-  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.34);
+  border-radius: 24px;
+  border: 1px solid rgba(39, 112, 78, 0.42);
+  background: linear-gradient(180deg, rgba(6, 11, 10, 0.98), rgba(3, 8, 7, 0.99));
+  box-shadow: 0 24px 44px rgba(0, 0, 0, 0.38);
 }
 
 .mbb-match-card::before {
@@ -256,20 +298,20 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent 42%, rgba(20, 184, 166, 0.06));
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), transparent 42%, rgba(20, 184, 166, 0.04));
   pointer-events: none;
 }
 
 .mbb-match-card.is-resolved {
-  box-shadow: 0 20px 50px rgba(34, 197, 94, 0.18), 0 18px 40px rgba(0, 0, 0, 0.36);
+  box-shadow: 0 20px 52px rgba(16, 185, 129, 0.12), 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 
 .mbb-match-card-bg {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top right, rgba(110, 231, 183, 0.08), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.1), transparent 28%);
+    radial-gradient(circle at top right, rgba(110, 231, 183, 0.04), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.07), transparent 26%);
   pointer-events: none;
 }
 
@@ -277,20 +319,24 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 90px 92px;
+  grid-template-columns: minmax(0, 1fr) 78px 74px;
   gap: 10px;
-  align-items: stretch;
-  margin: 10px 12px;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  align-items: center;
+  margin: 12px 12px 0;
+  padding: 10px 10px 11px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.mbb-side-row:last-child {
+  margin-bottom: 12px;
 }
 
 .mbb-side-row.is-win {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.14));
-  border-color: rgba(74, 222, 128, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.06), 0 14px 28px rgba(16, 185, 129, 0.1);
+  background: linear-gradient(135deg, rgba(20, 120, 78, 0.22), rgba(11, 78, 56, 0.18));
+  border-color: rgba(78, 220, 145, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.04), 0 12px 28px rgba(16, 185, 129, 0.08);
 }
 
 .mbb-player-stack {
@@ -302,41 +348,50 @@
 
 .mbb-mini-input,
 .mbb-mini-select {
-  min-height: 42px;
-  border-radius: 12px;
+  min-height: 46px;
+  border-radius: 14px;
   padding: 10px 12px;
   font-size: 13px;
   font-weight: 800;
 }
 
 .mbb-mini-input--name {
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 950;
   letter-spacing: 0.01em;
+  padding-top: 11px;
+  padding-bottom: 11px;
 }
 
 .mbb-mini-input--bonus {
   font-size: 12px;
   color: #c4ffe5;
+  min-height: 42px;
+  padding-top: 9px;
+  padding-bottom: 9px;
 }
 
 .mbb-mini-input--value {
   text-align: center;
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 950;
+  min-height: 94px;
+  padding: 0 10px;
 }
 
 .mbb-mini-select {
   text-align: center;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 950;
+  min-height: 94px;
+  padding: 0 8px;
 }
 
 .mbb-mini-select.is-win {
   color: #dbffe9;
-  border-color: rgba(74, 222, 128, 0.36);
-  background: rgba(7, 54, 31, 0.9);
+  border-color: rgba(74, 222, 128, 0.34);
+  background: rgba(7, 54, 31, 0.88);
 }
 
 .mbb-empty {
@@ -352,7 +407,7 @@
   to { transform: translate3d(0, -16px, 0) scale(1.03); }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1100px) {
   .mbb-create-card {
     width: calc(100% - 28px);
     margin: 18px auto;
@@ -363,11 +418,12 @@
     grid-template-columns: 1fr;
   }
 
-  .mbb-board-actions {
-    justify-content: stretch;
+  .mbb-battle-stage {
+    inset: 10px;
+    border-radius: 24px;
   }
 
   .mbb-board-actions .mbb-btn {
-    width: 100%;
+    width: auto;
   }
 }

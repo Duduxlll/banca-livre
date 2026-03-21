@@ -81,8 +81,8 @@
           <div class="mbb-create-noise"></div>
           <div class="mbb-create-card">
             <div class="mbb-create-badge">BATALHA BÔNUS</div>
-            <h2 class="mbb-create-title">Monta a chave manual e resolve tudo dentro do site.</h2>
-            <p class="mbb-create-copy">Escolhe 8, 16 ou 32 vagas. Depois a estrutura completa aparece em formato de campeonato para tu preencher nome, bônus, valor e WIN ou LOSE direto na chave.</p>
+            <h2 class="mbb-create-title">Monta a chave manual e resolve tudo no site.</h2>
+            <p class="mbb-create-copy">Escolhe 8, 16 ou 32 vagas. Depois a chave abre em tela cheia para tu preencher nome, bônus, valor e WIN ou LOSE diretamente em cada confronto.</p>
             <div class="mbb-create-form">
               <label class="mbb-field">
                 <span>Nome da batalha</span>
@@ -135,7 +135,7 @@
       const card = target.closest('[data-match-card="1"]');
       if (!card) return;
       if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
-        markCardState(card, 'pending', 'Salvando...');
+        markCardState(card, 'pending');
         scheduleSave(card, 700);
       }
     });
@@ -162,11 +162,9 @@
     return tab;
   }
 
-  function markCardState(card, kind, label) {
+  function markCardState(card, kind) {
     if (!card) return;
     card.dataset.saveStateKind = kind || '';
-    const node = qs('[data-role="saveState"]', card);
-    if (node) node.textContent = label || 'Pronto';
   }
 
   function scheduleSave(card, delay = 500) {
@@ -181,7 +179,7 @@
     const matchId = String(card?.dataset.matchId || '');
     if (!matchId || savingMatches.has(matchId) || battleFinished()) return;
     savingMatches.add(matchId);
-    markCardState(card, 'saving', 'Salvando...');
+    markCardState(card, 'saving');
 
     try {
       const res = await apiFetch(`/api/batalha-bonus/admin/matches/${encodeURIComponent(matchId)}`, {
@@ -191,7 +189,7 @@
       state = res || state;
       renderBattle();
     } catch (e) {
-      markCardState(card, 'error', e.message || 'Erro');
+      markCardState(card, 'error');
       if (String(e.message || '') === 'duplo_win') {
         notify('Só um lado pode ficar com WIN.', 'error');
       }
@@ -200,15 +198,23 @@
     }
   }
 
+  function getBoardPreset(firstRoundCount) {
+    if (firstRoundCount <= 4) {
+      return { cardWidth: 480, cardHeight: 176, laneGap: 122, baseGap: 30, minScale: 0.84 };
+    }
+    if (firstRoundCount <= 8) {
+      return { cardWidth: 450, cardHeight: 162, laneGap: 112, baseGap: 22, minScale: 0.76 };
+    }
+    return { cardWidth: 420, cardHeight: 148, laneGap: 100, baseGap: 16, minScale: 0.66 };
+  }
+
   function computeBoardGeometry(rounds) {
-    const cardWidth = 380;
-    const cardHeight = 138;
-    const laneGap = 118;
-    const baseGap = 24;
-    const leftPadding = 28;
-    const topPadding = 54;
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
-    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 24;
+    const preset = getBoardPreset(firstRoundCount);
+    const { cardWidth, cardHeight, laneGap, baseGap } = preset;
+    const leftPadding = 32;
+    const topPadding = 64;
+    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 30;
     const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
 
     const roundMeta = rounds.map((round, roundIdx) => {
@@ -220,19 +226,8 @@
         x,
         y: Math.round(firstTop + matchIdx * step)
       }));
-      return {
-        round,
-        x,
-        cards
-      };
+      return { round, x, cards };
     });
-
-    const posMap = new Map();
-    for (const meta of roundMeta) {
-      for (const c of meta.cards) {
-        posMap.set(String(c.match.id), { x: c.x, y: c.y });
-      }
-    }
 
     const lines = [];
     for (const meta of roundMeta) {
@@ -255,11 +250,18 @@
       cardWidth,
       cardHeight,
       laneGap,
+      minScale: preset.minScale,
       totalWidth,
       totalHeight,
       roundMeta,
       lines
     };
+  }
+
+  function setBattleMode(enabled) {
+    document.body.classList.toggle('mbb-battle-active', !!enabled);
+    const tab = qs('#tab-batalha-bonus');
+    if (tab) tab.classList.toggle('mbb-tab-fullscreen', !!enabled);
   }
 
   function renderBattle() {
@@ -268,6 +270,7 @@
     const hasBattle = !!state?.battle;
     if (createStage) createStage.style.display = hasBattle ? 'none' : '';
     if (battleStage) battleStage.style.display = hasBattle ? '' : 'none';
+    setBattleMode(hasBattle);
     if (!hasBattle) return;
 
     const rounds = Array.isArray(state?.rounds) ? state.rounds : [];
@@ -276,7 +279,6 @@
     const finalizeBtn = qs('#mbbFinalizeBtn');
 
     if (!stage || !wrap) return;
-
     if (finalizeBtn) finalizeBtn.disabled = battleFinished() || !state?.battle?.championName;
 
     if (!rounds.length) {
@@ -285,11 +287,10 @@
     }
 
     const geo = computeBoardGeometry(rounds);
-    const availableWidth = Math.max(620, wrap.clientWidth - 14);
-    const maxHeight = Math.max(560, Math.min(window.innerHeight - 220, 880));
-    const naturalScale = Math.min(1, availableWidth / geo.totalWidth, maxHeight / geo.totalHeight);
-    const scale = naturalScale < 0.58 ? 0.58 : naturalScale;
-    const scaledHeight = Math.round(geo.totalHeight * scale);
+    const availableWidth = Math.max(860, wrap.clientWidth - 40);
+    const widthScale = availableWidth / geo.totalWidth;
+    const scale = Math.min(1, Math.max(geo.minScale, widthScale));
+    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 24;
 
     stage.style.height = `${scaledHeight}px`;
     stage.innerHTML = `
