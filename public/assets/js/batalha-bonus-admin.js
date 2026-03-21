@@ -1,7 +1,6 @@
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
-  const qsa = (s, r = document) => Array.from(r.querySelectorAll(s));
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\\^])/g, '\\$1') + '=([^;]*)'));
@@ -16,12 +15,10 @@
       if (csrf) headers['X-CSRF-Token'] = csrf;
     }
     const res = await fetch(`${API}${path}`, { credentials: 'include', ...opts, headers });
-    if (!res.ok) {
-      let err = null;
-      try { err = await res.json(); } catch {}
-      throw new Error(err?.error || `HTTP ${res.status}`);
-    }
-    return res.status === 204 ? null : res.json();
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
   }
 
   function notify(msg, type = 'ok') {
@@ -30,300 +27,321 @@
   }
 
   const esc = (s = '') => String(s).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-  const brl = (cents = 0) => (Number(cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const toReaisInput = (cents = 0) => {
+
+  const brl = (cents = 0) => (Number(cents || 0) / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
+
+  function toReaisInput(cents = 0) {
     const n = Number(cents || 0) / 100;
-    return Number.isFinite(n) ? String(n).replace('.', ',') : '0';
-  };
-  const fromReaisInput = (value) => {
+    if (!Number.isFinite(n)) return '0,00';
+    return n.toFixed(2).replace('.', ',');
+  }
+
+  function fromReaisInput(value) {
     const s = String(value || '').trim().replace(/\./g, '').replace(',', '.');
     const n = Number(s);
     if (!Number.isFinite(n) || n < 0) return 0;
     return Math.round(n * 100);
-  };
+  }
+
+  function statusLabel(status) {
+    const s = String(status || '').toUpperCase();
+    if (s === 'ACTIVE') return 'Batalha ativa';
+    if (s === 'FINISHED') return 'Batalha finalizada';
+    return s || '—';
+  }
+
+  function roundGlowClass(roundName = '') {
+    const s = String(roundName || '').toLowerCase();
+    if (s.includes('top 32')) return 'is-top32';
+    if (s.includes('oitavas')) return 'is-oitavas';
+    if (s.includes('quartas')) return 'is-quartas';
+    if (s.includes('semi')) return 'is-semi';
+    if (s.includes('final')) return 'is-final';
+    return 'is-default';
+  }
 
   let state = null;
-  let initialized = false;
   let poll = null;
+  let initialized = false;
 
   function ensureUI() {
     const tab = qs('#tab-batalha-bonus');
     if (!tab) return null;
-    if (qs('#bbRoot', tab)) return tab;
+    if (qs('#mbbRoot', tab)) return tab;
 
     tab.innerHTML = `
-      <div id="bbRoot" class="bb-root">
-        <div class="card bb-card">
-          <div class="bb-top">
-            <div>
-              <h2 class="bb-title">Batalha bônus</h2>
-              <div id="bbStatusText" class="bb-status-text">Nenhuma batalha ativa.</div>
+      <div id="mbbRoot" class="mbb-root">
+        <section id="mbbCreateStage" class="mbb-create-stage">
+          <div class="mbb-create-backdrop"></div>
+          <div class="mbb-create-grid">
+            <div class="mbb-intro-card">
+              <span class="mbb-kicker">BATALHA BÔNUS MANUAL</span>
+              <h2 class="mbb-main-title">Cria a chave completa e controla tudo dentro do site.</h2>
+              <p class="mbb-main-copy">Sem Twitch, sem planilha, sem histórico separado. Tu monta os confrontos, escreve nome, bônus, valor e escolhe win ou lose direto na estrutura da batalha.</p>
+              <div class="mbb-intro-pills">
+                <span>8 vagas</span>
+                <span>16 vagas</span>
+                <span>32 vagas</span>
+                <span>Brackets automáticos</span>
+                <span>Manual total</span>
+              </div>
             </div>
-            <div class="bb-actions">
-              <button class="btn btn--primary" id="bbRefreshBtn">Atualizar</button>
-              <button class="btn" id="bbOpenRegBtn">Abrir inscrições</button>
-              <button class="btn" id="bbCloseRegBtn">Fechar inscrições</button>
-              <button class="btn" id="bbOpenChoicesBtn">Abrir escolhas</button>
-              <button class="btn" id="bbCloseChoicesBtn">Fechar escolhas</button>
-              <button class="btn" id="bbNextRoundBtn">Próxima fase</button>
-              <button class="btn btn--danger" id="bbFinishBtn">Finalizar</button>
-            </div>
-          </div>
-          <div class="bb-pills" id="bbPills"></div>
-        </div>
 
-        <div class="card bb-card" id="bbCreateCard">
-          <div class="bb-top">
-            <div>
-              <h3 class="bb-subtitle">Criar batalha</h3>
-              <div class="bb-muted">Limite configurado até 32 jogadores.</div>
+            <div class="mbb-create-card">
+              <div class="mbb-create-glow"></div>
+              <div class="mbb-create-inner">
+                <div class="mbb-card-head">
+                  <div class="mbb-card-icon">⚔️</div>
+                  <div>
+                    <h3>Criar batalha</h3>
+                    <p>Escolhe o nome e o tamanho da chave.</p>
+                  </div>
+                </div>
+                <label class="mbb-field">
+                  <span>Nome da batalha</span>
+                  <input id="mbbName" class="mbb-input" placeholder="Batalha da madrugada">
+                </label>
+                <label class="mbb-field">
+                  <span>Vagas</span>
+                  <select id="mbbSlots" class="mbb-input">
+                    <option value="8">8 jogadores</option>
+                    <option value="16">16 jogadores</option>
+                    <option value="32" selected>32 jogadores</option>
+                  </select>
+                </label>
+                <button id="mbbCreateBtn" class="mbb-btn mbb-btn--primary">Criar batalha</button>
+              </div>
             </div>
-            <button class="btn btn--primary" id="bbCreateBtn">Criar batalha</button>
           </div>
-          <div class="bb-form-grid">
-            <div>
-              <label class="bb-label">Nome</label>
-              <input id="bbName" class="input" placeholder="Batalha da madrugada">
-            </div>
-            <div>
-              <label class="bb-label">Vagas</label>
-              <select id="bbSlots" class="input">
-                <option value="8">8</option>
-                <option value="16">16</option>
-                <option value="32" selected>32</option>
-              </select>
-            </div>
-            <div>
-              <label class="bb-label">Comando de entrada</label>
-              <input id="bbEntryCommand" class="input" placeholder="!batalha" value="!batalha">
-            </div>
-          </div>
-        </div>
+        </section>
 
-        <div class="bb-grid">
-          <div class="card bb-card">
-            <div class="bb-section-head">
-              <h3 class="bb-subtitle">Participantes</h3>
-              <span id="bbParticipantsCount" class="bb-chip">0</span>
+        <section id="mbbBattleStage" class="mbb-battle-stage" style="display:none;">
+          <div class="mbb-hero">
+            <div class="mbb-hero-orb mbb-hero-orb--one"></div>
+            <div class="mbb-hero-orb mbb-hero-orb--two"></div>
+            <div class="mbb-hero-top">
+              <div>
+                <span class="mbb-kicker" id="mbbHeroKicker">BATALHA ATIVA</span>
+                <h2 id="mbbBattleName" class="mbb-battle-name">Batalha bônus</h2>
+                <p id="mbbBattleSubtitle" class="mbb-battle-subtitle">Controle manual completo</p>
+              </div>
+              <div class="mbb-hero-actions">
+                <button class="mbb-btn mbb-btn--ghost" data-mbb-action="refresh">Atualizar</button>
+                <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
+              </div>
             </div>
-            <div id="bbParticipants" class="bb-list bb-list--table"></div>
+            <div id="mbbStats" class="mbb-stats"></div>
+            <div id="mbbChampionWrap" class="mbb-champion-wrap"></div>
           </div>
 
-          <div class="card bb-card">
-            <div class="bb-section-head">
-              <h3 class="bb-subtitle">Confrontos da fase</h3>
-              <span id="bbRoundName" class="bb-chip">—</span>
-            </div>
-            <div id="bbMatches" class="bb-matches"></div>
+          <div class="mbb-board-wrap">
+            <div id="mbbRounds" class="mbb-rounds"></div>
           </div>
-        </div>
-
-        <div class="card bb-card">
-          <div class="bb-section-head">
-            <h3 class="bb-subtitle">Histórico</h3>
-            <span id="bbHistoryCount" class="bb-chip">0</span>
-          </div>
-          <div id="bbHistory" class="bb-history"></div>
-        </div>
+        </section>
       </div>
     `;
 
-    qs('#bbRefreshBtn', tab)?.addEventListener('click', () => refresh());
-    qs('#bbCreateBtn', tab)?.addEventListener('click', createBattle);
-    qs('#bbOpenRegBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/open-registration', 'Inscrições abertas.'));
-    qs('#bbCloseRegBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/close-registration', 'Inscrições fechadas.'));
-    qs('#bbOpenChoicesBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/open-choices', 'Escolhas abertas.'));
-    qs('#bbCloseChoicesBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/close-choices', 'Escolhas fechadas.'));
-    qs('#bbNextRoundBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/next-round', 'Próxima fase criada.'));
-    qs('#bbFinishBtn', tab)?.addEventListener('click', () => runAction('/api/batalha-bonus/admin/finalize', 'Batalha finalizada.'));
+    qs('#mbbCreateBtn', tab)?.addEventListener('click', createBattle);
+
+    tab.addEventListener('change', (ev) => {
+      const select = ev.target.closest('[data-role="result"]');
+      if (!select) return;
+      const card = select.closest('[data-match-card="1"]');
+      if (!card) return;
+      const side = select.dataset.side;
+      const other = qs(`[data-role="result"][data-side="${side === 'A' ? 'B' : 'A'}"]`, card);
+      if (select.value === 'WIN' && other) other.value = 'LOSE';
+    });
 
     tab.addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('[data-bb-action]');
+      const btn = ev.target.closest('[data-mbb-action]');
       if (!btn) return;
-      const action = btn.dataset.bbAction;
-      const matchId = btn.dataset.matchId;
-      if (!action || !matchId) return;
+      const action = btn.dataset.mbbAction;
 
-      const card = btn.closest('[data-match-card="1"]');
-      const valueA = fromReaisInput(qs('[data-role="valueA"]', card)?.value || '0');
-      const valueB = fromReaisInput(qs('[data-role="valueB"]', card)?.value || '0');
-
-      if (action === 'auto') {
-        await saveMatch(matchId, { valueA, valueB, winnerMode: 'auto' });
+      if (action === 'refresh') {
+        await refresh();
         return;
       }
 
-      if (action === 'manualA') {
-        await saveMatch(matchId, { valueA, valueB, winnerMode: 'manual', winnerPlayerId: btn.dataset.playerId });
+      if (action === 'finalize') {
+        await finalizeBattle();
         return;
       }
 
-      if (action === 'manualB') {
-        await saveMatch(matchId, { valueA, valueB, winnerMode: 'manual', winnerPlayerId: btn.dataset.playerId });
+      if (action === 'save-match') {
+        const card = btn.closest('[data-match-card="1"]');
+        if (!card) return;
+        const matchId = card.dataset.matchId;
+        await saveMatch(matchId, readCardPayload(card));
       }
     });
 
     return tab;
   }
 
-  function statusLabel(status) {
-    const map = {
-      DRAFT: 'Rascunho',
-      REGISTRATION_OPEN: 'Inscrições abertas',
-      REGISTRATION_CLOSED: 'Inscrições fechadas',
-      CHOICES_OPEN: 'Escolhas abertas',
-      CHOICES_CLOSED: 'Escolhas fechadas',
-      ROUND_RESOLVED: 'Fase resolvida',
-      FINISHED: 'Finalizada'
+  function readCardPayload(card) {
+    return {
+      playerAName: qs('[data-role="playerAName"]', card)?.value?.trim() || '',
+      bonusA: qs('[data-role="bonusA"]', card)?.value?.trim() || '',
+      valueA: fromReaisInput(qs('[data-role="valueA"]', card)?.value || '0'),
+      resultA: qs('[data-role="result"][data-side="A"]', card)?.value || 'LOSE',
+      playerBName: qs('[data-role="playerBName"]', card)?.value?.trim() || '',
+      bonusB: qs('[data-role="bonusB"]', card)?.value?.trim() || '',
+      valueB: fromReaisInput(qs('[data-role="valueB"]', card)?.value || '0'),
+      resultB: qs('[data-role="result"][data-side="B"]', card)?.value || 'LOSE'
     };
-    return map[String(status || '').toUpperCase()] || (status || '—');
-  }
-
-  function setButtons() {
-    const battle = state?.battle || null;
-    const status = String(battle?.status || '');
-    const setDisabled = (id, disabled) => { const el = qs(id); if (el) el.disabled = !!disabled; };
-    setDisabled('#bbOpenRegBtn', !battle || status !== 'DRAFT');
-    setDisabled('#bbCloseRegBtn', !battle || status !== 'REGISTRATION_OPEN');
-    setDisabled('#bbOpenChoicesBtn', !battle || status !== 'REGISTRATION_CLOSED');
-    setDisabled('#bbCloseChoicesBtn', !battle || status !== 'CHOICES_OPEN');
-    setDisabled('#bbNextRoundBtn', !battle || status !== 'ROUND_RESOLVED');
-    setDisabled('#bbFinishBtn', !battle || status === 'FINISHED');
-    const createCard = qs('#bbCreateCard');
-    if (createCard) createCard.style.display = battle ? 'none' : '';
-  }
-
-  function renderHeader() {
-    const battle = state?.battle || null;
-    const counts = state?.counts || { filled: 0, maxPlayers: 0, alive: 0, resolvedCurrentMatches: 0, totalCurrentMatches: 0 };
-    const statusText = qs('#bbStatusText');
-    const pills = qs('#bbPills');
-    if (!battle) {
-      if (statusText) statusText.textContent = 'Nenhuma batalha ativa.';
-      if (pills) pills.innerHTML = '';
-      setButtons();
-      return;
-    }
-
-    if (statusText) {
-      statusText.textContent = `${battle.name} • ${statusLabel(battle.status)} • ${battle.currentRoundName || '—'}`;
-    }
-
-    if (pills) {
-      pills.innerHTML = `
-        <span class="bb-pill">Comando: <strong>${esc(battle.entryCommand)}</strong></span>
-        <span class="bb-pill">Vagas: <strong>${counts.filled}/${battle.maxPlayers}</strong></span>
-        <span class="bb-pill">Vivos: <strong>${counts.alive}</strong></span>
-        <span class="bb-pill">Resolvidos: <strong>${counts.resolvedCurrentMatches}/${counts.totalCurrentMatches}</strong></span>
-        <span class="bb-pill">Fase: <strong>${esc(battle.currentRoundName || '—')}</strong></span>
-      `;
-    }
-
-    setButtons();
-  }
-
-  function renderParticipants() {
-    const wrap = qs('#bbParticipants');
-    const countEl = qs('#bbParticipantsCount');
-    const list = state?.participants || [];
-    if (countEl) countEl.textContent = String(list.length);
-    if (!wrap) return;
-    if (!list.length) {
-      wrap.innerHTML = '<div class="bb-empty">Sem participantes.</div>';
-      return;
-    }
-
-    wrap.innerHTML = `
-      <div class="bb-row bb-row--head">
-        <span>#</span>
-        <span>Nick</span>
-        <span>Status</span>
-      </div>
-      ${list.map((p) => `
-        <div class="bb-row">
-          <span>${p.joinOrder}</span>
-          <span>${esc(p.displayName || p.twitchName)}</span>
-          <span>${p.isActive ? 'Vivo' : `Eliminado${p.eliminatedRound ? ` R${p.eliminatedRound}` : ''}`}</span>
-        </div>
-      `).join('')}
-    `;
-  }
-
-  function renderMatches() {
-    const wrap = qs('#bbMatches');
-    const roundNameEl = qs('#bbRoundName');
-    const battle = state?.battle || null;
-    const matches = state?.currentMatches || [];
-    if (roundNameEl) roundNameEl.textContent = battle?.currentRoundName || '—';
-    if (!wrap) return;
-    if (!battle) {
-      wrap.innerHTML = '<div class="bb-empty">Crie uma batalha.</div>';
-      return;
-    }
-    if (!matches.length) {
-      wrap.innerHTML = '<div class="bb-empty">Ainda não existem confrontos para a fase atual.</div>';
-      return;
-    }
-
-    wrap.innerHTML = matches.map((m) => {
-      const aWinner = m.winnerPlayerId && m.winnerPlayerId === m.playerAId;
-      const bWinner = m.winnerPlayerId && m.winnerPlayerId === m.playerBId;
-      return `
-        <div class="bb-match-card" data-match-card="1">
-          <div class="bb-match-head">
-            <strong>Confronto ${m.matchNumber}</strong>
-            <span class="bb-chip">${m.status === 'RESOLVED' ? 'Resolvido' : 'Pendente'}</span>
-          </div>
-          <div class="bb-player ${aWinner ? 'is-winner' : ''}">
-            <div class="bb-player-top">
-              <strong>${esc(m.playerADisplay || m.playerAName || 'Jogador A')}</strong>
-              <span>${esc(m.bonusA || 'Sem bônus')}</span>
-            </div>
-            <input class="input" data-role="valueA" placeholder="Valor A" value="${esc(toReaisInput(m.valueA))}">
-            <button class="btn ${aWinner ? 'btn--primary' : ''}" data-bb-action="manualA" data-match-id="${m.id}" data-player-id="${m.playerAId}">Vencedor A</button>
-          </div>
-          <div class="bb-vs">VS</div>
-          <div class="bb-player ${bWinner ? 'is-winner' : ''}">
-            <div class="bb-player-top">
-              <strong>${esc(m.playerBDisplay || m.playerBName || 'Jogador B')}</strong>
-              <span>${esc(m.bonusB || 'Sem bônus')}</span>
-            </div>
-            <input class="input" data-role="valueB" placeholder="Valor B" value="${esc(toReaisInput(m.valueB))}">
-            <button class="btn ${bWinner ? 'btn--primary' : ''}" data-bb-action="manualB" data-match-id="${m.id}" data-player-id="${m.playerBId}">Vencedor B</button>
-          </div>
-          <div class="bb-match-actions">
-            <button class="btn btn--primary" data-bb-action="auto" data-match-id="${m.id}">Definir automático</button>
-            <div class="bb-match-result">${m.winnerName ? `Vencedor: ${esc(m.winnerName)} • ${brl(Math.max(m.valueA, m.valueB))}` : 'Aguardando resultado'}</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  function renderHistory() {
-    const wrap = qs('#bbHistory');
-    const countEl = qs('#bbHistoryCount');
-    const matches = state?.matches || [];
-    if (countEl) countEl.textContent = String(matches.length);
-    if (!wrap) return;
-    if (!matches.length) {
-      wrap.innerHTML = '<div class="bb-empty">Sem histórico ainda.</div>';
-      return;
-    }
-    wrap.innerHTML = matches.map((m) => `
-      <div class="bb-history-row">
-        <span>R${m.roundNumber} • ${esc(m.roundName || 'Fase')}</span>
-        <span>${esc(m.playerAName || 'A')} (${esc(m.bonusA || '—')}) ${brl(m.valueA)} x ${brl(m.valueB)} ${esc(m.playerBName || 'B')} (${esc(m.bonusB || '—')})</span>
-        <strong>${esc(m.winnerName || '—')}</strong>
-      </div>
-    `).join('');
   }
 
   function render() {
-    renderHeader();
-    renderParticipants();
-    renderMatches();
-    renderHistory();
+    const hasBattle = !!state?.battle;
+    const createStage = qs('#mbbCreateStage');
+    const battleStage = qs('#mbbBattleStage');
+    if (createStage) createStage.style.display = hasBattle ? 'none' : '';
+    if (battleStage) battleStage.style.display = hasBattle ? '' : 'none';
+    if (!hasBattle) return;
+    renderHero();
+    renderRounds();
+  }
+
+  function renderHero() {
+    const battle = state?.battle || null;
+    const counts = state?.counts || {};
+    if (!battle) return;
+
+    const filled = Number(counts.filledSlots || 0);
+    const maxPlayers = Number(counts.maxPlayers || battle.maxPlayers || 0);
+    const resolvedMatches = Number(counts.resolvedMatches || 0);
+    const totalMatches = Number(counts.totalMatches || 0);
+    const remainingMatches = Number(counts.remainingMatches || Math.max(0, totalMatches - resolvedMatches));
+
+    const battleName = qs('#mbbBattleName');
+    const battleSubtitle = qs('#mbbBattleSubtitle');
+    const heroKicker = qs('#mbbHeroKicker');
+    const stats = qs('#mbbStats');
+    const championWrap = qs('#mbbChampionWrap');
+    const finalizeBtn = qs('#mbbFinalizeBtn');
+
+    if (battleName) battleName.textContent = battle.name || 'Batalha bônus';
+    if (battleSubtitle) battleSubtitle.textContent = `${statusLabel(battle.status)} • ${battle.currentRoundName || 'Estrutura pronta'}`;
+    if (heroKicker) heroKicker.textContent = battle.status === 'FINISHED' ? 'FINALIZADA' : 'MANUAL TOTAL';
+
+    if (stats) {
+      stats.innerHTML = `
+        <div class="mbb-stat-card">
+          <span>Vagas preenchidas</span>
+          <strong>${filled}/${maxPlayers}</strong>
+          <small>${Math.max(0, maxPlayers - filled)} restantes</small>
+        </div>
+        <div class="mbb-stat-card">
+          <span>Confrontos resolvidos</span>
+          <strong>${resolvedMatches}/${totalMatches}</strong>
+          <small>${remainingMatches} pendentes</small>
+        </div>
+        <div class="mbb-stat-card">
+          <span>Fase atual</span>
+          <strong>${esc(battle.currentRoundName || '—')}</strong>
+          <small>Estrutura completa visível</small>
+        </div>
+      `;
+    }
+
+    if (championWrap) {
+      championWrap.innerHTML = battle.championName
+        ? `<div class="mbb-champion-card"><span>🏆 Campeão atual</span><strong>${esc(battle.championName)}</strong></div>`
+        : `<div class="mbb-champion-card is-empty"><span>🏆 Campeão atual</span><strong>Aguardando final</strong></div>`;
+    }
+
+    if (finalizeBtn) finalizeBtn.disabled = battle.status === 'FINISHED' || !battle.championName;
+  }
+
+  function renderRounds() {
+    const roundsWrap = qs('#mbbRounds');
+    if (!roundsWrap) return;
+    const rounds = state?.rounds || [];
+    const battleFinished = String(state?.battle?.status || '').toUpperCase() === 'FINISHED';
+
+    if (!rounds.length) {
+      roundsWrap.innerHTML = '<div class="mbb-empty">Nenhuma estrutura encontrada.</div>';
+      return;
+    }
+
+    roundsWrap.innerHTML = rounds.map((round) => {
+      const resolved = Number(round.resolvedMatches || 0);
+      const total = Number(round.totalMatches || 0);
+      return `
+        <section class="mbb-round ${roundGlowClass(round.roundName)}">
+          <div class="mbb-round-head">
+            <div>
+              <span class="mbb-round-kicker">Fase ${round.roundNumber}</span>
+              <h3>${esc(round.roundName || 'Fase')}</h3>
+            </div>
+            <div class="mbb-round-badge">${resolved}/${total}</div>
+          </div>
+
+          <div class="mbb-round-list">
+            ${round.matches.map((match) => {
+              const winnerSide = String(match.winnerSide || '').toUpperCase();
+              const isAWin = winnerSide === 'A';
+              const isBWin = winnerSide === 'B';
+              const disabled = battleFinished ? 'disabled' : '';
+              return `
+                <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(match.id)}">
+                  <div class="mbb-match-head">
+                    <div>
+                      <span class="mbb-match-label">Confronto ${match.matchNumber}</span>
+                      <strong>${esc(round.roundName || 'Fase')}</strong>
+                    </div>
+                    <div class="mbb-match-score">${brl(match.valueA)} <span>vs</span> ${brl(match.valueB)}</div>
+                  </div>
+
+                  <div class="mbb-player ${isAWin ? 'is-win' : ''}">
+                    <div class="mbb-player-side">A</div>
+                    <div class="mbb-fields">
+                      <input class="mbb-input" data-role="playerAName" placeholder="Nome do jogador" value="${esc(match.playerAName || '')}" ${disabled}>
+                      <input class="mbb-input" data-role="bonusA" placeholder="Nome do bônus" value="${esc(match.bonusA || '')}" ${disabled}>
+                    </div>
+                    <div class="mbb-mini-fields">
+                      <input class="mbb-input" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(match.valueA))}" ${disabled}>
+                      <select class="mbb-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
+                        <option value="LOSE" ${match.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
+                        <option value="WIN" ${match.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="mbb-versus">VS</div>
+
+                  <div class="mbb-player ${isBWin ? 'is-win' : ''}">
+                    <div class="mbb-player-side">B</div>
+                    <div class="mbb-fields">
+                      <input class="mbb-input" data-role="playerBName" placeholder="Nome do jogador" value="${esc(match.playerBName || '')}" ${disabled}>
+                      <input class="mbb-input" data-role="bonusB" placeholder="Nome do bônus" value="${esc(match.bonusB || '')}" ${disabled}>
+                    </div>
+                    <div class="mbb-mini-fields">
+                      <input class="mbb-input" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(match.valueB))}" ${disabled}>
+                      <select class="mbb-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
+                        <option value="LOSE" ${match.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
+                        <option value="WIN" ${match.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="mbb-match-footer">
+                    <div class="mbb-pathing">
+                      ${match.nextRoundNumber ? `<span>Avança para ${esc((state.rounds || []).find((r) => r.roundNumber === match.nextRoundNumber)?.roundName || `Fase ${match.nextRoundNumber}`)}</span>` : `<span>Decide o campeão</span>`}
+                    </div>
+                    <button class="mbb-btn mbb-btn--save" data-mbb-action="save-match" ${disabled}>Salvar confronto</button>
+                  </div>
+                </article>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }).join('');
   }
 
   async function refresh() {
@@ -335,31 +353,20 @@
 
   async function createBattle() {
     try {
-      const name = qs('#bbName')?.value?.trim() || '';
-      const maxPlayers = Number(qs('#bbSlots')?.value || '32');
-      const entryCommand = qs('#bbEntryCommand')?.value?.trim() || '!batalha';
+      const name = qs('#mbbName')?.value?.trim() || '';
+      const maxPlayers = Number(qs('#mbbSlots')?.value || '32');
       if (!name) {
-        notify('Preencha o nome da batalha.', 'error');
+        notify('Preenche o nome da batalha.', 'error');
         return;
       }
       await apiFetch('/api/batalha-bonus/admin/create', {
         method: 'POST',
-        body: JSON.stringify({ name, maxPlayers, entryCommand })
+        body: JSON.stringify({ name, maxPlayers })
       });
       notify('Batalha criada.', 'ok');
       await refresh();
     } catch (e) {
       notify(e.message || 'Erro ao criar batalha.', 'error');
-    }
-  }
-
-  async function runAction(path, okMsg) {
-    try {
-      await apiFetch(path, { method: 'POST', body: '{}' });
-      if (okMsg) notify(okMsg, 'ok');
-      await refresh();
-    } catch (e) {
-      notify(e.message || 'Erro na ação.', 'error');
     }
   }
 
@@ -369,14 +376,24 @@
         method: 'PATCH',
         body: JSON.stringify(payload)
       });
-      notify('Confronto atualizado.', 'ok');
+      notify('Confronto salvo.', 'ok');
       await refresh();
     } catch (e) {
-      if (String(e.message || '') === 'empate_manual') {
-        notify('Empate. Escolhe o vencedor manualmente.', 'error');
+      if (String(e.message || '') === 'duplo_win') {
+        notify('Só um lado pode ficar com WIN.', 'error');
         return;
       }
       notify(e.message || 'Erro ao salvar confronto.', 'error');
+    }
+  }
+
+  async function finalizeBattle() {
+    try {
+      await apiFetch('/api/batalha-bonus/admin/finalize', { method: 'POST', body: '{}' });
+      notify('Batalha finalizada.', 'ok');
+      await refresh();
+    } catch (e) {
+      notify(e.message || 'Erro ao finalizar batalha.', 'error');
     }
   }
 
@@ -386,7 +403,7 @@
       const current = document.querySelector('.nav-btn.active')?.dataset.tab;
       if (current !== 'batalha-bonus') return;
       refresh().catch(() => {});
-    }, 5000);
+    }, 4000);
   }
 
   function stopPolling() {
@@ -407,10 +424,7 @@
     else startPolling();
   });
 
-  window.BatalhaBonusAdmin = {
-    refresh,
-    onTabShown
-  };
+  window.BatalhaBonusAdmin = { refresh, onTabShown };
 
   if (!initialized) {
     initialized = true;
