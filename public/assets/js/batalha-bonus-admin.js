@@ -201,12 +201,12 @@
   }
 
   function computeBoardGeometry(rounds) {
-    const cardWidth = 298;
-    const cardHeight = 116;
-    const laneGap = 104;
-    const baseGap = 20;
-    const leftPadding = 24;
-    const topPadding = 60;
+    const cardWidth = 380;
+    const cardHeight = 138;
+    const laneGap = 118;
+    const baseGap = 24;
+    const leftPadding = 28;
+    const topPadding = 54;
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
     const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 24;
     const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
@@ -316,14 +316,12 @@
     return `
       <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(match.id)}" style="left:${x}px;top:${y}px;width:${cardWidth}px;height:${cardHeight}px">
         <div class="mbb-match-card-bg"></div>
-        <div class="mbb-match-top">
-          <span class="mbb-match-tag">M${esc(match.matchNumber)}</span>
-          <span class="mbb-save-state" data-role="saveState">Pronto</span>
-        </div>
 
         <div class="mbb-side-row ${isAWin ? 'is-win' : ''}">
-          <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Jogador A" value="${esc(match.playerAName || '')}" ${disabled}>
-          <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Bônus A" value="${esc(match.bonusA || '')}" ${disabled}>
+          <div class="mbb-player-stack">
+            <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(match.playerAName || '')}" ${disabled}>
+            <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(match.bonusA || '')}" ${disabled}>
+          </div>
           <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(match.valueA))}" ${disabled}>
           <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
             <option value="LOSE" ${match.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
@@ -332,8 +330,10 @@
         </div>
 
         <div class="mbb-side-row ${isBWin ? 'is-win' : ''}">
-          <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Jogador B" value="${esc(match.playerBName || '')}" ${disabled}>
-          <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Bônus B" value="${esc(match.bonusB || '')}" ${disabled}>
+          <div class="mbb-player-stack">
+            <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(match.playerBName || '')}" ${disabled}>
+            <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(match.bonusB || '')}" ${disabled}>
+          </div>
           <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(match.valueB))}" ${disabled}>
           <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
             <option value="LOSE" ${match.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>

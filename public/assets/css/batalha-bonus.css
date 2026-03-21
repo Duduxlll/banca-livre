@@ -1,7 +1,7 @@
 .mbb-root {
   position: relative;
   padding: 18px;
-  color: #eef7ff;
+  color: #edfdf5;
 }
 
 .mbb-create-stage,
@@ -13,22 +13,22 @@
   min-height: 520px;
   overflow: hidden;
   border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.16);
   background:
-    radial-gradient(circle at 15% 15%, rgba(34, 211, 238, 0.18), transparent 26%),
-    radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.18), transparent 28%),
-    radial-gradient(circle at 55% 90%, rgba(168, 85, 247, 0.14), transparent 30%),
-    linear-gradient(145deg, rgba(4, 12, 30, 0.96), rgba(11, 27, 66, 0.96));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+    radial-gradient(circle at 12% 16%, rgba(16, 185, 129, 0.18), transparent 26%),
+    radial-gradient(circle at 80% 18%, rgba(34, 197, 94, 0.16), transparent 28%),
+    radial-gradient(circle at 52% 88%, rgba(20, 184, 166, 0.14), transparent 34%),
+    linear-gradient(145deg, rgba(2, 14, 10, 0.98), rgba(5, 38, 24, 0.98));
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
 }
 
 .mbb-create-noise {
   position: absolute;
   inset: -30%;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    radial-gradient(circle at 30% 70%, rgba(34, 211, 238, 0.1), transparent 18%),
-    radial-gradient(circle at 70% 30%, rgba(96, 165, 250, 0.12), transparent 18%);
+    radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 30% 70%, rgba(16, 185, 129, 0.12), transparent 18%),
+    radial-gradient(circle at 70% 30%, rgba(52, 211, 153, 0.12), transparent 18%);
   background-size: 22px 22px, auto, auto;
   opacity: 0.55;
   filter: blur(0.3px);
@@ -43,10 +43,10 @@
   margin: 42px auto;
   padding: 34px;
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(6, 16, 39, 0.82), rgba(9, 18, 44, 0.72));
+  border: 1px solid rgba(52, 211, 153, 0.14);
+  background: linear-gradient(180deg, rgba(4, 24, 16, 0.82), rgba(5, 30, 20, 0.74));
   backdrop-filter: blur(18px);
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
 }
 
 .mbb-create-badge {
@@ -58,9 +58,9 @@
   font-weight: 900;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #7dd3fc;
-  background: rgba(125, 211, 252, 0.08);
-  border: 1px solid rgba(125, 211, 252, 0.18);
+  color: #9cf6d2;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.2);
 }
 
 .mbb-create-title {
@@ -103,10 +103,10 @@
 .mbb-select,
 .mbb-mini-input,
 .mbb-mini-select {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.12);
   outline: none;
   color: #f8fbff;
-  background: rgba(5, 11, 29, 0.72);
+  background: rgba(2, 18, 12, 0.86);
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
 }
 
@@ -123,8 +123,8 @@
 .mbb-select:focus,
 .mbb-mini-input:focus,
 .mbb-mini-select:focus {
-  border-color: rgba(56, 189, 248, 0.7);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+  border-color: rgba(52, 211, 153, 0.72);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
   transform: translateY(-1px);
 }
 
@@ -156,26 +156,26 @@
 }
 
 .mbb-btn--primary {
-  color: #08131d;
-  background: linear-gradient(135deg, #67e8f9, #c084fc);
-  box-shadow: 0 18px 36px rgba(103, 232, 249, 0.24);
+  color: #062116;
+  background: linear-gradient(135deg, #6ee7b7, #34d399);
+  box-shadow: 0 18px 36px rgba(16, 185, 129, 0.24);
 }
 
 .mbb-btn--danger {
-  color: #fff;
-  background: linear-gradient(135deg, #ef4444, #f97316);
-  box-shadow: 0 18px 34px rgba(239, 68, 68, 0.22);
+  color: #f4fff9;
+  background: linear-gradient(135deg, #15803d, #22c55e);
+  box-shadow: 0 18px 34px rgba(34, 197, 94, 0.24);
 }
 
 .mbb-battle-stage {
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 32px;
+  border: 1px solid rgba(52, 211, 153, 0.16);
   background:
-    radial-gradient(circle at 12% 20%, rgba(34, 211, 238, 0.12), transparent 18%),
-    radial-gradient(circle at 78% 18%, rgba(96, 165, 250, 0.12), transparent 22%),
-    radial-gradient(circle at 50% 88%, rgba(14, 165, 233, 0.12), transparent 20%),
-    linear-gradient(180deg, rgba(4, 14, 40, 0.97), rgba(5, 18, 56, 0.98));
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
+    radial-gradient(circle at 12% 20%, rgba(16, 185, 129, 0.14), transparent 18%),
+    radial-gradient(circle at 78% 18%, rgba(34, 197, 94, 0.12), transparent 22%),
+    radial-gradient(circle at 50% 88%, rgba(20, 184, 166, 0.12), transparent 20%),
+    linear-gradient(180deg, rgba(2, 18, 12, 0.985), rgba(4, 34, 22, 0.99));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
   overflow: hidden;
 }
 
@@ -185,19 +185,26 @@
   z-index: 3;
   display: flex;
   justify-content: flex-end;
-  padding: 18px 18px 4px;
-  background: linear-gradient(180deg, rgba(3, 10, 30, 0.7), rgba(3, 10, 30, 0));
-  backdrop-filter: blur(4px);
+  padding: 14px 14px 2px;
+  background: linear-gradient(180deg, rgba(2, 18, 12, 0.8), rgba(2, 18, 12, 0));
+  backdrop-filter: blur(5px);
+}
+
+.mbb-board-actions .mbb-btn {
+  padding: 10px 16px;
+  min-height: 40px;
+  border-radius: 14px;
+  font-size: 13px;
 }
 
 .mbb-bracket-wrap {
-  padding: 10px 0 18px;
+  padding: 6px 0 18px;
   overflow: auto;
 }
 
 .mbb-bracket-stage {
   position: relative;
-  min-height: 420px;
+  min-height: 520px;
 }
 
 .mbb-board {
@@ -216,32 +223,32 @@
 
 .mbb-board-lines path {
   fill: none;
-  stroke: rgba(191, 219, 254, 0.6);
-  stroke-width: 2;
+  stroke: rgba(167, 243, 208, 0.58);
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 10px rgba(125, 211, 252, 0.12));
+  filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.12));
 }
 
 .mbb-round-title {
   position: absolute;
-  top: 12px;
+  top: 10px;
   text-align: center;
   font-size: 16px;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #79e7ff;
-  text-shadow: 0 0 18px rgba(103, 232, 249, 0.3);
+  color: #9cf6d2;
+  text-shadow: 0 0 18px rgba(52, 211, 153, 0.28);
 }
 
 .mbb-match-card {
   position: absolute;
   overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(8, 18, 45, 0.92), rgba(4, 9, 24, 0.94));
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+  border-radius: 22px;
+  border: 1px solid rgba(52, 211, 153, 0.14);
+  background: linear-gradient(180deg, rgba(3, 22, 14, 0.94), rgba(2, 12, 8, 0.96));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.34);
 }
 
 .mbb-match-card::before {
@@ -249,112 +256,87 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.06), transparent 40%, rgba(168, 85, 247, 0.08));
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), transparent 42%, rgba(20, 184, 166, 0.06));
   pointer-events: none;
 }
 
 .mbb-match-card.is-resolved {
-  box-shadow: 0 18px 44px rgba(34, 197, 94, 0.14), 0 16px 38px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 20px 50px rgba(34, 197, 94, 0.18), 0 18px 40px rgba(0, 0, 0, 0.36);
 }
 
 .mbb-match-card-bg {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top right, rgba(103, 232, 249, 0.08), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.08), transparent 26%);
+    radial-gradient(circle at top right, rgba(110, 231, 183, 0.08), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.1), transparent 28%);
   pointer-events: none;
-}
-
-.mbb-match-top {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px 0;
-}
-
-.mbb-match-tag,
-.mbb-save-state {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.mbb-match-tag {
-  color: #9ddfff;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.18);
-}
-
-.mbb-save-state {
-  color: rgba(226, 232, 240, 0.76);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.mbb-match-card[data-save-state-kind="pending"] .mbb-save-state,
-.mbb-match-card[data-save-state-kind="saving"] .mbb-save-state {
-  color: #08131d;
-  background: linear-gradient(135deg, #67e8f9, #7dd3fc);
-  border-color: transparent;
-}
-
-.mbb-match-card[data-save-state-kind="error"] .mbb-save-state {
-  color: #fff;
-  background: linear-gradient(135deg, #ef4444, #f97316);
-  border-color: transparent;
 }
 
 .mbb-side-row {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) 72px 74px;
-  gap: 6px;
-  align-items: center;
-  margin: 8px 10px;
-  padding: 6px;
-  border-radius: 14px;
+  grid-template-columns: minmax(0, 1fr) 90px 92px;
+  gap: 10px;
+  align-items: stretch;
+  margin: 10px 12px;
+  padding: 10px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .mbb-side-row.is-win {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.12));
-  border-color: rgba(34, 197, 94, 0.26);
-  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.05), 0 12px 26px rgba(16, 185, 129, 0.1);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.14));
+  border-color: rgba(74, 222, 128, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.06), 0 14px 28px rgba(16, 185, 129, 0.1);
+}
+
+.mbb-player-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  min-width: 0;
 }
 
 .mbb-mini-input,
 .mbb-mini-select {
-  min-height: 34px;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
+  min-height: 42px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 800;
+}
+
+.mbb-mini-input--name {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.mbb-mini-input--bonus {
+  font-size: 12px;
+  color: #c4ffe5;
 }
 
 .mbb-mini-input--value {
   text-align: center;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .mbb-mini-select {
   text-align: center;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
 }
 
 .mbb-mini-select.is-win {
   color: #dbffe9;
-  border-color: rgba(34, 197, 94, 0.34);
-  background: rgba(9, 45, 24, 0.78);
+  border-color: rgba(74, 222, 128, 0.36);
+  background: rgba(7, 54, 31, 0.9);
 }
 
 .mbb-empty {
