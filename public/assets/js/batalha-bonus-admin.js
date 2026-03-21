@@ -1,7 +1,6 @@
 (() => {
   const API = window.location.origin;
   const qs = (s, r = document) => r.querySelector(s);
-  const qsa = (s, r = document) => Array.from(r.querySelectorAll(s));
   const LOCAL_VIEW_KEY = 'mbb:viewOpen';
   const LOCAL_ACTIVE_KEY = 'mbb:activeBattleId';
 
@@ -62,94 +61,34 @@
   }
 
   function getMatchIdFromCard(card) {
-  return String(card?.dataset.matchId || '');
-}
+    return String(card?.dataset.matchId || '');
+  }
 
-function rememberDraft(card) {
-  const matchId = getMatchIdFromCard(card);
-  if (!matchId) return;
-  draftMatches.set(matchId, readCardPayload(card));
-}
+  function rememberDraft(card) {
+    const matchId = getMatchIdFromCard(card);
+    if (!matchId) return;
+    draftMatches.set(matchId, readCardPayload(card));
+  }
 
-function getRenderedMatch(match) {
-  const draft = draftMatches.get(String(match?.id || ''));
-  if (!draft) return match;
-  return {
-    ...match,
-    playerAName: draft.playerAName,
-    bonusA: draft.bonusA,
-    valueA: draft.valueA,
-    resultA: draft.resultA,
-    playerBName: draft.playerBName,
-    bonusB: draft.bonusB,
-    valueB: draft.valueB,
-    resultB: draft.resultB,
-    winnerSide:
-      draft.resultA === 'WIN' ? 'A'
-      : draft.resultB === 'WIN' ? 'B'
-      : null
-  };
-}
-
-function bindDelegatedEvents() {
-  if (delegatedBound) return;
-  delegatedBound = true;
-
-  document.addEventListener('click', async (ev) => {
-    const inside = ev.target.closest('#mbbBattleStage, #mbbFullscreenOverlay, #tab-batalha-bonus');
-    if (!inside) return;
-
-    const btn = ev.target.closest('[data-mbb-action]');
-    if (!btn) return;
-
-    if (btn.dataset.mbbAction === 'finalize') {
-      await finalizeBattle();
-      return;
-    }
-
-    if (btn.dataset.mbbAction === 'back') {
-      setBoardOpen(false);
-      renderBattle();
-      return;
-    }
-  });
-
-  document.addEventListener('change', (ev) => {
-    const target = ev.target;
-    if (!target.closest('#mbbBattleStage')) return;
-
-    const card = target.closest('[data-match-card="1"]');
-    if (!card) return;
-
-    if (target.matches('[data-role="result"]')) {
-      const side = target.dataset.side;
-      const other = qs(`[data-role="result"][data-side="${side === 'A' ? 'B' : 'A'}"]`, card);
-      if (target.value === 'WIN' && other) other.value = 'LOSE';
-      rememberDraft(card);
-      scheduleSave(card, 40);
-      return;
-    }
-
-    if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
-      rememberDraft(card);
-      scheduleSave(card, 180);
-    }
-  });
-
-  document.addEventListener('input', (ev) => {
-    const target = ev.target;
-    if (!target.closest('#mbbBattleStage')) return;
-
-    const card = target.closest('[data-match-card="1"]');
-    if (!card) return;
-
-    if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
-      rememberDraft(card);
-      markCardState(card, 'pending');
-      scheduleSave(card, 500);
-    }
-  });
-}
+  function getRenderedMatch(match) {
+    const draft = draftMatches.get(String(match?.id || ''));
+    if (!draft) return match;
+    return {
+      ...match,
+      playerAName: draft.playerAName,
+      bonusA: draft.bonusA,
+      valueA: draft.valueA,
+      resultA: draft.resultA,
+      playerBName: draft.playerBName,
+      bonusB: draft.bonusB,
+      valueB: draft.valueB,
+      resultB: draft.resultB,
+      winnerSide:
+        draft.resultA === 'WIN' ? 'A'
+        : draft.resultB === 'WIN' ? 'B'
+        : null
+    };
+  }
 
   function battleFinished() {
     return String(state?.battle?.status || '').toUpperCase() === 'FINISHED';
@@ -168,14 +107,105 @@ function bindDelegatedEvents() {
     }
   }
 
+  function countResolvedMatches(rounds) {
+    const all = Array.isArray(rounds) ? rounds.flatMap((round) => round?.matches || []) : [];
+    return all.filter((match) => String(match?.winnerSide || '').toUpperCase() === 'A' || String(match?.winnerSide || '').toUpperCase() === 'B').length;
+  }
+
+  function totalMatches(rounds) {
+    return Array.isArray(rounds) ? rounds.reduce((acc, round) => acc + Number(round?.matches?.length || 0), 0) : 0;
+  }
+
+  function championLabel() {
+    const champion = String(state?.battle?.championName || '').trim();
+    return champion || 'Aguardando campeão';
+  }
+
+  function battleStatusLabel() {
+    return battleFinished() ? 'Finalizada' : 'Ativa';
+  }
+
+  function getCardStateLabel(kind) {
+    if (kind === 'pending') return 'Alterando';
+    if (kind === 'saving') return 'Salvando';
+    if (kind === 'error') return 'Erro';
+    return 'Pronto';
+  }
+
+  function getCardStateClass(kind) {
+    if (kind === 'pending') return 'is-pending';
+    if (kind === 'saving') return 'is-saving';
+    if (kind === 'error') return 'is-error';
+    return 'is-ready';
+  }
+
   let state = null;
   let poll = null;
   let initialized = false;
   let resizeBound = false;
+  let delegatedBound = false;
   const saveTimers = new Map();
-const savingMatches = new Set();
-const draftMatches = new Map();
-let delegatedBound = false;
+  const savingMatches = new Set();
+  const draftMatches = new Map();
+
+  function bindDelegatedEvents() {
+    if (delegatedBound) return;
+    delegatedBound = true;
+
+    document.addEventListener('click', async (ev) => {
+      const inside = ev.target.closest('#mbbBattleStage, #mbbFullscreenOverlay, #tab-batalha-bonus');
+      if (!inside) return;
+
+      const btn = ev.target.closest('[data-mbb-action]');
+      if (!btn) return;
+
+      if (btn.dataset.mbbAction === 'finalize') {
+        await finalizeBattle();
+        return;
+      }
+
+      if (btn.dataset.mbbAction === 'back') {
+        setBoardOpen(false);
+        renderBattle();
+      }
+    });
+
+    document.addEventListener('change', (ev) => {
+      const target = ev.target;
+      if (!target.closest('#mbbBattleStage')) return;
+
+      const card = target.closest('[data-match-card="1"]');
+      if (!card) return;
+
+      if (target.matches('[data-role="result"]')) {
+        const side = target.dataset.side;
+        const other = qs(`[data-role="result"][data-side="${side === 'A' ? 'B' : 'A'}"]`, card);
+        if (target.value === 'WIN' && other) other.value = 'LOSE';
+        rememberDraft(card);
+        scheduleSave(card, 40);
+        return;
+      }
+
+      if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
+        rememberDraft(card);
+        scheduleSave(card, 180);
+      }
+    });
+
+    document.addEventListener('input', (ev) => {
+      const target = ev.target;
+      if (!target.closest('#mbbBattleStage')) return;
+
+      const card = target.closest('[data-match-card="1"]');
+      if (!card) return;
+
+      if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
+        rememberDraft(card);
+        markCardState(card, 'pending');
+        scheduleSave(card, 500);
+      }
+    });
+  }
 
   function ensureUI() {
     const tab = qs('#tab-batalha-bonus');
@@ -187,9 +217,45 @@ let delegatedBound = false;
         <section id="mbbCreateStage" class="mbb-create-stage">
           <div class="mbb-create-noise"></div>
           <div class="mbb-create-card">
-            <div class="mbb-create-badge">BATALHA BÔNUS</div>
-            <h2 class="mbb-create-title">Cria a chave manual e resolve tudo no site.</h2>
-            <p class="mbb-create-copy">Escolhe 8, 16 ou 32 vagas. Depois a batalha abre em tela cheia, com a estrutura inteira do campeonato, para preencher nomes, bônus, valores e WIN ou LOSE.</p>
+            <div class="mbb-create-top">
+              <div class="mbb-create-copy-wrap">
+                <div class="mbb-create-badge">Batalha bônus premium</div>
+                <h2 class="mbb-create-title">
+                  Monta a sua chave com visual forte e leitura rápida.
+                  <span class="mbb-title-grad">8, 16 ou 32 vagas sem bagunça.</span>
+                </h2>
+                <p class="mbb-create-copy">Agora cada confronto fica mais limpo, com campos maiores para nome do jogador, nome do bônus ou jogo, valor e resultado. A batalha abre em tela cheia com presença forte, melhor contraste e leitura muito melhor em todas as fases.</p>
+                <div class="mbb-create-pills">
+                  <span class="mbb-create-pill">Tela cheia</span>
+                  <span class="mbb-create-pill">Animações suaves</span>
+                  <span class="mbb-create-pill">Melhor leitura</span>
+                  <span class="mbb-create-pill">32 vagas</span>
+                </div>
+              </div>
+              <div class="mbb-create-sidepanel">
+                <h3 class="mbb-create-sidepanel-title">Visual de campeonato</h3>
+                <p class="mbb-create-sidepanel-copy">A área ficou com cara de evento ao vivo, sem depender daquele verde forte. O foco agora é contraste, profundidade, brilho e espaço para os dados aparecerem direito.</p>
+                <div class="mbb-preview-grid">
+                  <div class="mbb-preview-card">
+                    <strong>8</strong>
+                    <span>Quartas até final</span>
+                  </div>
+                  <div class="mbb-preview-card">
+                    <strong>16</strong>
+                    <span>Oitavas completas</span>
+                  </div>
+                  <div class="mbb-preview-card">
+                    <strong>32</strong>
+                    <span>Top 32 com scroll</span>
+                  </div>
+                  <div class="mbb-preview-card">
+                    <strong>2</strong>
+                    <span>Jogadores visíveis por card</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="mbb-create-form">
               <label class="mbb-field">
                 <span>Nome da batalha</span>
@@ -209,7 +275,7 @@ let delegatedBound = false;
             <div id="mbbActiveResume" class="mbb-active-resume" style="display:none">
               <div class="mbb-active-resume__text">
                 <strong>Tem uma batalha ativa agora.</strong>
-                <span>Abre a estrutura em tela cheia para continuar de onde parou.</span>
+                <span>Abre a estrutura em tela cheia e continua exatamente de onde parou.</span>
               </div>
               <button id="mbbGoActiveBtn" class="mbb-btn mbb-btn--ghost">Ir pra batalha ativa</button>
             </div>
@@ -218,8 +284,17 @@ let delegatedBound = false;
 
         <section id="mbbBattleStage" class="mbb-battle-stage" style="display:none">
           <div class="mbb-board-actions">
-            <button id="mbbBackBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="back">Voltar</button>
-            <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
+            <div class="mbb-board-side">
+              <div class="mbb-board-topline">
+                <h3 class="mbb-board-title" id="mbbBoardTitle">Batalha bônus</h3>
+                <span class="mbb-board-badge is-active" id="mbbBoardStatus">Ativa</span>
+              </div>
+              <div class="mbb-board-submeta" id="mbbBoardMeta"></div>
+            </div>
+            <div class="mbb-board-actions-right">
+              <button id="mbbBackBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="back">Voltar</button>
+              <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
+            </div>
           </div>
           <div class="mbb-bracket-wrap" id="mbbBracketWrap">
             <div class="mbb-bracket-stage" id="mbbBracketStage"></div>
@@ -247,6 +322,7 @@ let delegatedBound = false;
         renderBattle();
       });
     }
+
     ensureOverlay();
     return tab;
   }
@@ -265,52 +341,52 @@ let delegatedBound = false;
   }
 
   async function saveMatch(card) {
-  const matchId = String(card?.dataset.matchId || '');
-  if (!matchId || savingMatches.has(matchId) || battleFinished()) return;
+    const matchId = String(card?.dataset.matchId || '');
+    if (!matchId || savingMatches.has(matchId) || battleFinished()) return;
 
-  savingMatches.add(matchId);
-  markCardState(card, 'saving');
+    savingMatches.add(matchId);
+    markCardState(card, 'saving');
 
-  try {
-    rememberDraft(card);
+    try {
+      rememberDraft(card);
 
-    const res = await apiFetch(`/api/batalha-bonus/admin/matches/${encodeURIComponent(matchId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(readCardPayload(card))
-    });
+      const res = await apiFetch(`/api/batalha-bonus/admin/matches/${encodeURIComponent(matchId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(readCardPayload(card))
+      });
 
-    draftMatches.delete(matchId);
-    state = res || state;
-    renderBattle();
-  } catch (e) {
-    markCardState(card, 'error');
-    if (String(e.message || '') === 'duplo_win') {
-      notify('Só um lado pode ficar com WIN.', 'error');
-    } else {
-      notify(e.message || 'Erro ao salvar confronto.', 'error');
+      draftMatches.delete(matchId);
+      state = res || state;
+      renderBattle();
+    } catch (e) {
+      markCardState(card, 'error');
+      if (String(e.message || '') === 'duplo_win') {
+        notify('Só um lado pode ficar com WIN.', 'error');
+      } else {
+        notify(e.message || 'Erro ao salvar confronto.', 'error');
+      }
+    } finally {
+      savingMatches.delete(matchId);
     }
-  } finally {
-    savingMatches.delete(matchId);
   }
-}
 
   function getBoardPreset(firstRoundCount) {
-  if (firstRoundCount <= 4) {
-    return { cardWidth: 520, cardHeight: 196, laneGap: 126, baseGap: 32, minScale: 0.88 };
+    if (firstRoundCount <= 4) {
+      return { cardWidth: 560, cardHeight: 258, laneGap: 132, baseGap: 34, minScale: 0.84 };
+    }
+    if (firstRoundCount <= 8) {
+      return { cardWidth: 540, cardHeight: 242, laneGap: 118, baseGap: 18, minScale: 0.7 };
+    }
+    return { cardWidth: 520, cardHeight: 226, laneGap: 104, baseGap: 10, minScale: 0.5 };
   }
-  if (firstRoundCount <= 8) {
-    return { cardWidth: 490, cardHeight: 182, laneGap: 112, baseGap: 20, minScale: 0.74 };
-  }
-  return { cardWidth: 450, cardHeight: 170, laneGap: 96, baseGap: 12, minScale: 0.62 };
-}
 
   function computeBoardGeometry(rounds) {
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
     const preset = getBoardPreset(firstRoundCount);
     const { cardWidth, cardHeight, laneGap, baseGap } = preset;
     const leftPadding = 44;
-    const topPadding = 76;
-    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 48;
+    const topPadding = 92;
+    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 60;
     const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
 
     const roundMeta = rounds.map((round, roundIdx) => {
@@ -354,55 +430,75 @@ let delegatedBound = false;
     };
   }
 
-
   function ensureOverlay() {
-  let overlay = document.getElementById('mbbFullscreenOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'mbbFullscreenOverlay';
-    overlay.innerHTML = `<div class="mbb-fullscreen-shell"></div>`;
-    document.body.appendChild(overlay);
+    let overlay = document.getElementById('mbbFullscreenOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'mbbFullscreenOverlay';
+      overlay.innerHTML = `<div class="mbb-fullscreen-shell"></div>`;
+      document.body.appendChild(overlay);
+    }
+    return overlay;
   }
-  return overlay;
-}
 
   function setBattleMode(enabled) {
-  const overlay = ensureOverlay();
-  const shell = overlay.querySelector('.mbb-fullscreen-shell');
-  const root = qs('#mbbRoot');
-  const battleStage = document.getElementById('mbbBattleStage');
+    const overlay = ensureOverlay();
+    const shell = overlay.querySelector('.mbb-fullscreen-shell');
+    const root = qs('#mbbRoot');
+    const battleStage = document.getElementById('mbbBattleStage');
 
-  document.body.classList.toggle('mbb-battle-active', !!enabled);
+    document.body.classList.toggle('mbb-battle-active', !!enabled);
 
-  if (!battleStage || !root || !shell) return;
+    if (!battleStage || !root || !shell) return;
 
-  if (enabled) {
-    overlay.classList.add('is-open');
-    if (battleStage.parentElement !== shell) shell.appendChild(battleStage);
-    battleStage.style.display = 'flex';
-    stopPolling();
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  } else {
-    overlay.classList.remove('is-open');
-    if (battleStage.parentElement !== root) root.appendChild(battleStage);
-    battleStage.style.display = 'none';
-    startPolling();
+    if (enabled) {
+      overlay.classList.add('is-open');
+      if (battleStage.parentElement !== shell) shell.appendChild(battleStage);
+      battleStage.style.display = 'flex';
+      stopPolling();
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } else {
+      overlay.classList.remove('is-open');
+      if (battleStage.parentElement !== root) root.appendChild(battleStage);
+      battleStage.style.display = 'none';
+      startPolling();
+    }
   }
-}
+
+  function updateBoardHeader(rounds) {
+    const titleEl = qs('#mbbBoardTitle');
+    const statusEl = qs('#mbbBoardStatus');
+    const metaEl = qs('#mbbBoardMeta');
+    if (!titleEl || !statusEl || !metaEl) return;
+
+    const battleName = String(state?.battle?.name || 'Batalha bônus').trim() || 'Batalha bônus';
+    const maxPlayers = Number(state?.battle?.maxPlayers || 0);
+    const resolved = countResolvedMatches(rounds);
+    const total = totalMatches(rounds);
+
+    titleEl.textContent = battleName;
+    statusEl.textContent = battleStatusLabel();
+    statusEl.className = `mbb-board-badge ${battleFinished() ? 'is-finished' : 'is-active'}`;
+    metaEl.innerHTML = `
+      <span class="mbb-board-chip">${esc(String(maxPlayers || 0))} vagas</span>
+      <span class="mbb-board-chip">${esc(String(resolved))}/${esc(String(total))} confrontos resolvidos</span>
+      <span class="mbb-board-chip">Campeão: ${esc(championLabel())}</span>
+    `;
+  }
 
   function renderBattle() {
-  const createStage = qs('#mbbCreateStage');
-  const activeResume = qs('#mbbActiveResume');
-  const hasBattle = !!state?.battle;
-  const boardOpen = hasBattle && shouldOpenBoard();
+    const createStage = qs('#mbbCreateStage');
+    const activeResume = qs('#mbbActiveResume');
+    const hasBattle = !!state?.battle;
+    const boardOpen = hasBattle && shouldOpenBoard();
 
-  if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
-  if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
+    if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
+    if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
 
-  setBattleMode(boardOpen);
+    setBattleMode(boardOpen);
 
-  const battleStage = document.getElementById('mbbBattleStage');
-  if (!boardOpen || !battleStage) return;
+    const battleStage = document.getElementById('mbbBattleStage');
+    if (!boardOpen || !battleStage) return;
 
     const rounds = Array.isArray(state?.rounds) ? state.rounds : [];
     const stage = qs('#mbbBracketStage');
@@ -411,6 +507,8 @@ let delegatedBound = false;
 
     if (!stage || !wrap) return;
     if (finalizeBtn) finalizeBtn.disabled = battleFinished() || !state?.battle?.championName;
+
+    updateBoardHeader(rounds);
 
     if (!rounds.length) {
       stage.innerHTML = '<div class="mbb-empty">Nenhuma estrutura encontrada.</div>';
@@ -421,7 +519,7 @@ let delegatedBound = false;
     const availableWidth = Math.max(1080, wrap.clientWidth - 56);
     const widthScale = availableWidth / geo.totalWidth;
     const scale = Math.min(1, Math.max(geo.minScale, widthScale));
-    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 34;
+    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 36;
 
     stage.style.height = `${scaledHeight}px`;
     stage.innerHTML = `
@@ -440,63 +538,88 @@ let delegatedBound = false;
   }
 
   function renderCard(match, x, y, cardWidth, cardHeight) {
-  const vm = getRenderedMatch(match);
-  const winnerSide = String(vm.winnerSide || '').toUpperCase();
-  const isAWin = winnerSide === 'A';
-  const isBWin = winnerSide === 'B';
-  const disabled = battleFinished() ? 'disabled' : '';
+    const vm = getRenderedMatch(match);
+    const winnerSide = String(vm.winnerSide || '').toUpperCase();
+    const isAWin = winnerSide === 'A';
+    const isBWin = winnerSide === 'B';
+    const disabled = battleFinished() ? 'disabled' : '';
+    const cardStateKind = savingMatches.has(String(vm.id)) ? 'saving' : '';
+    const cardStateLabel = getCardStateLabel(cardStateKind);
+    const cardStateClass = getCardStateClass(cardStateKind);
 
-  return `
-    <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(vm.id)}" style="left:${x}px;top:${y}px;width:${cardWidth}px;height:${cardHeight}px">
-      <div class="mbb-match-card-bg"></div>
+    return `
+      <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(vm.id)}" data-save-state-kind="${esc(cardStateKind)}" style="left:${x}px;top:${y}px;width:${cardWidth}px;height:${cardHeight}px">
+        <div class="mbb-match-card-bg"></div>
 
-      <div class="mbb-side-row ${isAWin ? 'is-win' : ''}">
-        <div class="mbb-player-stack">
-          <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
-          <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
+        <div class="mbb-card-head">
+          <div class="mbb-card-head-left">
+            <span class="mbb-card-kicker">${esc(brRoundLabel(vm.roundName || 'Confronto'))}</span>
+            <span class="mbb-card-match-number">Confronto ${esc(String(vm.matchNumber || 1))}</span>
+          </div>
+          <span class="mbb-card-state ${cardStateClass}">${esc(cardStateLabel)}</span>
         </div>
-        <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(vm.valueA))}" ${disabled}>
-        <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
-          <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
-          <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
-        </select>
-      </div>
 
-      <div class="mbb-side-row ${isBWin ? 'is-win' : ''}">
-        <div class="mbb-player-stack">
-          <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
-          <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
+        <div class="mbb-side-row ${isAWin ? 'is-win' : ''}">
+          <div class="mbb-side-main">
+            <div class="mbb-side-topline">
+              <span class="mbb-side-label">Jogador A</span>
+              ${isAWin ? '<span class="mbb-side-win-badge">Winner</span>' : ''}
+            </div>
+            <div class="mbb-player-stack">
+              <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
+              <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
+            </div>
+          </div>
+          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(vm.valueA))}" ${disabled}>
+          <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
+            <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
+            <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
+          </select>
         </div>
-        <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(vm.valueB))}" ${disabled}>
-        <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
-          <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
-          <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
-        </select>
-      </div>
-    </article>
-  `;
-}
 
-  async function refresh() {
-  ensureUI();
-  const res = await apiFetch('/api/batalha-bonus/admin/state');
-  state = res?.state || null;
+        <div class="mbb-card-divider"></div>
 
-  if (!state?.battle) {
-    setBoardOpen(false);
-    draftMatches.clear();
-    localStorage.removeItem(LOCAL_ACTIVE_KEY);
-  } else {
-    const remembered = localStorage.getItem(LOCAL_ACTIVE_KEY);
-    if (remembered && remembered !== String(state.battle.id)) {
-      setBoardOpen(false);
-      draftMatches.clear();
-    }
-    localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
+        <div class="mbb-side-row ${isBWin ? 'is-win' : ''}">
+          <div class="mbb-side-main">
+            <div class="mbb-side-topline">
+              <span class="mbb-side-label">Jogador B</span>
+              ${isBWin ? '<span class="mbb-side-win-badge">Winner</span>' : ''}
+            </div>
+            <div class="mbb-player-stack">
+              <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
+              <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
+            </div>
+          </div>
+          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(vm.valueB))}" ${disabled}>
+          <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
+            <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
+            <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
+          </select>
+        </div>
+      </article>
+    `;
   }
 
-  renderBattle();
-}
+  async function refresh() {
+    ensureUI();
+    const res = await apiFetch('/api/batalha-bonus/admin/state');
+    state = res?.state || null;
+
+    if (!state?.battle) {
+      setBoardOpen(false);
+      draftMatches.clear();
+      localStorage.removeItem(LOCAL_ACTIVE_KEY);
+    } else {
+      const remembered = localStorage.getItem(LOCAL_ACTIVE_KEY);
+      if (remembered && remembered !== String(state.battle.id)) {
+        setBoardOpen(false);
+        draftMatches.clear();
+      }
+      localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
+    }
+
+    renderBattle();
+  }
 
   async function createBattle() {
     try {
@@ -531,14 +654,14 @@ let delegatedBound = false;
   }
 
   function startPolling() {
-  stopPolling();
-  poll = setInterval(() => {
-    const current = document.querySelector('.nav-btn.active')?.dataset.tab;
-    if (current !== 'batalha-bonus') return;
-    if (shouldOpenBoard()) return;
-    refresh().catch(() => {});
-  }, 4500);
-}
+    stopPolling();
+    poll = setInterval(() => {
+      const current = document.querySelector('.nav-btn.active')?.dataset.tab;
+      if (current !== 'batalha-bonus') return;
+      if (shouldOpenBoard()) return;
+      refresh().catch(() => {});
+    }, 4500);
+  }
 
   function stopPolling() {
     if (poll) {
