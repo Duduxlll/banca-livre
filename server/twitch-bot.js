@@ -249,14 +249,32 @@ export function initTwitchBot({
   }
 
   async function getBatalhaBonusState() {
-  const url = `http://127.0.0.1:${port}/api/batalha-bonus/state?key=${encodeURIComponent(APP_KEY)}`;
-  const res = await fetch(url, { method: "GET", headers: { Accept: "application/json", "X-APP-KEY": APP_KEY } });
+  try {
+    const url = `http://127.0.0.1:${port}/api/batalha-bonus/state?key=${encodeURIComponent(APP_KEY)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "X-APP-KEY": APP_KEY
+      }
+    });
 
-  let data = null;
-  try { data = await res.json(); } catch {}
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {}
 
-  if (!res.ok) return { error: data?.error || `http_${res.status}` };
-  return { ok: true, data };
+    if (!res.ok) {
+      console.log("[BATALHA] state non-ok:", res.status, data);
+      return { error: data?.error || `http_${res.status}` };
+    }
+
+    console.log("[BATALHA] state ok:", data);
+    return { ok: true, data };
+  } catch (e) {
+    console.log("[BATALHA] state fetch exception:", e?.message || e);
+    return { error: `fetch_exception:${e?.message || e}` };
+  }
 }
 
 async function batalhaBonusJoin(userTag, displayName) {
@@ -540,80 +558,90 @@ async function batalhaBonusJoin(userTag, displayName) {
       }
 
       if (cmd.type === "bonus_battle_raw") {
-  const raw = String(cmd.payload || '').trim();
+  const raw = String(cmd.payload || "").trim();
+  console.log("[BATALHA] msg recebida:", raw, "user:", userTag || user);
+
   const st = await getBatalhaBonusState();
 
-console.log("[BATALHA] msg recebida:", raw, "user:", userTag || user);
-
   if (st.error) {
-  console.log("[BATALHA] erro state:", st);
-  await say(`${mention} não consegui verificar a batalha agora.`);
-  return;
-}
+    console.log("[BATALHA] erro state:", st);
+    await say(`${mention} não consegui verificar a batalha agora: ${st.error}`);
+    return;
+  }
 
-if (!st.data?.active || !st.data?.battle) {
-  console.log("[BATALHA] sem batalha ativa:", st);
-  await say(`${mention} não há batalha ativa agora.`);
-  return;
-}
-
-console.log("[BATALHA] state:", JSON.stringify(st));
+  if (!st.data?.active || !st.data?.battle) {
+    console.log("[BATALHA] sem batalha ativa:", st);
+    await say(`${mention} não há batalha ativa agora.`);
+    return;
+  }
 
   const battle = st.data.battle;
-  const activeCommand = String(battle.entryCommand || '').trim().toLowerCase();
+  const activeCommand = String(battle.entryCommand || "").trim().toLowerCase();
   const lowerRaw = raw.toLowerCase();
 
-  if (battle.status === 'REGISTRATION_OPEN' && activeCommand && lowerRaw === activeCommand) {
+  console.log("[BATALHA] comparando:", { lowerRaw, activeCommand, status: battle.status });
+
+  if (battle.status === "REGISTRATION_OPEN" && activeCommand && lowerRaw === activeCommand) {
     const r = await batalhaBonusJoin(userTag || user, display || user);
-    if (r.error === 'inscricoes_fechadas') {
+    console.log("[BATALHA] join:", r);
+
+    if (r.error === "inscricoes_fechadas") {
       await say(`${mention} inscrições fechadas.`);
       return;
     }
-    if (r.error === 'limite_atingido') {
+    if (r.error === "limite_atingido") {
       await say(`${mention} vagas encerradas.`);
       return;
     }
     if (r.error) {
-      await say(`${mention} não consegui te colocar na batalha agora.`);
+      await say(`${mention} não consegui te colocar na batalha agora: ${r.error}`);
       return;
     }
     if (r.data?.alreadyJoined) {
       await say(`${mention} você já está na batalha ✅`);
       return;
     }
+
     const total = Number(r.data?.total || 0);
     const maxPlayers = Number(r.data?.maxPlayers || 0);
+
     if (r.data?.autoClosed) {
       await say(`${mention} entrou na batalha ✅ vagas ${maxPlayers}/${maxPlayers}.`);
       return;
     }
+
     await say(`${mention} entrou na batalha ✅ vagas ${total}/${maxPlayers}.`);
     return;
   }
 
-  if (battle.status === 'CHOICES_OPEN' && /^!bonus\b/i.test(raw)) {
-    const bonusName = raw.replace(/^!bonus\b/i, '').trim();
+  if (battle.status === "CHOICES_OPEN" && /^!bonus\b/i.test(raw)) {
+    const bonusName = raw.replace(/^!bonus\b/i, "").trim();
+
     if (!bonusName) {
       await say(`${mention} use !bonus NOME_DO_BONUS`);
       return;
     }
+
     const r = await batalhaBonusSendBonus(userTag || user, display || user, bonusName);
-    if (r.error === 'escolhas_fechadas') {
+    console.log("[BATALHA] bonus:", r);
+
+    if (r.error === "escolhas_fechadas") {
       await say(`${mention} escolhas fechadas.`);
       return;
     }
-    if (r.error === 'nao_classificado') {
+    if (r.error === "nao_classificado") {
       await say(`${mention} você não está classificado para esta fase.`);
       return;
     }
     if (r.error) {
-      await say(`${mention} não consegui salvar seu bônus agora.`);
+      await say(`${mention} não consegui salvar seu bônus agora: ${r.error}`);
       return;
     }
     if (r.data?.alreadyChosen) {
       await say(`${mention} seu bônus desta fase já foi salvo ✅`);
       return;
     }
+
     await say(`${mention} bônus salvo ✅ ${bonusName}`);
     return;
   }
