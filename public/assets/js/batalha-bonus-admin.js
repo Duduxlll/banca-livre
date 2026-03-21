@@ -43,10 +43,6 @@
     return Math.round(n * 100);
   }
 
-  function brRoundLabel(roundName = '') {
-    return String(roundName || '').toUpperCase();
-  }
-
   function readCardPayload(card) {
     return {
       playerAName: qs('[data-role="playerAName"]', card)?.value?.trim() || '',
@@ -90,64 +86,6 @@
     };
   }
 
-  function battleFinished() {
-    return String(state?.battle?.status || '').toUpperCase() === 'FINISHED';
-  }
-
-  function shouldOpenBoard() {
-    return localStorage.getItem(LOCAL_VIEW_KEY) === '1' && !!state?.battle;
-  }
-
-  function setBoardOpen(open) {
-    if (open && state?.battle?.id) {
-      localStorage.setItem(LOCAL_VIEW_KEY, '1');
-      localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
-    } else {
-      localStorage.removeItem(LOCAL_VIEW_KEY);
-    }
-  }
-
-  function countResolvedMatches(rounds) {
-    const all = Array.isArray(rounds) ? rounds.flatMap((round) => round?.matches || []) : [];
-    return all.filter((match) => String(match?.winnerSide || '').toUpperCase() === 'A' || String(match?.winnerSide || '').toUpperCase() === 'B').length;
-  }
-
-  function totalMatches(rounds) {
-    return Array.isArray(rounds) ? rounds.reduce((acc, round) => acc + Number(round?.matches?.length || 0), 0) : 0;
-  }
-
-  function championLabel() {
-    const champion = String(state?.battle?.championName || '').trim();
-    return champion || 'Aguardando campeão';
-  }
-
-  function battleStatusLabel() {
-    return battleFinished() ? 'Finalizada' : 'Ativa';
-  }
-
-  function getCardStateLabel(kind) {
-    if (kind === 'pending') return 'Alterando';
-    if (kind === 'saving') return 'Salvando';
-    if (kind === 'error') return 'Erro';
-    return 'Pronto';
-  }
-
-  function getCardStateClass(kind) {
-    if (kind === 'pending') return 'is-pending';
-    if (kind === 'saving') return 'is-saving';
-    if (kind === 'error') return 'is-error';
-    return 'is-ready';
-  }
-
-  let state = null;
-  let poll = null;
-  let initialized = false;
-  let resizeBound = false;
-  let delegatedBound = false;
-  const saveTimers = new Map();
-  const savingMatches = new Set();
-  const draftMatches = new Map();
-
   function bindDelegatedEvents() {
     if (delegatedBound) return;
     delegatedBound = true;
@@ -182,7 +120,7 @@
         const other = qs(`[data-role="result"][data-side="${side === 'A' ? 'B' : 'A'}"]`, card);
         if (target.value === 'WIN' && other) other.value = 'LOSE';
         rememberDraft(card);
-        scheduleSave(card, 40);
+        scheduleSave(card, 50);
         return;
       }
 
@@ -207,6 +145,32 @@
     });
   }
 
+  function battleFinished() {
+    return String(state?.battle?.status || '').toUpperCase() === 'FINISHED';
+  }
+
+  function shouldOpenBoard() {
+    return localStorage.getItem(LOCAL_VIEW_KEY) === '1' && !!state?.battle;
+  }
+
+  function setBoardOpen(open) {
+    if (open && state?.battle?.id) {
+      localStorage.setItem(LOCAL_VIEW_KEY, '1');
+      localStorage.setItem(LOCAL_ACTIVE_KEY, String(state.battle.id));
+    } else {
+      localStorage.removeItem(LOCAL_VIEW_KEY);
+    }
+  }
+
+  let state = null;
+  let poll = null;
+  let initialized = false;
+  let resizeBound = false;
+  let delegatedBound = false;
+  const saveTimers = new Map();
+  const savingMatches = new Set();
+  const draftMatches = new Map();
+
   function ensureUI() {
     const tab = qs('#tab-batalha-bonus');
     if (!tab) return null;
@@ -215,83 +179,56 @@
     tab.innerHTML = `
       <div id="mbbRoot" class="mbb-root">
         <section id="mbbCreateStage" class="mbb-create-stage">
-          <div class="mbb-create-noise"></div>
-          <div class="mbb-create-card">
-            <div class="mbb-create-top">
-              <div class="mbb-create-copy-wrap">
-                <div class="mbb-create-badge">Batalha bônus premium</div>
-                <h2 class="mbb-create-title">
-                  Monta a sua chave com visual forte e leitura rápida.
-                  <span class="mbb-title-grad">8, 16 ou 32 vagas sem bagunça.</span>
-                </h2>
-                <p class="mbb-create-copy">Agora cada confronto fica mais limpo, com campos maiores para nome do jogador, nome do bônus ou jogo, valor e resultado. A batalha abre em tela cheia com presença forte, melhor contraste e leitura muito melhor em todas as fases.</p>
-                <div class="mbb-create-pills">
-                  <span class="mbb-create-pill">Tela cheia</span>
-                  <span class="mbb-create-pill">Animações suaves</span>
-                  <span class="mbb-create-pill">Melhor leitura</span>
-                  <span class="mbb-create-pill">32 vagas</span>
+          <div class="mbb-create-shell">
+            <div class="mbb-create-card">
+              <div class="mbb-create-head">
+                <div class="mbb-create-title-block">
+                  <h2 class="mbb-create-title">Batalha de bônus</h2>
+                  <p class="mbb-create-subtitle">Cria a batalha, escolhe as vagas e abre a chave no mesmo painel.</p>
                 </div>
+                <div class="mbb-create-badge">Painel ativo</div>
               </div>
-              <div class="mbb-create-sidepanel">
-                <h3 class="mbb-create-sidepanel-title">Visual de campeonato</h3>
-                <p class="mbb-create-sidepanel-copy">A área ficou com cara de evento ao vivo, sem depender daquele verde forte. O foco agora é contraste, profundidade, brilho e espaço para os dados aparecerem direito.</p>
-                <div class="mbb-preview-grid">
-                  <div class="mbb-preview-card">
-                    <strong>8</strong>
-                    <span>Quartas até final</span>
-                  </div>
-                  <div class="mbb-preview-card">
-                    <strong>16</strong>
-                    <span>Oitavas completas</span>
-                  </div>
-                  <div class="mbb-preview-card">
-                    <strong>32</strong>
-                    <span>Top 32 com scroll</span>
-                  </div>
-                  <div class="mbb-preview-card">
-                    <strong>2</strong>
-                    <span>Jogadores visíveis por card</span>
+
+              <div class="mbb-create-form">
+                <label class="mbb-field">
+                  <span>Nome da batalha</span>
+                  <input id="mbbName" class="mbb-input" placeholder="Ex.: Batalha do Guigz">
+                </label>
+                <label class="mbb-field">
+                  <span>Vagas</span>
+                  <select id="mbbSlots" class="mbb-select">
+                    <option value="8">8 vagas</option>
+                    <option value="16">16 vagas</option>
+                    <option value="32">32 vagas</option>
+                  </select>
+                </label>
+                <button id="mbbCreateBtn" class="mbb-btn mbb-btn--primary">Criar batalha</button>
+              </div>
+
+              <div id="mbbActiveResume" class="mbb-active-resume" style="display:none">
+                <div class="mbb-active-resume__text">
+                  <span class="mbb-active-resume__dot"></span>
+                  <div class="mbb-active-resume__stack">
+                    <strong>Tem uma batalha ativa agora</strong>
+                    <span>Abre a batalha atual e continua de onde parou.</span>
                   </div>
                 </div>
+                <button id="mbbGoActiveBtn" class="mbb-btn mbb-btn--ghost">Abrir batalha ativa</button>
               </div>
-            </div>
-
-            <div class="mbb-create-form">
-              <label class="mbb-field">
-                <span>Nome da batalha</span>
-                <input id="mbbName" class="mbb-input" placeholder="Ex.: Batalha da Madrugada">
-              </label>
-              <label class="mbb-field">
-                <span>Vagas</span>
-                <select id="mbbSlots" class="mbb-select">
-                  <option value="8">8 vagas</option>
-                  <option value="16">16 vagas</option>
-                  <option value="32" selected>32 vagas</option>
-                </select>
-              </label>
-              <button id="mbbCreateBtn" class="mbb-btn mbb-btn--primary">Criar batalha</button>
-            </div>
-
-            <div id="mbbActiveResume" class="mbb-active-resume" style="display:none">
-              <div class="mbb-active-resume__text">
-                <strong>Tem uma batalha ativa agora.</strong>
-                <span>Abre a estrutura em tela cheia e continua exatamente de onde parou.</span>
-              </div>
-              <button id="mbbGoActiveBtn" class="mbb-btn mbb-btn--ghost">Ir pra batalha ativa</button>
             </div>
           </div>
         </section>
 
         <section id="mbbBattleStage" class="mbb-battle-stage" style="display:none">
-          <div class="mbb-board-actions">
-            <div class="mbb-board-side">
-              <div class="mbb-board-topline">
-                <h3 class="mbb-board-title" id="mbbBoardTitle">Batalha bônus</h3>
-                <span class="mbb-board-badge is-active" id="mbbBoardStatus">Ativa</span>
+          <div class="mbb-board-header">
+            <div class="mbb-board-brand">
+              <div class="mbb-board-kicker">Batalha de bônus</div>
+              <div class="mbb-board-title-line">
+                <h2 id="mbbBattleTitle" class="mbb-board-title">Batalha</h2>
+                <span id="mbbBattleStatus" class="mbb-status-pill">Ativa</span>
               </div>
-              <div class="mbb-board-submeta" id="mbbBoardMeta"></div>
             </div>
-            <div class="mbb-board-actions-right">
+            <div class="mbb-board-actions">
               <button id="mbbBackBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="back">Voltar</button>
               <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
             </div>
@@ -349,12 +286,10 @@
 
     try {
       rememberDraft(card);
-
       const res = await apiFetch(`/api/batalha-bonus/admin/matches/${encodeURIComponent(matchId)}`, {
         method: 'PATCH',
         body: JSON.stringify(readCardPayload(card))
       });
-
       draftMatches.delete(matchId);
       state = res || state;
       renderBattle();
@@ -372,21 +307,21 @@
 
   function getBoardPreset(firstRoundCount) {
     if (firstRoundCount <= 4) {
-      return { cardWidth: 560, cardHeight: 258, laneGap: 132, baseGap: 34, minScale: 0.84 };
+      return { cardWidth: 520, cardHeight: 194, laneGap: 132, baseGap: 34, minScale: 0.9 };
     }
     if (firstRoundCount <= 8) {
-      return { cardWidth: 540, cardHeight: 242, laneGap: 118, baseGap: 18, minScale: 0.7 };
+      return { cardWidth: 490, cardHeight: 182, laneGap: 110, baseGap: 18, minScale: 0.76 };
     }
-    return { cardWidth: 520, cardHeight: 226, laneGap: 104, baseGap: 10, minScale: 0.5 };
+    return { cardWidth: 450, cardHeight: 168, laneGap: 92, baseGap: 12, minScale: 0.62 };
   }
 
   function computeBoardGeometry(rounds) {
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
     const preset = getBoardPreset(firstRoundCount);
     const { cardWidth, cardHeight, laneGap, baseGap } = preset;
-    const leftPadding = 44;
-    const topPadding = 92;
-    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 60;
+    const leftPadding = 36;
+    const topPadding = 16;
+    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 24;
     const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
 
     const roundMeta = rounds.map((round, roundIdx) => {
@@ -421,7 +356,6 @@
     return {
       cardWidth,
       cardHeight,
-      laneGap,
       minScale: preset.minScale,
       totalWidth,
       totalHeight,
@@ -435,7 +369,7 @@
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'mbbFullscreenOverlay';
-      overlay.innerHTML = `<div class="mbb-fullscreen-shell"></div>`;
+      overlay.innerHTML = '<div class="mbb-fullscreen-shell"></div>';
       document.body.appendChild(overlay);
     }
     return overlay;
@@ -465,35 +399,18 @@
     }
   }
 
-  function updateBoardHeader(rounds) {
-    const titleEl = qs('#mbbBoardTitle');
-    const statusEl = qs('#mbbBoardStatus');
-    const metaEl = qs('#mbbBoardMeta');
-    if (!titleEl || !statusEl || !metaEl) return;
-
-    const battleName = String(state?.battle?.name || 'Batalha bônus').trim() || 'Batalha bônus';
-    const maxPlayers = Number(state?.battle?.maxPlayers || 0);
-    const resolved = countResolvedMatches(rounds);
-    const total = totalMatches(rounds);
-
-    titleEl.textContent = battleName;
-    statusEl.textContent = battleStatusLabel();
-    statusEl.className = `mbb-board-badge ${battleFinished() ? 'is-finished' : 'is-active'}`;
-    metaEl.innerHTML = `
-      <span class="mbb-board-chip">${esc(String(maxPlayers || 0))} vagas</span>
-      <span class="mbb-board-chip">${esc(String(resolved))}/${esc(String(total))} confrontos resolvidos</span>
-      <span class="mbb-board-chip">Campeão: ${esc(championLabel())}</span>
-    `;
-  }
-
   function renderBattle() {
     const createStage = qs('#mbbCreateStage');
     const activeResume = qs('#mbbActiveResume');
     const hasBattle = !!state?.battle;
     const boardOpen = hasBattle && shouldOpenBoard();
+    const battleTitle = qs('#mbbBattleTitle');
+    const battleStatus = qs('#mbbBattleStatus');
 
     if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
     if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
+    if (battleTitle) battleTitle.textContent = state?.battle?.name || 'Batalha de bônus';
+    if (battleStatus) battleStatus.textContent = battleFinished() ? 'Finalizada' : 'Ativa';
 
     setBattleMode(boardOpen);
 
@@ -508,18 +425,16 @@
     if (!stage || !wrap) return;
     if (finalizeBtn) finalizeBtn.disabled = battleFinished() || !state?.battle?.championName;
 
-    updateBoardHeader(rounds);
-
     if (!rounds.length) {
       stage.innerHTML = '<div class="mbb-empty">Nenhuma estrutura encontrada.</div>';
       return;
     }
 
     const geo = computeBoardGeometry(rounds);
-    const availableWidth = Math.max(1080, wrap.clientWidth - 56);
+    const availableWidth = Math.max(1040, wrap.clientWidth - 44);
     const widthScale = availableWidth / geo.totalWidth;
     const scale = Math.min(1, Math.max(geo.minScale, widthScale));
-    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 36;
+    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 18;
 
     stage.style.height = `${scaledHeight}px`;
     stage.innerHTML = `
@@ -527,11 +442,6 @@
         <svg class="mbb-board-lines" viewBox="0 0 ${geo.totalWidth} ${geo.totalHeight}" preserveAspectRatio="none">
           ${geo.lines.map((d) => `<path d="${d}" />`).join('')}
         </svg>
-
-        ${geo.roundMeta.map((meta) => `
-          <div class="mbb-round-title" style="left:${meta.x}px;width:${geo.cardWidth}px;">${esc(brRoundLabel(meta.round.roundName))}</div>
-        `).join('')}
-
         ${geo.roundMeta.flatMap((meta) => meta.cards.map((card) => renderCard(card.match, card.x, card.y, geo.cardWidth, geo.cardHeight))).join('')}
       </div>
     `;
@@ -543,32 +453,13 @@
     const isAWin = winnerSide === 'A';
     const isBWin = winnerSide === 'B';
     const disabled = battleFinished() ? 'disabled' : '';
-    const cardStateKind = savingMatches.has(String(vm.id)) ? 'saving' : '';
-    const cardStateLabel = getCardStateLabel(cardStateKind);
-    const cardStateClass = getCardStateClass(cardStateKind);
 
     return `
-      <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(vm.id)}" data-save-state-kind="${esc(cardStateKind)}" style="left:${x}px;top:${y}px;width:${cardWidth}px;height:${cardHeight}px">
-        <div class="mbb-match-card-bg"></div>
-
-        <div class="mbb-card-head">
-          <div class="mbb-card-head-left">
-            <span class="mbb-card-kicker">${esc(brRoundLabel(vm.roundName || 'Confronto'))}</span>
-            <span class="mbb-card-match-number">Confronto ${esc(String(vm.matchNumber || 1))}</span>
-          </div>
-          <span class="mbb-card-state ${cardStateClass}">${esc(cardStateLabel)}</span>
-        </div>
-
+      <article class="mbb-match-card ${winnerSide ? 'is-resolved' : ''}" data-match-card="1" data-match-id="${esc(vm.id)}" style="left:${x}px;top:${y}px;width:${cardWidth}px;height:${cardHeight}px">
         <div class="mbb-side-row ${isAWin ? 'is-win' : ''}">
-          <div class="mbb-side-main">
-            <div class="mbb-side-topline">
-              <span class="mbb-side-label">Jogador A</span>
-              ${isAWin ? '<span class="mbb-side-win-badge">Winner</span>' : ''}
-            </div>
-            <div class="mbb-player-stack">
-              <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
-              <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
-            </div>
+          <div class="mbb-player-stack">
+            <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
+            <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
           </div>
           <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(vm.valueA))}" ${disabled}>
           <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
@@ -577,18 +468,10 @@
           </select>
         </div>
 
-        <div class="mbb-card-divider"></div>
-
         <div class="mbb-side-row ${isBWin ? 'is-win' : ''}">
-          <div class="mbb-side-main">
-            <div class="mbb-side-topline">
-              <span class="mbb-side-label">Jogador B</span>
-              ${isBWin ? '<span class="mbb-side-win-badge">Winner</span>' : ''}
-            </div>
-            <div class="mbb-player-stack">
-              <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
-              <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
-            </div>
+          <div class="mbb-player-stack">
+            <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
+            <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
           </div>
           <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(vm.valueB))}" ${disabled}>
           <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
@@ -624,7 +507,7 @@
   async function createBattle() {
     try {
       const name = qs('#mbbName')?.value?.trim() || '';
-      const maxPlayers = Number(qs('#mbbSlots')?.value || '32');
+      const maxPlayers = Number(qs('#mbbSlots')?.value || '8');
       if (!name) {
         notify('Preenche o nome da batalha.', 'error');
         return;
