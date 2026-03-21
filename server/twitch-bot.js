@@ -542,7 +542,22 @@ async function batalhaBonusJoin(userTag, displayName) {
       if (cmd.type === "bonus_battle_raw") {
   const raw = String(cmd.payload || '').trim();
   const st = await getBatalhaBonusState();
-  if (st.error || !st.data?.active || !st.data?.battle) return;
+
+console.log("[BATALHA] msg recebida:", raw, "user:", userTag || user);
+
+  if (st.error) {
+  console.log("[BATALHA] erro state:", st);
+  await say(`${mention} não consegui verificar a batalha agora.`);
+  return;
+}
+
+if (!st.data?.active || !st.data?.battle) {
+  console.log("[BATALHA] sem batalha ativa:", st);
+  await say(`${mention} não há batalha ativa agora.`);
+  return;
+}
+
+console.log("[BATALHA] state:", JSON.stringify(st));
 
   const battle = st.data.battle;
   const activeCommand = String(battle.entryCommand || '').trim().toLowerCase();
