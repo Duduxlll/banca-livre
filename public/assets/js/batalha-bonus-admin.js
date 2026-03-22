@@ -607,7 +607,7 @@ function computeBoardGeometry(rounds) {
 const availableWidth = Math.max(1040, wrap.clientWidth - 44);
 const widthScale = availableWidth / geo.totalWidth;
 
-const BRACKET_ZOOM = 0.88;
+const BRACKET_ZOOM = 0.84;
 
 const baseScale = Math.min(1, Math.max(geo.minScale, widthScale));
 const scale = Math.max(0.55, baseScale * BRACKET_ZOOM);
