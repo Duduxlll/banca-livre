@@ -36,7 +36,26 @@
     return n.toFixed(2).replace('.', ',');
   }
 
+  function extractMoneyDigits(value) {
+    return String(value || '').replace(/\D/g, '').slice(0, 9);
+  }
+
+  function formatMoneyDigits(digits, allowEmpty = false) {
+    const clean = extractMoneyDigits(digits);
+    if (!clean) return allowEmpty ? '' : '0,00';
+    return toReaisInput(Number(clean));
+  }
+
+  function applyMoneyMask(input, { allowEmpty = false } = {}) {
+    if (!input) return;
+    const digits = extractMoneyDigits(input.value);
+    input.dataset.moneyDigits = digits;
+    input.value = formatMoneyDigits(digits, allowEmpty);
+  }
+
   function fromReaisInput(value) {
+    const digits = extractMoneyDigits(value);
+    if (digits) return Number(digits);
     const s = String(value || '').trim().replace(/\./g, '').replace(',', '.');
     const n = Number(s);
     if (!Number.isFinite(n) || n < 0) return 0;
@@ -44,14 +63,18 @@
   }
 
   function readCardPayload(card) {
+    const valueAInput = qs('[data-role="valueA"]', card)?.value || '';
+    const valueBInput = qs('[data-role="valueB"]', card)?.value || '';
     return {
       playerAName: qs('[data-role="playerAName"]', card)?.value?.trim() || '',
       bonusA: qs('[data-role="bonusA"]', card)?.value?.trim() || '',
-      valueA: fromReaisInput(qs('[data-role="valueA"]', card)?.value || '0'),
+      valueA: fromReaisInput(valueAInput),
+      valueADisplay: valueAInput,
       resultA: qs('[data-role="result"][data-side="A"]', card)?.value || 'LOSE',
       playerBName: qs('[data-role="playerBName"]', card)?.value?.trim() || '',
       bonusB: qs('[data-role="bonusB"]', card)?.value?.trim() || '',
-      valueB: fromReaisInput(qs('[data-role="valueB"]', card)?.value || '0'),
+      valueB: fromReaisInput(valueBInput),
+      valueBDisplay: valueBInput,
       resultB: qs('[data-role="result"][data-side="B"]', card)?.value || 'LOSE'
     };
   }
@@ -74,10 +97,12 @@
       playerAName: draft.playerAName,
       bonusA: draft.bonusA,
       valueA: draft.valueA,
+      valueADisplay: draft.valueADisplay,
       resultA: draft.resultA,
       playerBName: draft.playerBName,
       bonusB: draft.bonusB,
       valueB: draft.valueB,
+      valueBDisplay: draft.valueBDisplay,
       resultB: draft.resultB,
       winnerSide:
         draft.resultA === 'WIN' ? 'A'
@@ -108,6 +133,13 @@
       }
     });
 
+    document.addEventListener('focusin', (ev) => {
+      const target = ev.target;
+      if (!target.closest('#mbbBattleStage')) return;
+      if (!target.matches('[data-role^="value"]')) return;
+      requestAnimationFrame(() => target.select());
+    });
+
     document.addEventListener('change', (ev) => {
       const target = ev.target;
       if (!target.closest('#mbbBattleStage')) return;
@@ -124,7 +156,14 @@
         return;
       }
 
-      if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
+      if (target.matches('[data-role^="value"]')) {
+        applyMoneyMask(target, { allowEmpty: false });
+        rememberDraft(card);
+        scheduleSave(card, 120);
+        return;
+      }
+
+      if (target.matches('[data-role^="player"], [data-role^="bonus"]')) {
         rememberDraft(card);
         scheduleSave(card, 180);
       }
@@ -137,7 +176,15 @@
       const card = target.closest('[data-match-card="1"]');
       if (!card) return;
 
-      if (target.matches('[data-role^="player"], [data-role^="bonus"], [data-role^="value"]')) {
+      if (target.matches('[data-role^="value"]')) {
+        applyMoneyMask(target, { allowEmpty: true });
+        rememberDraft(card);
+        markCardState(card, 'pending');
+        scheduleSave(card, 420);
+        return;
+      }
+
+      if (target.matches('[data-role^="player"], [data-role^="bonus"]')) {
         rememberDraft(card);
         markCardState(card, 'pending');
         scheduleSave(card, 500);
@@ -307,12 +354,12 @@
 
   function getBoardPreset(firstRoundCount) {
     if (firstRoundCount <= 4) {
-      return { cardWidth: 520, cardHeight: 194, laneGap: 132, baseGap: 34, minScale: 0.9 };
+      return { cardWidth: 520, cardHeight: 186, laneGap: 124, baseGap: 24, minScale: 0.88 };
     }
     if (firstRoundCount <= 8) {
-      return { cardWidth: 490, cardHeight: 182, laneGap: 110, baseGap: 18, minScale: 0.76 };
+      return { cardWidth: 500, cardHeight: 186, laneGap: 112, baseGap: 18, minScale: 0.76 };
     }
-    return { cardWidth: 450, cardHeight: 168, laneGap: 92, baseGap: 12, minScale: 0.62 };
+    return { cardWidth: 470, cardHeight: 176, laneGap: 96, baseGap: 12, minScale: 0.66 };
   }
 
   function computeBoardGeometry(rounds) {
@@ -461,7 +508,7 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
           </div>
-          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" placeholder="0,00" value="${esc(toReaisInput(vm.valueA))}" ${disabled}>
+          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueADisplay ?? toReaisInput(vm.valueA))}" ${disabled}>
           <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
             <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
             <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
@@ -473,7 +520,7 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
           </div>
-          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" placeholder="0,00" value="${esc(toReaisInput(vm.valueB))}" ${disabled}>
+          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueBDisplay ?? toReaisInput(vm.valueB))}" ${disabled}>
           <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
             <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
             <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>

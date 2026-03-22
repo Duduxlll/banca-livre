@@ -516,18 +516,18 @@ body.mbb-battle-active {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 78px 94px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 64px 76px;
+  gap: 6px;
   align-items: center;
-  margin: 9px 9px 0;
-  padding: 8px;
-  border-radius: 16px;
+  margin: 7px 7px 0;
+  padding: 6px;
+  border-radius: 15px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .mbb-side-row:last-child {
-  margin-bottom: 9px;
+  margin-bottom: 7px;
 }
 
 .mbb-side-row.is-win {
@@ -539,46 +539,52 @@ body.mbb-battle-active {
 .mbb-player-stack {
   display: grid;
   grid-template-rows: 1fr 1fr;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
 }
 
+.mbb-player-stack .mbb-mini-input {
+  width: 100%;
+  min-width: 0;
+}
+
+
 .mbb-mini-input,
 .mbb-mini-select {
-  min-height: 38px;
-  border-radius: 13px;
-  padding: 8px 10px;
-  font-size: 13px;
+  min-height: 34px;
+  border-radius: 12px;
+  padding: 7px 9px;
+  font-size: 12px;
   font-weight: 850;
 }
 
 .mbb-mini-input--name {
-  min-height: 40px;
-  font-size: 15px;
+  min-height: 36px;
+  font-size: 14px;
   font-weight: 950;
 }
 
 .mbb-mini-input--bonus {
-  min-height: 34px;
-  font-size: 12px;
+  min-height: 30px;
+  font-size: 11px;
   color: rgba(236, 241, 244, 0.82);
 }
 
 .mbb-mini-input--value {
-  min-height: 82px;
-  padding: 0 8px;
+  min-height: 71px;
+  padding: 0 6px;
   text-align: center;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 950;
   letter-spacing: -0.02em;
 }
 
 .mbb-mini-select {
-  min-height: 82px;
-  padding: 0 12px;
+  min-height: 71px;
+  padding: 0 8px;
   text-align: center;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 950;
 }
 
@@ -632,4 +638,25 @@ body.mbb-battle-active {
   .mbb-board-actions {
     justify-content: flex-end;
   }
+}
+
+
+.mbb-mini-input--name,
+.mbb-mini-input--bonus,
+.mbb-mini-input--value {
+  width: 100%;
+  min-width: 0;
+}
+
+.mbb-mini-input--name,
+.mbb-mini-input--bonus {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mbb-mini-input--value::-webkit-outer-spin-button,
+.mbb-mini-input--value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
