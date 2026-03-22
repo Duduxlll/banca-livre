@@ -4,6 +4,8 @@
   const LOCAL_VIEW_KEY = 'mbb:viewOpen';
   const LOCAL_ACTIVE_KEY = 'mbb:activeBattleId';
 
+  let forceBracketView = false;
+
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([$?*|{}\\^])/g, '\\$1') + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : null;
@@ -60,6 +62,40 @@
     const n = Number(s);
     if (!Number.isFinite(n) || n < 0) return 0;
     return Math.round(n * 100);
+  }
+
+  function toBrlLabel(cents = 0) {
+    const value = Math.max(0, Number(cents || 0)) / 100;
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function maskPixKey(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '—';
+    if (raw.length <= 8) return raw;
+    return `${raw.slice(0, 4)}••••${raw.slice(-4)}`;
+  }
+
+  function championStatusLabel(status = '') {
+    const s = String(status || '').toUpperCase();
+    if (s === 'APROVADO') return 'Aprovado';
+    if (s === 'REPROVADO') return 'Reprovado';
+    if (s === 'PENDENTE') return 'Pendente';
+    return 'Sem print';
+  }
+
+  async function copyToClipboard(textToCopy, okMessage) {
+    const value = String(textToCopy || '').trim();
+    if (!value) {
+      notify('Nada para copiar.', 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      notify(okMessage || 'Copiado.', 'ok');
+    } catch {
+      notify('Não consegui copiar automaticamente.', 'error');
+    }
   }
 
   function readCardPayload(card) {
@@ -130,6 +166,22 @@
       if (btn.dataset.mbbAction === 'back') {
         setBoardOpen(false);
         renderBattle();
+        return;
+      }
+
+      if (btn.dataset.mbbAction === 'toggle-champion-view') {
+        forceBracketView = !forceBracketView;
+        renderBattle();
+        return;
+      }
+
+      if (btn.dataset.mbbAction === 'copy-pix') {
+        await copyToClipboard(btn.dataset.pix || '', 'PIX copiado.');
+        return;
+      }
+
+      if (btn.dataset.mbbAction === 'copy-emv') {
+        await copyToClipboard(btn.dataset.emv || '', 'Código Pix copiado.');
       }
     });
 
@@ -249,6 +301,10 @@
                     <option value="32">32 vagas</option>
                   </select>
                 </label>
+                <label class="mbb-field">
+                  <span>Premiação</span>
+                  <input id="mbbPrize" class="mbb-input" inputmode="numeric" autocomplete="off" placeholder="0,00" value="0,00">
+                </label>
                 <button id="mbbCreateBtn" class="mbb-btn mbb-btn--primary">Criar batalha</button>
               </div>
 
@@ -273,9 +329,11 @@
               <div class="mbb-board-title-line">
                 <h2 id="mbbBattleTitle" class="mbb-board-title">Batalha</h2>
                 <span id="mbbBattleStatus" class="mbb-status-pill">Ativa</span>
+                <span id="mbbBattlePrize" class="mbb-prize-pill" style="display:none">Premiação R$ 0,00</span>
               </div>
             </div>
             <div class="mbb-board-actions">
+              <button id="mbbChampionToggleBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="toggle-champion-view" style="display:none">Ver chave</button>
               <button id="mbbBackBtn" class="mbb-btn mbb-btn--ghost" data-mbb-action="back">Voltar</button>
               <button id="mbbFinalizeBtn" class="mbb-btn mbb-btn--danger" data-mbb-action="finalize">Finalizar batalha</button>
             </div>
@@ -288,6 +346,16 @@
     `;
 
     qs('#mbbCreateBtn', tab)?.addEventListener('click', createBattle);
+
+    const prizeInput = qs('#mbbPrize', tab);
+    if (prizeInput) {
+      applyMoneyMask(prizeInput, { allowEmpty: false });
+      prizeInput.addEventListener('focus', () => requestAnimationFrame(() => prizeInput.select()));
+      prizeInput.addEventListener('input', () => applyMoneyMask(prizeInput, { allowEmpty: true }));
+      prizeInput.addEventListener('change', () => applyMoneyMask(prizeInput, { allowEmpty: false }));
+      prizeInput.addEventListener('blur', () => applyMoneyMask(prizeInput, { allowEmpty: false }));
+    }
+
     qs('#mbbGoActiveBtn', tab)?.addEventListener('click', async () => {
       try {
         await refresh();
@@ -354,12 +422,12 @@
 
   function getBoardPreset(firstRoundCount) {
     if (firstRoundCount <= 4) {
-      return { cardWidth: 520, cardHeight: 184, laneGap: 124, baseGap: 24, minScale: 0.88 };
+      return { cardWidth: 520, cardHeight: 186, laneGap: 124, baseGap: 24, minScale: 0.88 };
     }
     if (firstRoundCount <= 8) {
-      return { cardWidth: 500, cardHeight: 184, laneGap: 112, baseGap: 18, minScale: 0.76 };
+      return { cardWidth: 500, cardHeight: 186, laneGap: 112, baseGap: 18, minScale: 0.76 };
     }
-    return { cardWidth: 470, cardHeight: 172, laneGap: 96, baseGap: 12, minScale: 0.66 };
+    return { cardWidth: 470, cardHeight: 176, laneGap: 96, baseGap: 12, minScale: 0.66 };
   }
 
   function computeBoardGeometry(rounds) {
@@ -453,11 +521,24 @@
     const boardOpen = hasBattle && shouldOpenBoard();
     const battleTitle = qs('#mbbBattleTitle');
     const battleStatus = qs('#mbbBattleStatus');
+    const battlePrize = qs('#mbbBattlePrize');
+    const championToggleBtn = qs('#mbbChampionToggleBtn');
+    const championReady = !!state?.battle?.championName;
+    const showChampionScreen = championReady && !forceBracketView;
 
     if (createStage) createStage.style.display = !boardOpen ? '' : 'none';
     if (activeResume) activeResume.style.display = hasBattle && !boardOpen ? 'flex' : 'none';
     if (battleTitle) battleTitle.textContent = state?.battle?.name || 'Batalha de bônus';
     if (battleStatus) battleStatus.textContent = battleFinished() ? 'Finalizada' : 'Ativa';
+    if (battlePrize) {
+      const cents = Number(state?.battle?.prizeCents || 0);
+      battlePrize.style.display = cents > 0 ? '' : 'none';
+      battlePrize.textContent = `Premiação ${toBrlLabel(cents)}`;
+    }
+    if (championToggleBtn) {
+      championToggleBtn.style.display = championReady ? '' : 'none';
+      championToggleBtn.textContent = showChampionScreen ? 'Ver chave' : 'Ver campeão';
+    }
 
     setBattleMode(boardOpen);
 
@@ -471,6 +552,15 @@
 
     if (!stage || !wrap) return;
     if (finalizeBtn) finalizeBtn.disabled = battleFinished() || !state?.battle?.championName;
+
+    if (showChampionScreen) {
+      wrap.classList.add('is-champion-view');
+      stage.style.height = 'auto';
+      stage.innerHTML = renderChampionScreen();
+      return;
+    }
+
+    wrap.classList.remove('is-champion-view');
 
     if (!rounds.length) {
       stage.innerHTML = '<div class="mbb-empty">Nenhuma estrutura encontrada.</div>';
@@ -494,6 +584,62 @@
     `;
   }
 
+  function renderChampionScreen() {
+    const payout = state?.championPayout || null;
+    const championName = payout?.championName || state?.battle?.championName || 'Campeão';
+    const prizeCents = Number(payout?.amountCents ?? state?.battle?.prizeCents ?? 0);
+    const status = String(payout?.status || '').toUpperCase();
+    const approved = !!payout?.approved;
+    const hasQr = !!payout?.qrCodeDataUrl;
+    const statusClass = approved ? 'is-approved' : (status === 'REPROVADO' ? 'is-reproved' : (status === 'PENDENTE' ? 'is-pending' : 'is-empty'));
+    const helper = approved
+      ? 'Print aprovado e Pix pronto para pagamento.'
+      : (status === 'REPROVADO'
+        ? 'O último print foi reprovado. Ajusta no painel de prints antes de pagar.'
+        : (status === 'PENDENTE'
+          ? 'O print ainda está pendente. Aprova no painel de prints para liberar o Pix.'
+          : 'Esse campeão ainda não tem print aprovado cadastrado.'));
+
+    return `
+      <section class="mbb-champion-screen">
+        <div class="mbb-champion-card">
+          <div class="mbb-champion-kicker">Campeão da batalha</div>
+          <h3 class="mbb-champion-battle">${esc(state?.battle?.name || 'Batalha de bônus')}</h3>
+          <div class="mbb-champion-name">${esc(championName)}</div>
+          <div class="mbb-champion-row">
+            <span class="mbb-champion-status ${statusClass}">${esc(championStatusLabel(status))}</span>
+            <span class="mbb-champion-prize">Premiação ${esc(toBrlLabel(prizeCents))}</span>
+          </div>
+          <p class="mbb-champion-helper">${esc(helper)}</p>
+          ${payout?.reason ? `<div class="mbb-champion-note">Motivo: <strong>${esc(payout.reason)}</strong></div>` : ''}
+        </div>
+
+        <div class="mbb-payout-card">
+          <div class="mbb-payout-head">
+            <strong>Pagamento Pix</strong>
+            <span>${esc(payout?.pixType ? `Pix ${payout.pixType}` : 'Pix do print')}</span>
+          </div>
+
+          ${hasQr ? `
+            <div class="mbb-payout-qr-wrap">
+              <img class="mbb-payout-qr" src="${esc(payout.qrCodeDataUrl)}" alt="QR Code Pix">
+            </div>
+            <div class="mbb-payout-code">${esc(maskPixKey(payout?.pixKey || ''))}</div>
+            <div class="mbb-payout-actions">
+              <button class="mbb-btn mbb-btn--primary" data-mbb-action="copy-pix" data-pix="${esc(payout?.pixKey || '')}">Copiar Pix</button>
+              <button class="mbb-btn mbb-btn--ghost" data-mbb-action="copy-emv" data-emv="${esc(payout?.emv || '')}">Copiar código</button>
+            </div>
+          ` : `
+            <div class="mbb-payout-empty">
+              <div class="mbb-payout-empty__title">QR Code ainda não liberado</div>
+              <div class="mbb-payout-empty__text">${esc(helper)}</div>
+            </div>
+          `}
+        </div>
+      </section>
+    `;
+  }
+
   function renderCard(match, x, y, cardWidth, cardHeight) {
     const vm = getRenderedMatch(match);
     const winnerSide = String(vm.winnerSide || '').toUpperCase();
@@ -508,7 +654,7 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
           </div>
-          <div class="mbb-side-meta">
+          <div class="mbb-side-controls">
             <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
               <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
               <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
@@ -522,7 +668,7 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
           </div>
-          <div class="mbb-side-meta">
+          <div class="mbb-side-controls">
             <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
               <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
               <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
@@ -542,8 +688,10 @@
     if (!state?.battle) {
       setBoardOpen(false);
       draftMatches.clear();
+      forceBracketView = false;
       localStorage.removeItem(LOCAL_ACTIVE_KEY);
     } else {
+      if (!state.battle.championName) forceBracketView = false;
       const remembered = localStorage.getItem(LOCAL_ACTIVE_KEY);
       if (remembered && remembered !== String(state.battle.id)) {
         setBoardOpen(false);
@@ -559,14 +707,20 @@
     try {
       const name = qs('#mbbName')?.value?.trim() || '';
       const maxPlayers = Number(qs('#mbbSlots')?.value || '8');
+      const prizeCents = fromReaisInput(qs('#mbbPrize')?.value || '');
       if (!name) {
         notify('Preenche o nome da batalha.', 'error');
         return;
       }
+      if (prizeCents <= 0) {
+        notify('Preenche a premiação da batalha.', 'error');
+        return;
+      }
       await apiFetch('/api/batalha-bonus/admin/create', {
         method: 'POST',
-        body: JSON.stringify({ name, maxPlayers })
+        body: JSON.stringify({ name, maxPlayers, prizeCents })
       });
+      forceBracketView = false;
       await refresh();
       setBoardOpen(true);
       requestAnimationFrame(() => renderBattle());

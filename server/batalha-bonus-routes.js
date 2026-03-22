@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 const BATTLE_STATUS = {
   ACTIVE: 'ACTIVE',
   FINISHED: 'FINISHED'
@@ -9,6 +11,80 @@ const RESULT = {
 };
 
 const ALLOWED_SLOTS = new Set([8, 16, 32]);
+
+function normalizeLookupName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/^@+/, '')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
+function digitsOnly(v) {
+  return String(v || '').replace(/\D+/g, '');
+}
+
+function centsToPixAmount(cents) {
+  const n = Math.max(0, asInt(cents, 0));
+  return (n / 100).toFixed(2);
+}
+
+function cleanPixText(v, max) {
+  const s = String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9 .\-_/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+  return max ? s.slice(0, max) : s;
+}
+
+function tlv(id, value) {
+  const v = String(value ?? '');
+  return `${id}${String(v.length).padStart(2, '0')}${v}`;
+}
+
+function crc16(payload) {
+  let crc = 0xffff;
+  for (let i = 0; i < payload.length; i += 1) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j += 1) {
+      if (crc & 0x8000) crc = ((crc << 1) ^ 0x1021) & 0xffff;
+      else crc = (crc << 1) & 0xffff;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function buildPixPayload({ pixKey, amountCents, battleName, championName, battleId }) {
+  const key = safeText(pixKey, 160);
+  if (!key) return null;
+
+  const merchantName = cleanPixText(process.env.PIX_MERCHANT_NAME || process.env.ADMIN_USER || 'GUIZ', 25) || 'GUIZ';
+  const merchantCity = cleanPixText(process.env.PIX_MERCHANT_CITY || 'BRASIL', 15) || 'BRASIL';
+  const description = cleanPixText(`${battleName || 'BATALHA BONUS'} ${championName || ''}`, 72);
+  const txidBase = cleanPixText(`${battleId || 'BATALHA'}${digitsOnly(amountCents).slice(0, 8)}`, 25).replace(/[^A-Z0-9]/g, '');
+  const txid = txidBase || 'BATALHABONUS';
+
+  let merchantAccount = tlv('00', 'br.gov.bcb.pix') + tlv('01', key);
+  if (description) merchantAccount += tlv('02', description);
+
+  let payload = '';
+  payload += tlv('00', '01');
+  payload += tlv('26', merchantAccount);
+  payload += tlv('52', '0000');
+  payload += tlv('53', '986');
+  if (Math.max(0, asInt(amountCents, 0)) > 0) payload += tlv('54', centsToPixAmount(amountCents));
+  payload += tlv('58', 'BR');
+  payload += tlv('59', merchantName);
+  payload += tlv('60', merchantCity);
+  payload += tlv('62', tlv('05', txid));
+
+  const base = `${payload}6304`;
+  return `${base}${crc16(base)}`;
+}
+
 
 function asInt(v, def = 0) {
   const n = Number(v);
@@ -57,6 +133,7 @@ function mapBattleRow(r) {
     id: r.id,
     name: r.name,
     maxPlayers: Number(r.maxPlayers || 0),
+    prizeCents: Number(r.prizeCents || 0),
     status: r.status,
     championName: r.championName || '',
     createdAt: r.createdAt,
@@ -96,6 +173,7 @@ async function getActiveBattle(q) {
        id,
        name,
        max_players AS "maxPlayers",
+       prize_cents AS "prizeCents",
        status,
        champion_name AS "championName",
        created_at AS "createdAt",
@@ -116,6 +194,7 @@ async function getBattleById(q, battleId) {
        id,
        name,
        max_players AS "maxPlayers",
+       prize_cents AS "prizeCents",
        status,
        champion_name AS "championName",
        created_at AS "createdAt",
@@ -333,6 +412,99 @@ async function syncForward(q, battleId, roundNumber, matchNumber) {
   await syncForward(q, battleId, current.nextRoundNumber, current.nextMatchNumber);
 }
 
+async function buildChampionPayout(q, battle) {
+  const championName = safeText(battle?.championName, 60);
+  if (!championName) return null;
+
+  const twitchNameLc = normalizeLookupName(championName);
+  if (!twitchNameLc) {
+    return {
+      championName,
+      status: 'SEM_CADASTRO',
+      approved: false,
+      pixKey: null,
+      pixType: null,
+      qrCodeDataUrl: null,
+      emv: null,
+      amountCents: Math.max(0, asInt(battle?.prizeCents, 0)),
+      reason: null
+    };
+  }
+
+  const { rows } = await q(
+    `SELECT
+       id,
+       twitch_name AS "twitchName",
+       pix_type AS "pixType",
+       pix_key AS "pixKey",
+       status,
+       reason,
+       screenshot_data_url IS NOT NULL AS "hasScreenshot",
+       updated_at AS "updatedAt",
+       decided_at AS "decidedAt"
+     FROM cashback_submissions
+     WHERE twitch_name_lc = $1
+     ORDER BY updated_at DESC, created_at DESC
+     LIMIT 1`,
+    [twitchNameLc]
+  );
+
+  const row = rows[0];
+  const amountCents = Math.max(0, asInt(battle?.prizeCents, 0));
+  if (!row) {
+    return {
+      championName,
+      status: 'SEM_CADASTRO',
+      approved: false,
+      pixKey: null,
+      pixType: null,
+      qrCodeDataUrl: null,
+      emv: null,
+      amountCents,
+      reason: null
+    };
+  }
+
+  const approved = String(row.status || '').toUpperCase() === 'APROVADO';
+  let emv = null;
+  let qrCodeDataUrl = null;
+
+  if (approved && row.pixKey && amountCents > 0) {
+    emv = buildPixPayload({
+      pixKey: row.pixKey,
+      amountCents,
+      battleName: battle?.name,
+      championName,
+      battleId: battle?.id
+    });
+
+    if (emv) {
+      qrCodeDataUrl = await QRCode.toDataURL(emv, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 360
+      });
+    }
+  }
+
+  return {
+    submissionId: row.id,
+    championName,
+    twitchName: row.twitchName || championName,
+    status: String(row.status || '').toUpperCase() || 'PENDENTE',
+    approved,
+    pixKey: row.pixKey || null,
+    pixType: row.pixType || null,
+    hasScreenshot: !!row.hasScreenshot,
+    updatedAt: row.updatedAt || null,
+    decidedAt: row.decidedAt || null,
+    reason: row.reason || null,
+    amountCents,
+    emv,
+    qrCodeDataUrl
+  };
+}
+
 function computeOverview(battle, matches) {
   const roundsMap = new Map();
   for (const match of matches) {
@@ -384,6 +556,7 @@ async function buildBattleState(q, battleId) {
   if (!battle) return null;
   const matches = await getMatches(q, battleId);
   const overview = computeOverview(battle, matches);
+  const championPayout = await buildChampionPayout(q, battle);
   return {
     battle: {
       ...battle,
@@ -392,7 +565,8 @@ async function buildBattleState(q, battleId) {
     },
     rounds: overview.rounds,
     matches,
-    counts: overview.counts
+    counts: overview.counts,
+    championPayout
   };
 }
 
@@ -402,6 +576,7 @@ export async function ensureBatalhaBonusTables(q) {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       max_players INT NOT NULL,
+      prize_cents INT NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'ACTIVE',
       champion_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -409,6 +584,8 @@ export async function ensureBatalhaBonusTables(q) {
       finished_at TIMESTAMPTZ
     )
   `);
+
+  await q(`ALTER TABLE bonus_manual_battles ADD COLUMN IF NOT EXISTS prize_cents INT NOT NULL DEFAULT 0`);
 
   await q(`
     CREATE TABLE IF NOT EXISTS bonus_manual_matches (
@@ -476,8 +653,10 @@ export function registerBatalhaBonusRoutes({ app, q, uid, requireAppKey, require
 
       const name = safeText(req.body?.name, 60);
       const maxPlayers = asInt(req.body?.maxPlayers, 0);
+      const prizeCents = Math.max(0, asInt(req.body?.prizeCents, 0));
       if (!name) return res.status(400).json({ error: 'nome_obrigatorio' });
       if (!ALLOWED_SLOTS.has(maxPlayers)) return res.status(400).json({ error: 'vagas_invalidas' });
+      if (prizeCents <= 0) return res.status(400).json({ error: 'premiacao_obrigatoria' });
 
       const battleId = uid();
       await q(
@@ -485,13 +664,14 @@ export function registerBatalhaBonusRoutes({ app, q, uid, requireAppKey, require
            id,
            name,
            max_players,
+           prize_cents,
            status,
            champion_name,
            created_at,
            updated_at
          )
-         VALUES ($1, $2, $3, $4, NULL, now(), now())`,
-        [battleId, name, maxPlayers, BATTLE_STATUS.ACTIVE]
+         VALUES ($1, $2, $3, $4, $5, NULL, now(), now())`,
+        [battleId, name, maxPlayers, prizeCents, BATTLE_STATUS.ACTIVE]
       );
 
       const plan = buildRoundPlan(maxPlayers);
