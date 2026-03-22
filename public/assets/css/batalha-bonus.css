@@ -584,18 +584,13 @@ body.mbb-battle-active {
   position: absolute;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.055);
   background:
-    radial-gradient(circle at top right, rgba(79, 224, 140, 0.09), transparent 25%),
-    linear-gradient(180deg, rgba(14, 18, 23, 0.985), rgba(8, 11, 15, 0.995));
-  box-shadow:
-    0 22px 44px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255,255,255,0.02);
-  transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
-  padding: 6px;
+    radial-gradient(circle at top right, rgba(79, 224, 140, 0.07), transparent 24%),
+    linear-gradient(180deg, rgba(14, 17, 22, 0.98), rgba(9, 11, 15, 0.99));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  padding: 8px;
 }
 
 .mbb-match-card:hover {
@@ -642,15 +637,16 @@ body.mbb-battle-active {
   grid-template-columns: minmax(0, 1fr) 96px;
   gap: 10px;
   align-items: stretch;
-  margin: 8px 8px 0;
-  padding: 8px;
-  border-radius: 17px;
-  background: rgba(255, 255, 255, 0.022);
-  border: 1px solid rgba(255, 255, 255, 0.045);
+  margin: 0 0 8px;
+  padding: 10px;
+  min-height: 92px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .mbb-side-row:last-child {
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .mbb-side-row.is-win {
@@ -664,14 +660,15 @@ body.mbb-battle-active {
 .mbb-player-stack {
   display: grid;
   grid-template-rows: 1fr 1fr;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
+  align-content: stretch;
 }
 
 .mbb-side-controls {
   display: grid;
   grid-template-rows: 1fr 1fr;
-  gap: 7px;
+  gap: 8px;
 }
 
 .mbb-player-stack .mbb-mini-input {
@@ -681,11 +678,11 @@ body.mbb-battle-active {
 
 .mbb-mini-input,
 .mbb-mini-select {
-  width: 100%;
-  min-width: 0;
+  min-height: 36px;
   border-radius: 13px;
   padding: 7px 10px;
-  line-height: 1.18;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .mbb-mini-input {
@@ -703,23 +700,17 @@ body.mbb-battle-active {
   padding: 9px 12px;
   font-size: 14px;
   font-weight: 950;
-  letter-spacing: -0.01em;
 }
 
 .mbb-mini-input--bonus {
-  min-height: 36px;
+  min-height: 38px;
   padding: 8px 12px;
   font-size: 12px;
-  font-weight: 800;
-  color: rgba(237, 243, 247, 0.88);
-  letter-spacing: 0.01em;
-  background:
-    linear-gradient(180deg, rgba(13, 17, 22, 0.98), rgba(8, 11, 15, 0.98));
-  border-color: rgba(111, 255, 180, 0.08);
+  color: rgba(236, 241, 244, 0.82);
 }
 
 .mbb-mini-input--value {
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 8px;
   text-align: center;
   font-size: 13px;
@@ -728,9 +719,12 @@ body.mbb-battle-active {
 }
 
 .mbb-mini-select {
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 8px;
+  text-align: center;
+  cursor: pointer;
   font-size: 11px;
+  font-weight: 950;
 }
 
 .mbb-mini-select.is-win {
@@ -742,6 +736,15 @@ body.mbb-battle-active {
 .mbb-mini-input--name,
 .mbb-mini-input--bonus,
 .mbb-mini-input--value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mbb-mini-input--name,
+.mbb-mini-input--bonus {
+  width: 100%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

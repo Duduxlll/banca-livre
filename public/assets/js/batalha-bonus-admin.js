@@ -414,15 +414,14 @@
   }
 
   function getBoardPreset(firstRoundCount) {
-    if (firstRoundCount <= 4) {
-      return { cardWidth: 520, cardHeight: 186, laneGap: 124, baseGap: 24, minScale: 0.88 };
-    }
-    if (firstRoundCount <= 8) {
-      return { cardWidth: 500, cardHeight: 186, laneGap: 112, baseGap: 18, minScale: 0.76 };
-    }
-    return { cardWidth: 470, cardHeight: 176, laneGap: 96, baseGap: 12, minScale: 0.66 };
+  if (firstRoundCount <= 4) {
+    return { cardWidth: 500, cardHeight: 220, laneGap: 118, baseGap: 22, minScale: 0.84 };
   }
-
+  if (firstRoundCount <= 8) {
+    return { cardWidth: 480, cardHeight: 220, laneGap: 100, baseGap: 16, minScale: 0.70 };
+  }
+  return { cardWidth: 450, cardHeight: 210, laneGap: 84, baseGap: 10, minScale: 0.60 };
+}
   function computeBoardGeometry(rounds) {
     const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
     const preset = getBoardPreset(firstRoundCount);
