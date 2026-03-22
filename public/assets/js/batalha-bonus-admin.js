@@ -604,15 +604,16 @@ function computeBoardGeometry(rounds) {
     }
 
     const geo = computeBoardGeometry(rounds);
-const availableWidth = Math.max(wrap.clientWidth - 56, 980);
+const availableWidth = Math.max(1040, wrap.clientWidth - 44);
 const widthScale = availableWidth / geo.totalWidth;
-const scale = Math.min(1, Math.max(geo.minScale, widthScale));
-const scaledHeight = Math.max(760, Math.ceil(geo.totalHeight * scale) + 36);
-const scaledWidth = Math.ceil(geo.totalWidth * scale);
+
+const BRACKET_ZOOM = 0.88;
+
+const baseScale = Math.min(1, Math.max(geo.minScale, widthScale));
+const scale = Math.max(0.55, baseScale * BRACKET_ZOOM);
+const scaledHeight = Math.ceil(geo.totalHeight * scale) + 24;
 
 stage.style.height = `${scaledHeight}px`;
-stage.style.minWidth = `${Math.max(scaledWidth, wrap.clientWidth - 24)}px`;
-
 stage.innerHTML = `
   <div class="mbb-board" style="width:${geo.totalWidth}px;height:${geo.totalHeight}px;transform:scale(${scale})">
     <svg class="mbb-board-lines" viewBox="0 0 ${geo.totalWidth} ${geo.totalHeight}" preserveAspectRatio="none">
