@@ -175,14 +175,7 @@
         return;
       }
 
-      if (btn.dataset.mbbAction === 'copy-pix') {
-        await copyToClipboard(btn.dataset.pix || '', 'PIX copiado.');
-        return;
-      }
-
-      if (btn.dataset.mbbAction === 'copy-emv') {
-        await copyToClipboard(btn.dataset.emv || '', 'Código Pix copiado.');
-      }
+      
     });
 
     document.addEventListener('focusin', (ev) => {
@@ -624,11 +617,7 @@
             <div class="mbb-payout-qr-wrap">
               <img class="mbb-payout-qr" src="${esc(payout.qrCodeDataUrl)}" alt="QR Code Pix">
             </div>
-            <div class="mbb-payout-code">${esc(maskPixKey(payout?.pixKey || ''))}</div>
-            <div class="mbb-payout-actions">
-              <button class="mbb-btn mbb-btn--primary" data-mbb-action="copy-pix" data-pix="${esc(payout?.pixKey || '')}">Copiar Pix</button>
-              <button class="mbb-btn mbb-btn--ghost" data-mbb-action="copy-emv" data-emv="${esc(payout?.emv || '')}">Copiar código</button>
-            </div>
+            
           ` : `
             <div class="mbb-payout-empty">
               <div class="mbb-payout-empty__title">QR Code ainda não liberado</div>
