@@ -354,12 +354,12 @@
 
   function getBoardPreset(firstRoundCount) {
     if (firstRoundCount <= 4) {
-      return { cardWidth: 520, cardHeight: 186, laneGap: 124, baseGap: 24, minScale: 0.88 };
+      return { cardWidth: 520, cardHeight: 184, laneGap: 124, baseGap: 24, minScale: 0.88 };
     }
     if (firstRoundCount <= 8) {
-      return { cardWidth: 500, cardHeight: 186, laneGap: 112, baseGap: 18, minScale: 0.76 };
+      return { cardWidth: 500, cardHeight: 184, laneGap: 112, baseGap: 18, minScale: 0.76 };
     }
-    return { cardWidth: 470, cardHeight: 176, laneGap: 96, baseGap: 12, minScale: 0.66 };
+    return { cardWidth: 470, cardHeight: 172, laneGap: 96, baseGap: 12, minScale: 0.66 };
   }
 
   function computeBoardGeometry(rounds) {
@@ -508,11 +508,13 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerAName" placeholder="Nome do jogador" value="${esc(vm.playerAName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusA" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusA || '')}" ${disabled}>
           </div>
-          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueADisplay ?? toReaisInput(vm.valueA))}" ${disabled}>
-          <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
-            <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
-            <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
-          </select>
+          <div class="mbb-side-meta">
+            <select class="mbb-mini-select ${isAWin ? 'is-win' : ''}" data-role="result" data-side="A" ${disabled}>
+              <option value="LOSE" ${vm.resultA === 'LOSE' ? 'selected' : ''}>LOSE</option>
+              <option value="WIN" ${vm.resultA === 'WIN' ? 'selected' : ''}>WIN</option>
+            </select>
+            <input class="mbb-mini-input mbb-mini-input--value" data-role="valueA" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueADisplay ?? toReaisInput(vm.valueA))}" ${disabled}>
+          </div>
         </div>
 
         <div class="mbb-side-row ${isBWin ? 'is-win' : ''}">
@@ -520,11 +522,13 @@
             <input class="mbb-mini-input mbb-mini-input--name" data-role="playerBName" placeholder="Nome do jogador" value="${esc(vm.playerBName || '')}" ${disabled}>
             <input class="mbb-mini-input mbb-mini-input--bonus" data-role="bonusB" placeholder="Nome do bônus / jogo" value="${esc(vm.bonusB || '')}" ${disabled}>
           </div>
-          <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueBDisplay ?? toReaisInput(vm.valueB))}" ${disabled}>
-          <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
-            <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
-            <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
-          </select>
+          <div class="mbb-side-meta">
+            <select class="mbb-mini-select ${isBWin ? 'is-win' : ''}" data-role="result" data-side="B" ${disabled}>
+              <option value="LOSE" ${vm.resultB === 'LOSE' ? 'selected' : ''}>LOSE</option>
+              <option value="WIN" ${vm.resultB === 'WIN' ? 'selected' : ''}>WIN</option>
+            </select>
+            <input class="mbb-mini-input mbb-mini-input--value" data-role="valueB" inputmode="numeric" autocomplete="off" placeholder="0,00" value="${esc(vm.valueBDisplay ?? toReaisInput(vm.valueB))}" ${disabled}>
+          </div>
         </div>
       </article>
     `;

@@ -516,9 +516,9 @@ body.mbb-battle-active {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px 76px;
+  grid-template-columns: minmax(0, 1fr) 76px;
   gap: 6px;
-  align-items: center;
+  align-items: stretch;
   margin: 7px 7px 0;
   padding: 6px;
   border-radius: 15px;
@@ -548,43 +548,49 @@ body.mbb-battle-active {
   min-width: 0;
 }
 
+.mbb-side-meta {
+  display: grid;
+  grid-template-rows: 30px 1fr;
+  gap: 5px;
+  min-width: 0;
+}
 
 .mbb-mini-input,
 .mbb-mini-select {
-  min-height: 34px;
+  min-height: 32px;
   border-radius: 12px;
-  padding: 7px 9px;
-  font-size: 12px;
+  padding: 6px 8px;
+  font-size: 11px;
   font-weight: 850;
 }
 
 .mbb-mini-input--name {
-  min-height: 36px;
-  font-size: 14px;
+  min-height: 35px;
+  font-size: 13px;
   font-weight: 950;
 }
 
 .mbb-mini-input--bonus {
-  min-height: 30px;
-  font-size: 11px;
+  min-height: 28px;
+  font-size: 10px;
   color: rgba(236, 241, 244, 0.82);
 }
 
 .mbb-mini-input--value {
-  min-height: 71px;
-  padding: 0 6px;
+  min-height: 36px;
+  padding: 0 4px;
   text-align: center;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 950;
   letter-spacing: -0.02em;
 }
 
 .mbb-mini-select {
-  min-height: 71px;
-  padding: 0 8px;
+  min-height: 30px;
+  padding: 0 6px;
   text-align: center;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 950;
 }
 
