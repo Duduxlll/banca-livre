@@ -415,61 +415,105 @@
 
   function getBoardPreset(firstRoundCount) {
   if (firstRoundCount <= 4) {
-    return { cardWidth: 500, cardHeight: 220, laneGap: 118, baseGap: 22, minScale: 0.84 };
-  }
-  if (firstRoundCount <= 8) {
-    return { cardWidth: 480, cardHeight: 220, laneGap: 100, baseGap: 16, minScale: 0.70 };
-  }
-  return { cardWidth: 450, cardHeight: 210, laneGap: 84, baseGap: 10, minScale: 0.60 };
-}
-  function computeBoardGeometry(rounds) {
-    const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
-    const preset = getBoardPreset(firstRoundCount);
-    const { cardWidth, cardHeight, laneGap, baseGap } = preset;
-    const leftPadding = 36;
-    const topPadding = 16;
-    const totalHeight = topPadding + firstRoundCount * cardHeight + Math.max(0, firstRoundCount - 1) * baseGap + 24;
-    const totalWidth = leftPadding * 2 + rounds.length * cardWidth + Math.max(0, rounds.length - 1) * laneGap;
-
-    const roundMeta = rounds.map((round, roundIdx) => {
-      const step = (cardHeight + baseGap) * Math.pow(2, roundIdx);
-      const firstTop = topPadding + (step / 2) - (cardHeight / 2);
-      const x = leftPadding + roundIdx * (cardWidth + laneGap);
-      const cards = round.matches.map((match, matchIdx) => ({
-        match,
-        x,
-        y: Math.round(firstTop + matchIdx * step)
-      }));
-      return { round, x, cards };
-    });
-
-    const lines = [];
-    for (const meta of roundMeta) {
-      for (const c of meta.cards) {
-        const m = c.match;
-        if (!m.nextRoundNumber || !m.nextMatchNumber) continue;
-        const nextRound = roundMeta.find((r) => r.round.roundNumber === m.nextRoundNumber);
-        const nextCard = nextRound?.cards.find((n) => Number(n.match.matchNumber) === Number(m.nextMatchNumber));
-        if (!nextCard) continue;
-        const startX = c.x + cardWidth;
-        const startY = c.y + cardHeight / 2;
-        const endX = nextCard.x;
-        const endY = nextCard.y + cardHeight / 2;
-        const midX = startX + laneGap / 2;
-        lines.push(`M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`);
-      }
-    }
-
     return {
-      cardWidth,
-      cardHeight,
-      minScale: preset.minScale,
-      totalWidth,
-      totalHeight,
-      roundMeta,
-      lines
+      cardWidth: 560,
+      cardHeight: 268,
+      laneGap: 124,
+      baseGap: 28,
+      minScale: 0.92
     };
   }
+
+  if (firstRoundCount <= 8) {
+    return {
+      cardWidth: 540,
+      cardHeight: 264,
+      laneGap: 112,
+      baseGap: 22,
+      minScale: 0.84
+    };
+  }
+
+  return {
+    cardWidth: 500,
+    cardHeight: 248,
+    laneGap: 94,
+    baseGap: 16,
+    minScale: 0.72
+  };
+}
+
+function computeBoardGeometry(rounds) {
+  const firstRoundCount = Number(rounds?.[0]?.matches?.length || 0);
+  const preset = getBoardPreset(firstRoundCount);
+  const { cardWidth, cardHeight, laneGap, baseGap } = preset;
+
+  const leftPadding = 42;
+  const rightPadding = 42;
+  const topPadding = 20;
+  const bottomPadding = 30;
+  const rowStride = cardHeight + baseGap;
+
+  const totalHeight =
+    topPadding +
+    firstRoundCount * cardHeight +
+    Math.max(0, firstRoundCount - 1) * baseGap +
+    bottomPadding;
+
+  const totalWidth =
+    leftPadding +
+    rightPadding +
+    rounds.length * cardWidth +
+    Math.max(0, rounds.length - 1) * laneGap;
+
+  const roundMeta = rounds.map((round, roundIdx) => {
+    const step = rowStride * Math.pow(2, roundIdx);
+    const firstTop = topPadding + (step / 2) - (cardHeight / 2);
+    const x = leftPadding + roundIdx * (cardWidth + laneGap);
+
+    const cards = round.matches.map((match, matchIdx) => ({
+      match,
+      x,
+      y: Math.round(firstTop + matchIdx * step)
+    }));
+
+    return { round, x, cards };
+  });
+
+  const lines = [];
+
+  for (const meta of roundMeta) {
+    for (const c of meta.cards) {
+      const m = c.match;
+      if (!m.nextRoundNumber || !m.nextMatchNumber) continue;
+
+      const nextRound = roundMeta.find((r) => r.round.roundNumber === m.nextRoundNumber);
+      const nextCard = nextRound?.cards.find(
+        (n) => Number(n.match.matchNumber) === Number(m.nextMatchNumber)
+      );
+
+      if (!nextCard) continue;
+
+      const startX = c.x + cardWidth;
+      const startY = c.y + cardHeight / 2;
+      const endX = nextCard.x;
+      const endY = nextCard.y + cardHeight / 2;
+      const midX = startX + laneGap / 2;
+
+      lines.push(`M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`);
+    }
+  }
+
+  return {
+    cardWidth,
+    cardHeight,
+    minScale: preset.minScale,
+    totalWidth,
+    totalHeight,
+    roundMeta,
+    lines
+  };
+}
 
   function ensureOverlay() {
     let overlay = document.getElementById('mbbFullscreenOverlay');
@@ -560,20 +604,29 @@
     }
 
     const geo = computeBoardGeometry(rounds);
-    const availableWidth = Math.max(1040, wrap.clientWidth - 44);
-    const widthScale = availableWidth / geo.totalWidth;
-    const scale = Math.min(1, Math.max(geo.minScale, widthScale));
-    const scaledHeight = Math.ceil(geo.totalHeight * scale) + 18;
+const availableWidth = Math.max(wrap.clientWidth - 56, 980);
+const widthScale = availableWidth / geo.totalWidth;
+const scale = Math.min(1, Math.max(geo.minScale, widthScale));
+const scaledHeight = Math.max(760, Math.ceil(geo.totalHeight * scale) + 36);
+const scaledWidth = Math.ceil(geo.totalWidth * scale);
 
-    stage.style.height = `${scaledHeight}px`;
-    stage.innerHTML = `
-      <div class="mbb-board" style="width:${geo.totalWidth}px;height:${geo.totalHeight}px;transform:scale(${scale})">
-        <svg class="mbb-board-lines" viewBox="0 0 ${geo.totalWidth} ${geo.totalHeight}" preserveAspectRatio="none">
-          ${geo.lines.map((d) => `<path d="${d}" />`).join('')}
-        </svg>
-        ${geo.roundMeta.flatMap((meta) => meta.cards.map((card) => renderCard(card.match, card.x, card.y, geo.cardWidth, geo.cardHeight))).join('')}
-      </div>
-    `;
+stage.style.height = `${scaledHeight}px`;
+stage.style.minWidth = `${Math.max(scaledWidth, wrap.clientWidth - 24)}px`;
+
+stage.innerHTML = `
+  <div class="mbb-board" style="width:${geo.totalWidth}px;height:${geo.totalHeight}px;transform:scale(${scale})">
+    <svg class="mbb-board-lines" viewBox="0 0 ${geo.totalWidth} ${geo.totalHeight}" preserveAspectRatio="none">
+      ${geo.lines.map((d) => `<path d="${d}" />`).join('')}
+    </svg>
+    ${geo.roundMeta
+      .flatMap((meta) =>
+        meta.cards.map((card) =>
+          renderCard(card.match, card.x, card.y, geo.cardWidth, geo.cardHeight)
+        )
+      )
+      .join('')}
+  </div>
+`;
   }
 
   function renderChampionScreen() {
