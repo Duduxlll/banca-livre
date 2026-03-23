@@ -171,33 +171,54 @@ function isPlaceholderCloudinaryUrl(s) {
 
 async function tryUploadToCloudinary({ imageUrl, ticketId, onLog }) {
   const cloudUrl = String(process.env.CLOUDINARY_URL || '').trim();
-  if (!cloudUrl || isPlaceholderCloudinaryUrl(cloudUrl)) return null;
+
+  if (!cloudUrl || isPlaceholderCloudinaryUrl(cloudUrl)) {
+    onLog?.error?.('cloudinary não configurado: CLOUDINARY_URL ausente ou inválido');
+    return null;
+  }
 
   try {
     const mod = await import('cloudinary').catch(() => null);
-    if (!mod) return null;
+    if (!mod) {
+      onLog?.error?.('cloudinary package não encontrado. Instala com: npm install cloudinary');
+      return null;
+    }
 
     const v2 = mod.v2 || mod.default?.v2 || mod.default || null;
-    if (!v2?.uploader?.upload) return null;
+    if (!v2?.uploader?.upload) {
+      onLog?.error?.('cloudinary uploader indisponível');
+      return null;
+    }
 
     let api_key = '';
     let api_secret = '';
     let cloud_name = '';
+
     try {
       const u = new URL(cloudUrl);
       api_key = decodeURIComponent(u.username || '');
       api_secret = decodeURIComponent(u.password || '');
       cloud_name = decodeURIComponent(u.hostname || '');
     } catch {
+      onLog?.error?.('CLOUDINARY_URL inválida');
       return null;
     }
 
-    if (!api_key || !api_secret || !cloud_name) return null;
+    if (!api_key || !api_secret || !cloud_name) {
+      onLog?.error?.('CLOUDINARY_URL incompleta: faltando cloud_name/api_key/api_secret');
+      return null;
+    }
 
-    v2.config({ cloud_name, api_key, api_secret, secure: true });
+    v2.config({
+      cloud_name,
+      api_key,
+      api_secret,
+      secure: true
+    });
 
     const folder = String(process.env.CLOUDINARY_FOLDER || 'banca-livre/depositos').trim();
-    const publicId = `ticket_${String(ticketId).replace(/[^a-z0-9_-]/gi, '')}_${Date.now()}`;
+    const safeTicketId = String(ticketId || 'sem-ticket').replace(/[^a-z0-9_-]/gi, '');
+    const publicId = `ticket_${safeTicketId}_${Date.now()}`;
 
     const res = await v2.uploader.upload(String(imageUrl), {
       folder,
@@ -206,8 +227,19 @@ async function tryUploadToCloudinary({ imageUrl, ticketId, onLog }) {
     });
 
     const out = res?.secure_url || res?.url || null;
-    if (out) return String(out);
-    return null;
+
+    if (!out) {
+      onLog?.error?.('cloudinary upload sem URL de retorno');
+      return null;
+    }
+
+    onLog?.log?.('cloudinary upload OK:', {
+      ticketId: safeTicketId,
+      publicId: res?.public_id || publicId,
+      secureUrl: out
+    });
+
+    return String(out);
   } catch (e) {
     onLog?.error?.('cloudinary upload falhou:', e?.message || e);
     return null;
@@ -1572,24 +1604,47 @@ if (info.status !== 'APROVADO') {
       }
 
       const att = imgs[0];
-      const rawUrl = String(att.url || '');
-      if (!rawUrl) return;
+const rawUrl = String(att.url || att.proxyURL || '');
+if (!rawUrl) {
+  await msg.channel.send({
+    content: `❌ Não consegui ler a imagem enviada. Tenta mandar novamente.`
+  }).catch(() => {});
+  scheduleWaitImage(String(t.id));
+  return;
+}
 
-      clearWaitTimer(String(t.id));
-      clearIdle(String(t.id));
+clearWaitTimer(String(t.id));
+clearIdle(String(t.id));
 
-      const uploaded = await tryUploadToCloudinary({ imageUrl: rawUrl, ticketId: t.id, onLog });
-      const finalUrl = uploaded || rawUrl;
+const uploaded = await tryUploadToCloudinary({
+  imageUrl: rawUrl,
+  ticketId: t.id,
+  onLog
+});
 
-      let submissionId = null;
-      try {
-        submissionId = await submitToCashback(t, finalUrl);
-      } catch (e) {
-        onLog.error('submitToCashback falhou:', e?.message || e);
-        await msg.channel.send({ content: `❌ Deu erro ao registrar o print. Tenta de novo ou chama um admin.` }).catch(() => {});
-        scheduleWaitImage(String(t.id));
-        return;
-      }
+if (!uploaded) {
+  await msg.channel.send({
+    content:
+      `❌ Não consegui salvar a imagem no armazenamento.\n` +
+      `Tenta enviar o print novamente em alguns segundos.\n` +
+      `Se continuar falhando, chama um admin.`
+  }).catch(() => {});
+
+  scheduleWaitImage(String(t.id));
+  return;
+}
+
+let submissionId = null;
+try {
+  submissionId = await submitToCashback(t, uploaded);
+} catch (e) {
+  onLog.error('submitToCashback falhou:', e?.message || e);
+  await msg.channel.send({
+    content: `❌ Deu erro ao registrar o print. Tenta de novo ou chama um admin.`
+  }).catch(() => {});
+  scheduleWaitImage(String(t.id));
+  return;
+}
 
       await logTicket({
         kind: 'FINAL',
