@@ -1,8 +1,6 @@
 import 'dotenv/config';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,7 +9,6 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import axios from 'axios';
 import QRCode from 'qrcode';
 import pkg from 'pg';
 import { initDiscordBot } from "./discord-bot.js";
@@ -36,13 +33,6 @@ const {
   ADMIN_USER = 'admin',
   ADMIN_PASSWORD_HASH,
   JWT_SECRET,
-  EFI_CLIENT_ID,
-  EFI_CLIENT_SECRET,
-  EFI_CERT_PATH,
-  EFI_KEY_PATH,
-  EFI_BASE_URL,
-  EFI_OAUTH_URL,
-  EFI_PIX_KEY,
   DATABASE_URL
 } = process.env;
 
@@ -57,14 +47,6 @@ const OVERLAY_PUBLIC_KEY = (process.env.OVERLAY_PUBLIC_KEY || "").trim();
     process.exit(1);
   }
 });
-
-['EFI_CLIENT_ID','EFI_CLIENT_SECRET','EFI_CERT_PATH','EFI_KEY_PATH','EFI_PIX_KEY','EFI_BASE_URL','EFI_OAUTH_URL']
-  .forEach(k => {
-    if(!process.env[k]) {
-      console.error(`❌ Falta ${k} no .env (Efi)`);
-      process.exit(1);
-    }
-  });
 
 if (!DATABASE_URL) {
   console.error('❌ Falta DATABASE_URL no .env');
@@ -84,46 +66,9 @@ const pool = new Pool({
 });
 const q = (text, params) => pool.query(text, params);
 
-const httpsAgent = new https.Agent({
-  cert: fs.readFileSync(EFI_CERT_PATH),
-  key:  fs.readFileSync(EFI_KEY_PATH),
-  rejectUnauthorized: true
-});
-
-async function getAccessToken() {
-  const resp = await axios.post(
-    EFI_OAUTH_URL,
-    'grant_type=client_credentials',
-    {
-      httpsAgent,
-      auth: { username: EFI_CLIENT_ID, password: EFI_CLIENT_SECRET },
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-    }
-  );
-  return resp.data.access_token;
-}
-
-function brlStrToCents(strOriginal) {
-  const n = Number.parseFloat(String(strOriginal).replace(',', '.'));
-  if (Number.isNaN(n)) return null;
-  return Math.round(n * 100);
-}
-
 function uid(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 }
-function tok(){
-  return 'tok_' + crypto.randomBytes(18).toString('hex');
-}
-
-const tokenStore = new Map();
-const TOKEN_TTL_MS = 15 * 60 * 1000;
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of tokenStore) {
-    if (now - v.createdAt > TOKEN_TTL_MS) tokenStore.delete(k);
-  }
-}, 60000);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -137,6 +82,21 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  const p = (req.path || '').toLowerCase();
+  if (
+    p === '/' ||
+    p === '/index.html' ||
+    p === '/assets/js/app.js' ||
+    p === '/assets/css/style.css' ||
+    p === '/assets/css/pix.css' ||
+    p === '/assets/img/panel.png'
+  ) {
+    return res.status(410).send('Página removida');
+  }
+  return next();
+});
+
+app.use((req, res, next) => {
   res.setHeader(
     "Permissions-Policy",
     "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
@@ -145,38 +105,30 @@ app.use((req, res, next) => {
 });
 
 
-const DISABLE_CASHBACK_PUBLIC = process.env.DISABLE_CASHBACK_PUBLIC === '1';
-
 app.use((req, res, next) => {
-  if (!DISABLE_CASHBACK_PUBLIC) return next();
-
   const p = (req.path || '').toLowerCase();
-
-  
   if (
     p === '/cashback-publico.html' ||
     p === '/cashback-publico' ||
-    p === '/assets/js/cashback-publico.js'
+    p === '/assets/js/cashback-publico.js' ||
+    p === '/assets/css/cashback-publico.css'
   ) {
-    return res.status(410).send('Página desativada'); 
+    return res.status(410).send('Página removida');
   }
 
   return next();
 });
 
-const DISABLE_SORTEIO_PUBLIC = process.env.DISABLE_SORTEIO_PUBLIC === '1';
-
 app.use((req, res, next) => {
-  if (!DISABLE_SORTEIO_PUBLIC) return next();
-
   const p = (req.path || '').toLowerCase();
 
   if (
     p === '/sorteio-publico.html' ||
     p === '/sorteio-publico' ||
-    p === '/assets/js/sorteio-publico.js'
+    p === '/assets/js/sorteio-publico.js' ||
+    p === '/assets/css/sorteio-publico.css'
   ) {
-    return res.status(410).send('Página desativada');
+    return res.status(410).send('Página removida');
   }
 
   return next();
@@ -474,46 +426,12 @@ async function palpiteAdminCompactState(){
   };
 }
 
-function mapCupom(row){
-  if (!row) return null;
-  return {
-    id: row.id,
-    codigo: row.codigo,
-    valorCentavos: row.valor_cents,
-    ativo: row.ativo,
-    maxUsos: row.max_usos,
-    usadoEm: row.usado_em,
-    expiraEm: row.expira_em,
-    usadoPorNome: row.usado_por_nome,
-    usadoPorPixType: row.usado_por_pix_type,
-    usadoPorPixKey: row.usado_por_pix_key,
-    usadoPorMessage: row.usado_por_message,
-    createdAt: row.created_at
-  };
-}
-
-function normalizarCodigo(c){
-  return String(c || '').trim().toUpperCase();
-}
-
-function gerarCodigoCupom(){
-  const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let tmp = '';
-  for (let i = 0; i < 8; i++) {
-    tmp += alpha[Math.floor(Math.random() * alpha.length)];
-  }
-  return tmp.slice(0,4) + '-' + tmp.slice(4);
-}
-
 app.use('/api', (req, res, next) => {
   const openRoutes = [
     '/api/auth/login',
     '/api/auth/logout',
     '/api/auth/me',
-    '/api/pix/cob',
-    '/api/pix/status',
     '/api/sorteio/inscrever',
-    '/api/cupons/resgatar',
     '/api/palpite/stream',
     '/api/palpite/guess',
     '/api/palpite/state-public',
@@ -1003,145 +921,10 @@ app.get('/api/auth/me', (req, res) => {
 
 app.get('/health', async (req, res) => {
   try {
-    fs.accessSync(EFI_CERT_PATH);
-    fs.accessSync(EFI_KEY_PATH);
     await q('select 1');
-    return res.json({ ok:true, cert:EFI_CERT_PATH, key:EFI_KEY_PATH, pg:true });
+    return res.json({ ok:true, pg:true });
   } catch (e) {
     return res.status(500).json({ ok:false, error: e.message });
-  }
-});
-
-app.get('/api/pix/ping', async (req, res) => {
-  try {
-    const token = await getAccessToken();
-    return res.json({ ok:true, token:true });
-  } catch (e) {
-    return res.status(500).json({ ok:false, error: e.response?.data || e.message });
-  }
-});
-
-app.post('/api/pix/cob', async (req, res) => {
-  try {
-    const { nome, cpf, valorCentavos } = req.body || {};
-    if (!nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
-      return res.status(400).json({ error: 'Dados inválidos (mínimo R$ 10,00)' });
-    }
-    const access = await getAccessToken();
-    const valor = (valorCentavos / 100).toFixed(2);
-
-    const payload = {
-      calendario: { expiracao: 3600 },
-      valor: { original: valor },
-      chave: EFI_PIX_KEY,
-      infoAdicionais: [{ nome: 'Nome', valor: nome }]
-    };
-    if (cpf) {
-      const cpfNum = String(cpf).replace(/\D/g, '');
-      if (cpfNum.length !== 11) {
-        return res.status(400).json({ error: 'cpf_invalido' });
-      }
-      payload.devedor = { cpf: cpfNum, nome };
-    }
-
-    const { data: cob } = await axios.post(`${EFI_BASE_URL}/v2/cob`, payload, {
-      httpsAgent,
-      headers: { Authorization: `Bearer ${access}` }
-    });
-    const { txid, loc } = cob;
-
-    const { data: qr } = await axios.get(`${EFI_BASE_URL}/v2/loc/${loc.id}/qrcode`, {
-      httpsAgent,
-      headers: { Authorization: `Bearer ${access}` }
-    });
-
-    const tokenOpaque = tok();
-    tokenStore.set(tokenOpaque, { txid, createdAt: Date.now() });
-
-    const emv = qr.qrcode;
-    const qrPng = qr.imagemQrcode || (await QRCode.toDataURL(emv));
-    res.json({ token: tokenOpaque, emv, qrPng });
-  } catch (err) {
-    console.error('Erro /api/pix/cob:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Falha ao criar cobrança PIX' });
-  }
-});
-
-app.get('/api/pix/status/:token', async (req, res) => {
-  try {
-    const rec = tokenStore.get(req.params.token);
-    if (!rec) return res.status(404).json({ error: 'token_not_found' });
-    const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-    res.json({ status: data.status });
-  } catch (err) {
-    console.error('Erro status:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Falha ao consultar status' });
-  }
-});
-
-app.post('/api/pix/confirmar', async (req, res) => {
-  try{
-    if (!APP_PUBLIC_KEY) return res.status(403).json({ error:'public_off' });
-    const key = req.get('X-APP-KEY');
-    if (!key || key !== APP_PUBLIC_KEY) return res.status(401).json({ error:'unauthorized' });
-
-    const { token, nome, valorCentavos, tipo=null, chave=null, message=null } = req.body || {};
-    if (!token || !nome || typeof valorCentavos !== 'number' || valorCentavos < 1) {
-      return res.status(400).json({ error:'dados_invalidos' });
-    }
-
-    const rec = tokenStore.get(token);
-    if (!rec) return res.status(404).json({ error:'token_not_found' });
-
-    const access = await getAccessToken();
-    const { data } = await axios.get(
-      `${EFI_BASE_URL}/v2/cob/${encodeURIComponent(rec.txid)}`,
-      { httpsAgent, headers: { Authorization: `Bearer ${access}` } }
-    );
-
-    if (data.status !== 'CONCLUIDA') {
-      return res.status(409).json({ error:'pix_nao_concluido' });
-    }
-    const valorEfiCents = brlStrToCents(data?.valor?.original);
-    if (valorEfiCents == null) {
-      return res.status(500).json({ error:'valor_invalido_efi' });
-    }
-    if (valorEfiCents !== valorCentavos) {
-      return res.status(409).json({ error:'valor_divergente' });
-    }
-
-    const id = uid();
-    const { rows } = await q(
-      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7, now())
-       returning id, nome,
-                 deposito_cents as "depositoCents",
-                 banca_cents    as "bancaCents",
-                 pix_type       as "pixType",
-                 pix_key        as "pixKey",
-                 message        as "message",
-                 created_at     as "createdAt"`,
-      [id, nome, valorCentavos, null, tipo, chave, message]
-    );
-
-    await q(
-  `insert into extratos (id, ref_id, nome, tipo, origem, valor_cents, created_at)
-   values ($1,$2,$3,'deposito','pix',$4, now())`,
-  [uid(), rows[0].id, nome, valorCentavos]
-);
-    sseSendAll('extratos-changed', { reason: 'deposito' });
-
-    tokenStore.delete(token);
-    sseSendAll('bancas-changed', { reason: 'insert-confirmed' });
-
-    return res.json({ ok:true, ...rows[0] });
-  }catch(e){
-    console.error('pix/confirmar:', e.response?.data || e.message);
-    return res.status(500).json({ error:'falha_confirmar' });
   }
 });
 
@@ -1149,45 +932,10 @@ app.post('/api/pix/confirmar', async (req, res) => {
 
 
 app.post('/api/cashbacks/submit', requireAppKey, async (req, res) => {
-  try{
-    const twitchNick = normalizeNick(req.body?.twitchNick ?? req.body?.nick ?? req.body?.user ?? req.body?.username);
-    const pixType = req.body?.pixType != null ? String(req.body.pixType).trim().slice(0, 40) : null;
-    const pixKeyRaw = req.body?.pixKey ?? req.body?.pix ?? req.body?.chavePix;
-    const pixKey = String(pixKeyRaw || '').trim().slice(0, 255);
-    const proofUrlRaw = req.body?.proofUrl ?? req.body?.printUrl ?? req.body?.screenshotUrl ?? req.body?.comprovanteUrl;
-    const proofUrl = proofUrlRaw != null ? String(proofUrlRaw).trim().slice(0, 800) : null;
-
-    if (!twitchNick || !pixKey) {
-      return res.status(400).json({ error:'dados_invalidos' });
-    }
-
-    const { rows: existing } = await q(
-      `select id, status, motivo, payout_prazo_horas, created_at, updated_at, decided_at
-         from cashbacks
-        where lower(twitch_nick) = lower($1)
-          and status = 'pendente'
-        order by created_at desc
-        limit 1`,
-      [twitchNick]
-    );
-    if (existing.length) {
-      return res.json({ ok:true, already:true, ...mapCashbackRow({ ...existing[0], twitch_nick: twitchNick, pix_type: null, pix_key: pixKey, proof_url: proofUrl }) });
-    }
-
-    const id = uid();
-    const { rows } = await q(
-      `insert into cashbacks (id, twitch_nick, pix_type, pix_key, proof_url, status, motivo, payout_prazo_horas, created_at, updated_at, decided_at)
-       values ($1,$2,$3,$4,$5,'pendente',null,null, now(), now(), null)
-       returning *`,
-      [id, twitchNick, pixType, pixKey, proofUrl]
-    );
-
-    sseSendAll('cashbacks-changed', { reason:'submit', id });
-    return res.status(201).json({ ok:true, ...mapCashbackRow(rows[0]) });
-  }catch(e){
-    console.error('cashbacks/submit:', e.message);
-    return res.status(500).json({ error:'falha_submit' });
-  }
+  return res.status(410).json({
+    error: 'cashback_public_removed',
+    message: 'O envio publico do cashback foi removido. Use o fluxo do Discord.'
+  });
 });
 
 
@@ -1620,69 +1368,6 @@ app.get('/qr', async (req, res) => {
   }
 });
 
-
-function dayRangeSQL(){
- 
-  return {
-    start: "date_trunc('day', now())",
-    end: "date_trunc('day', now()) + interval '1 day'"
-  };
-}
-
-async function sorteioIsOpen(){
-  const { rows } = await pool.query(`SELECT is_open FROM sorteio_state WHERE id = 1`);
-  return !!rows?.[0]?.is_open;
-}
-
-async function hasDepositoHoje(nick){
-  const { start, end } = dayRangeSQL();
-  const { rows } = await pool.query(
-    `SELECT 1
-       FROM extratos
-      WHERE tipo = 'deposito'
-        AND lower(nome) = lower($1)
-        AND created_at >= ${start}
-        AND created_at <  ${end}
-      LIMIT 1`,
-    [nick]
-  );
-  return rows.length > 0;
-}
-
-async function hasPrintHoje(nick){
-  const { start, end } = dayRangeSQL();
-
-  
-  try{
-    const { rows } = await pool.query(
-      `SELECT 1
-         FROM cashback_submissions
-        WHERE lower(twitch_name) = lower($1)
-          AND created_at >= ${start}
-          AND created_at <  ${end}
-        LIMIT 1`,
-      [nick]
-    );
-    if (rows.length) return true;
-  } catch {}
-
-  
-  try{
-    const { rows } = await pool.query(
-      `SELECT 1
-         FROM cashbacks
-        WHERE lower(twitch_nick) = lower($1)
-          AND created_at >= ${start}
-          AND created_at <  ${end}
-        LIMIT 1`,
-      [nick]
-    );
-    if (rows.length) return true;
-  } catch {}
-
-  return false;
-}
-
 app.get('/api/sorteio/state-public', async (req, res) => {
   try {
     const r = await q('SELECT is_open FROM sorteio_state WHERE id=1', []);
@@ -1742,52 +1427,11 @@ app.get('/api/sorteio/inscricoes', async (req, res) => {
 });
 
 app.post('/api/sorteio/inscrever', async (req, res) => {
-  const nick = normalizeNick(req.body?.nome_twitch || req.body?.nick || req.body?.twitchName);
-
-  if (!nick) {
-    return res.status(400).json({ ok:false, code:'NOME_OBRIGATORIO', error:'Informe seu nome da Twitch.' });
-  }
-
-  try{
-    const open = await sorteioIsOpen();
-    if (!open) {
-      return res.status(403).json({ ok:false, code:'SORTEIO_FECHADO', error:'O sorteio está fechado no momento.' });
-    }
-
-    const temDeposito = await hasDepositoHoje(nick);
-    if (!temDeposito) {
-      return res.status(403).json({ ok:false, code:'SEM_DEPOSITO_HOJE', error:'Para entrar, você precisa ter feito depósito HOJE.' });
-    }
-
-    const temPrint = await hasPrintHoje(nick);
-    if (!temPrint) {
-      return res.status(403).json({ ok:false, code:'SEM_PRINT_HOJE', error:'Para entrar, você precisa ter enviado o print HOJE.' });
-    }
-
-    
-    const dup = await pool.query(
-      `SELECT 1 FROM sorteio_inscricoes WHERE lower(nome_twitch)=lower($1) LIMIT 1`,
-      [nick]
-    );
-    if (dup.rows.length) {
-      return res.status(409).json({ ok:false, code:'NICK_DUPLICADO', error:'Esse nick já está inscrito no sorteio.' });
-    }
-
-    await pool.query(
-      `INSERT INTO sorteio_inscricoes (nome_twitch, mensagem)
-       VALUES ($1, NULL)`,
-      [nick]
-    );
-
-    return res.status(201).json({ ok:true });
-  }catch(err){
-    if (err?.code === '23505') {
-      return res.status(409).json({ ok:false, code:'NICK_DUPLICADO', error:'Esse nick já está inscrito no sorteio.' });
-    }
-
-    console.error('Erro ao inserir inscrição do sorteio', err);
-    return res.status(500).json({ ok:false, error:'Erro interno ao salvar inscrição.' });
-  }
+  return res.status(410).json({
+    ok: false,
+    code: 'SORTEIO_PUBLICO_REMOVIDO',
+    error: 'A inscricao publica foi removida. O sorteio agora funciona apenas pelo Discord.'
+  });
 });
 
 
@@ -1946,268 +1590,12 @@ app.get('/api/extratos', areaAuth, async (req, res) => {
   res.json(rows);
 });
 
-app.get('/api/cupons', requireAuth, async (req, res, next) => {
-  try {
-    const { rows } = await pool.query(
-      'SELECT * FROM cupons ORDER BY created_at DESC'
-    );
-    res.json(rows.map(mapCupom));
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.post('/api/cupons', requireAuth, async (req, res, next) => {
-  try {
-    const codigoRaw = req.body.codigo;
-
-    const valorBruto =
-      req.body.valorCentavos ??
-      req.body.valorCents ??
-      req.body.valor_cents ??
-      0;
-
-    const valorCentavos = Number(valorBruto) | 0;
-    const diasValidade  = Number(req.body.diasValidade || 3);
-    const maxUsos       = Number(req.body.maxUsos || 1);
-
-    if (!valorCentavos || valorCentavos <= 0) {
-      return res.status(400).json({ error: 'Código e valor são obrigatórios.' });
-    }
-
-    let codigo = normalizarCodigo(codigoRaw);
-    if (!codigo) {
-      codigo = gerarCodigoCupom();
-    }
-
-    const expiraEm = req.body.expiraEm
-      ? new Date(req.body.expiraEm)
-      : new Date(Date.now() + diasValidade * 24 * 60 * 60 * 1000);
-
-    const { rows } = await pool.query(
-      `INSERT INTO cupons (codigo, valor_cents, expira_em, max_usos, ativo)
-       VALUES ($1, $2, $3, $4, true)
-       RETURNING *`,
-      [codigo, valorCentavos, expiraEm, maxUsos]
-    );
-
-    const cupom = rows[0];
-    sseSendAll('cupons-changed', { reason: 'create', id: cupom.id });
-
-    res.status(201).json(mapCupom(cupom));
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'Já existe um cupom com esse código.' });
-    }
-    next(err);
-  }
-});
-
-app.patch('/api/cupons/:id', requireAuth, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const fields = [];
-    const values = [];
-    let idx = 1;
-
-    if (req.body.valorCentavos != null ||
-        req.body.valorCents    != null ||
-        req.body.valor_cents   != null) {
-      const v =
-        req.body.valorCentavos ??
-        req.body.valorCents ??
-        req.body.valor_cents;
-      fields.push(`valor_cents = $${idx++}`);
-      values.push(Number(v));
-    }
-    if (req.body.ativo != null) {
-      fields.push(`ativo = $${idx++}`);
-      values.push(!!req.body.ativo);
-    }
-    if (req.body.expiraEm) {
-      fields.push(`expira_em = $${idx++}`);
-      values.push(new Date(req.body.expiraEm));
-    }
-
-    if (!fields.length) {
-      return res.status(400).json({ error: 'Nada para atualizar.' });
-    }
-
-    values.push(id);
-
-    const { rows } = await pool.query(
-      `UPDATE cupons
-       SET ${fields.join(', ')}
-       WHERE id = $${idx}
-       RETURNING *`,
-      values
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-
-    const cupom = rows[0];
-    sseSendAll('cupons-changed', { reason: 'update', id: cupom.id });
-
-    res.json(mapCupom(cupom));
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.delete('/api/cupons/:id', requireAuth, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rowCount } = await pool.query(
-      'DELETE FROM cupons WHERE id = $1',
-      [id]
-    );
-    if (!rowCount) {
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-    sseSendAll('cupons-changed', { reason: 'delete', id });
-    res.status(204).end();
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.post('/api/cupons/resgatar', async (req, res, next) => {
-  const client = await pool.connect();
-  try {
-    const codigo   = normalizarCodigo(req.body.codigo);
-    const nome     = String(req.body.nome || '').trim();
-    const pixType  = String(req.body.pixType || '').trim() || null;
-    const pixKey   = String(req.body.pixKey || '').trim() || null;
-    const message  = req.body.message != null ? String(req.body.message) : null;
-
-    if (!codigo || !nome || !pixKey || !pixType) {
-      client.release();
-      return res.status(400).json({ error: 'Dados obrigatórios ausentes.' });
-    }
-
-    await client.query('BEGIN');
-
-    const { rows } = await client.query(
-      'SELECT * FROM cupons WHERE codigo = $1 FOR UPDATE',
-      [codigo]
-    );
-    if (!rows.length) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(404).json({ error: 'Cupom não encontrado.' });
-    }
-
-    const cupom = rows[0];
-
-    if (!cupom.ativo) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom inativo.' });
-    }
-
-    const agora = new Date();
-    if (cupom.expira_em && agora > cupom.expira_em) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom expirado.' });
-    }
-
-    if (cupom.usado_em) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({ error: 'Cupom já utilizado.' });
-    }
-
-    const valorCents = cupom.valor_cents;
-
-    const bancaId = uid();
-
-    await client.query(
-      `INSERT INTO bancas (id, nome, deposito_cents, banca_cents, pix_key, pix_type, message, created_at)
-       VALUES ($1, $2, $3, 0, $4, $5, $6, now())`,
-      [bancaId, nome, valorCents, pixKey, pixType, message]
-    );
-
-    await client.query(
-  `INSERT INTO extratos (id, ref_id, nome, tipo, origem, valor_cents, created_at)
-   VALUES ($1, $2, $3, 'deposito', 'cupom', $4, now())`,
-  [uid(), bancaId, nome, valorCents]
-);
-
-
-    await client.query(
-      `UPDATE cupons
-       SET usado_em = now(),
-           ativo = false,
-           usado_por_nome = $2,
-           usado_por_pix_type = $3,
-           usado_por_pix_key = $4,
-           usado_por_message = $5
-       WHERE id = $1`,
-      [cupom.id, nome, pixType, pixKey, message]
-    );
-
-    await client.query('COMMIT');
-    client.release();
-
-    setTimeout(async () => {
-      try {
-        await pool.query('DELETE FROM cupons WHERE id = $1', [cupom.id]);
-        sseSendAll('cupons-changed', { reason: 'auto-delete', id: cupom.id });
-      } catch (err) {
-        console.error('Erro ao apagar cupom após 5 minutos:', err);
-      }
-    }, 5 * 60 * 1000);
-
-    sseSendAll('bancas-changed',  { reason: 'cupom-resgatado', bancaId });
-    sseSendAll('extratos-changed',{ reason: 'cupom-resgatado' });
-    sseSendAll('cupons-changed',  { reason: 'resgatado', id: cupom.id });
-
-    res.json({
-      ok: true,
-      valorCentavos: valorCents,
-      codigo: cupom.codigo
-    });
-
-  } catch (err) {
-    try { await client.query('ROLLBACK'); } catch {}
-    client.release();
-    next(err);
-  }
-});
-
 async function ensureMessageColumns(){
   try{
     await q(`alter table if exists bancas add column if not exists message text`);
     await q(`alter table if exists pagamentos add column if not exists message text`);
   }catch(e){
     console.error('ensureMessageColumns:', e.message);
-  }
-}
-
-async function ensureCuponsTable(){
-  try {
-    await q(`
-      CREATE TABLE IF NOT EXISTS cupons (
-        id BIGSERIAL PRIMARY KEY,
-        codigo TEXT NOT NULL UNIQUE,
-        valor_cents INTEGER NOT NULL,
-        ativo BOOLEAN NOT NULL DEFAULT TRUE,
-        max_usos INTEGER NOT NULL DEFAULT 1,
-        usado_em TIMESTAMPTZ,
-        expira_em TIMESTAMPTZ,
-        usado_por_nome TEXT,
-        usado_por_pix_type TEXT,
-        usado_por_pix_key TEXT,
-        usado_por_message TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-      )
-    `);
-  } catch (e) {
-    console.error('ensureCuponsTable:', e.message);
   }
 }
 
@@ -2364,7 +1752,6 @@ catch (e) { console.error("❌ batalha bonus tables fail:", e); }
   try{
     await q('select 1');
     await ensureMessageColumns();
-    await ensureCuponsTable();
     await ensureCashbacksTable();
     await ensureSorteioTables();
     await ensureSorteioStateTable();

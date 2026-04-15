@@ -76,50 +76,10 @@ export function registerCashbackRoutes({
   });
 
   app.post('/api/cashback/submit', requireAppKey, submitLimiter, async (req, res) => {
-    try {
-      const twitchNameRaw = req.body?.twitchName ?? req.body?.user ?? req.body?.nome ?? '';
-      const twitchNameLc = normalizeTwitchName(twitchNameRaw);
-      const twitchName = safeText(String(twitchNameRaw).trim().replace(/^@+/, ''), 40);
-
-      const pixType = isValidPixType(req.body?.pixType) ? String(req.body.pixType).trim() : null;
-      const pixKey = safeText(req.body?.pixKey, 160);
-
-      const screenshot = req.body?.screenshotDataUrl ?? req.body?.screenshot ?? null;
-
-      if (!twitchNameLc || !twitchName || !pixKey) {
-        return res.status(400).json({ error: 'dados_invalidos' });
-      }
-
-      let screenshotDataUrl = null;
-
-      if (screenshot != null && String(screenshot).trim() !== '') {
-        if (!isDataUrlImage(screenshot)) {
-          return res.status(400).json({ error: 'screenshot_invalida' });
-        }
-        const bytes = approxBytesFromDataUrl(screenshot);
-        if (bytes > 4.5 * 1024 * 1024) {
-          return res.status(413).json({ error: 'screenshot_grande' });
-        }
-        screenshotDataUrl = String(screenshot);
-      }
-
-      const id = uid();
-
-      await q(
-        `INSERT INTO cashback_submissions
-          (id, twitch_name, twitch_name_lc, pix_type, pix_key, screenshot_data_url, status, created_at, updated_at)
-         VALUES
-          ($1, $2, $3, $4, $5, $6, $7, now(), now())`,
-        [id, twitchName, twitchNameLc, pixType, pixKey, screenshotDataUrl, STATUS.PENDENTE]
-      );
-
-      sseSendAll?.('cashback-changed', { reason: 'submit', id, twitch: twitchName });
-
-      return res.status(201).json({ ok: true, id, status: STATUS.PENDENTE });
-    } catch (e) {
-      console.error('cashback/submit:', e.message);
-      return res.status(500).json({ error: 'falha_submit' });
-    }
+    return res.status(410).json({
+      error: 'cashback_public_removed',
+      message: 'O envio publico do cashback foi removido. Use o fluxo do Discord.'
+    });
   });
 
   app.get('/api/cashback/status/:user', requireAppKey, async (req, res) => {

@@ -36,11 +36,6 @@ export function initTwitchBot({
 
   const OVERLAY_PUBLIC_KEY = (process.env.OVERLAY_PUBLIC_KEY || "").trim();
 
-  const publicUrl =
-    cashbackPublicUrl ||
-    process.env.CASHBACK_PUBLIC_URL ||
-    "guigz.com.br/cashback-publico";
-
   const sayOnJoin = String(process.env.TOURNEY_SAY_JOIN || "").trim().toLowerCase() === "true";
   const announceEnabled = String(process.env.TOURNEY_ANNOUNCE || "").trim().toLowerCase() === "true";
   const announceIntervalMs = (() => {
@@ -524,7 +519,7 @@ if (!cmd) return;
       }
 
       if (cmd.type === "cashback_link") {
-        await say(`${mention} envie seu print aqui: ${publicUrl}`);
+        await say(`${mention} o envio publico do print foi desativado. Agora o envio acontece so pelo Discord.`);
         return;
       }
 
