@@ -57,6 +57,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const PUBLIC_ROOT  = path.resolve(__dirname, '..', 'public');
 const PRIVATE_ROOT = path.resolve(__dirname, '..', 'private');
+const REACT_APP_INDEX = path.join(PUBLIC_ROOT, 'app', 'index.html');
 
 const ROOT = PUBLIC_ROOT;
 
@@ -165,6 +166,22 @@ app.use(express.json({ limit: '8mb' }));
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
 app.use(express.static(ROOT, { extensions: ['html'] }));
+
+app.get(/^\/app(?:\/.*)?$/, (req, res, next) => {
+  if (req.path.startsWith('/app/assets/')) {
+    return next();
+  }
+
+  return res.sendFile(REACT_APP_INDEX, (err) => {
+    if (!err) return;
+    if (err.code === 'ENOENT') {
+      return res
+        .status(503)
+        .send('Frontend React indisponivel. Rode o build da pasta frontend.');
+    }
+    return next(err);
+  });
+});
 
 app.get(['/area', '/area.html'], (req, res) => {
   const token = req.cookies?.session;
@@ -1102,59 +1119,74 @@ registerBatalhaBonusRoutes({
 const areaAuth = [requireAuth];
 
 app.get('/api/bancas', areaAuth, async (req, res) => {
-  const { rows } = await q(
-    `select id, nome,
-            deposito_cents as "depositoCents",
-            banca_cents    as "bancaCents",
-            pix_type       as "pixType",
-            pix_key        as "pixKey",
-            message        as "message",
-            created_at     as "createdAt"
-     from bancas
-     order by created_at desc`
-  );
-  res.json(rows);
+  try {
+    const { rows } = await q(
+      `select id, nome,
+              deposito_cents as "depositoCents",
+              banca_cents    as "bancaCents",
+              pix_type       as "pixType",
+              pix_key        as "pixKey",
+              message        as "message",
+              created_at     as "createdAt"
+       from bancas
+       order by created_at desc`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('bancas/list:', e.message);
+    res.status(500).json({ error: 'falha_bancas_list' });
+  }
 });
 
 app.post('/api/bancas', areaAuth, async (req, res) => {
-  const { nome, depositoCents, pixType=null, pixKey=null, message=null } = req.body || {};
-  if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
-    return res.status(400).json({ error: 'dados_invalidos' });
-  }
-  const id = uid();
-  const { rows } = await q(
-    `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
-     values ($1,$2,$3,$4,$5,$6,$7, now())
-     returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
-               pix_type as "pixType", pix_key as "pixKey", message as "message", created_at as "createdAt"`,
-    [id, nome, depositoCents, null, pixType, pixKey, message]
-  );
+  try {
+    const { nome, depositoCents, pixType=null, pixKey=null, message=null } = req.body || {};
+    if (!nome || typeof depositoCents !== 'number' || depositoCents <= 0) {
+      return res.status(400).json({ error: 'dados_invalidos' });
+    }
+    const id = uid();
+    const { rows } = await q(
+      `insert into bancas (id, nome, deposito_cents, banca_cents, pix_type, pix_key, message, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7, now())
+       returning id, nome, deposito_cents as "depositoCents", banca_cents as "bancaCents",
+                 pix_type as "pixType", pix_key as "pixKey", message as "message", created_at as "createdAt"`,
+      [id, nome, depositoCents, null, pixType, pixKey, message]
+    );
 
-  sseSendAll('bancas-changed', { reason: 'insert' });
-  res.json(rows[0]);
+    sseSendAll('bancas-changed', { reason: 'insert' });
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('bancas/create:', e.message);
+    res.status(500).json({ error: 'falha_bancas_create' });
+  }
 });
 
 app.patch('/api/bancas/:id', areaAuth, async (req, res) => {
-  const { bancaCents } = req.body || {};
-  if (typeof bancaCents !== 'number' || bancaCents < 0) {
-    return res.status(400).json({ error: 'dados_invalidos' });
-  }
-  const { rows } = await q(
-    `update bancas set banca_cents = $2
-     where id = $1
-     returning id, nome,
-               deposito_cents as "depositoCents",
-               banca_cents    as "bancaCents",
-               pix_type       as "pixType",
-               pix_key        as "pixKey",
-               message        as "message",
-               created_at     as "createdAt"`,
-    [req.params.id, bancaCents]
-  );
-  if (!rows.length) return res.status(404).json({ error:'not_found' });
+  try {
+    const { bancaCents } = req.body || {};
+    if (typeof bancaCents !== 'number' || bancaCents < 0) {
+      return res.status(400).json({ error: 'dados_invalidos' });
+    }
+    const { rows } = await q(
+      `update bancas set banca_cents = $2
+       where id = $1
+       returning id, nome,
+                 deposito_cents as "depositoCents",
+                 banca_cents    as "bancaCents",
+                 pix_type       as "pixType",
+                 pix_key        as "pixKey",
+                 message        as "message",
+                 created_at     as "createdAt"`,
+      [req.params.id, bancaCents]
+    );
+    if (!rows.length) return res.status(404).json({ error:'not_found' });
 
-  sseSendAll('bancas-changed', { reason: 'update' });
-  res.json(rows[0]);
+    sseSendAll('bancas-changed', { reason: 'update' });
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('bancas/update:', e.message);
+    res.status(500).json({ error: 'falha_bancas_update' });
+  }
 });
 
 app.post('/api/bancas/:id/to-pagamento', areaAuth, async (req, res) => {
@@ -1243,56 +1275,71 @@ return res.json({ ok: true });
 });
 
 app.delete('/api/bancas/:id', areaAuth, async (req, res) => {
-  const r = await q(`delete from bancas where id = $1`, [req.params.id]);
-  if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
-  sseSendAll('bancas-changed', { reason: 'delete' });
-  res.json({ ok:true });
+  try {
+    const r = await q(`delete from bancas where id = $1`, [req.params.id]);
+    if (r.rowCount === 0) return res.status(404).json({ error:'not_found' });
+    sseSendAll('bancas-changed', { reason: 'delete' });
+    res.json({ ok:true });
+  } catch (e) {
+    console.error('bancas/delete:', e.message);
+    res.status(500).json({ error: 'falha_bancas_delete' });
+  }
 });
 
 app.get('/api/pagamentos', areaAuth, async (req, res) => {
-  const { rows } = await q(
-    `select id, nome,
-            pagamento_cents as "pagamentoCents",
-            pix_type        as "pixType",
-            pix_key         as "pixKey",
-            message         as "message",
-            status,
-            created_at      as "createdAt",
-            paid_at         as "paidAt"
-     from pagamentos
-     order by created_at desc`
-  );
-  res.json(rows);
+  try {
+    const { rows } = await q(
+      `select id, nome,
+              pagamento_cents as "pagamentoCents",
+              pix_type        as "pixType",
+              pix_key         as "pixKey",
+              message         as "message",
+              status,
+              created_at      as "createdAt",
+              paid_at         as "paidAt"
+       from pagamentos
+       order by created_at desc`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('pagamentos/list:', e.message);
+    res.status(500).json({ error: 'falha_pagamentos_list' });
+  }
 });
 
 app.patch('/api/pagamentos/:id', areaAuth, async (req, res) => {
-  const { status } = req.body || {};
-  if (!['pago','nao_pago'].includes(status)) {
-    return res.status(400).json({ error: 'status_invalido' });
+  try {
+    const { status } = req.body || {};
+    if (!['pago','nao_pago'].includes(status)) {
+      return res.status(400).json({ error: 'status_invalido' });
+    }
+
+    const beforeQ = await q(
+      `select id, nome, pagamento_cents, status, paid_at from pagamentos where id = $1`,
+      [req.params.id]
+    );
+    if (!beforeQ.rows.length) return res.status(404).json({ error:'not_found' });
+
+    const { rows } = await q(
+      `update pagamentos
+         set status = $2,
+             paid_at = case when $2 = 'pago' then now() else null end
+       where id = $1
+       returning id, nome,
+                 pagamento_cents as "pagamentoCents",
+                 pix_type as "PixType",
+                 pix_key  as "pixKey",
+                 status, created_at as "CreatedAt", paid_at as "paidAt"`,
+      [req.params.id, status]
+    );
+    if (!rows.length) return res.status(404).json({ error:'not_found' });
+
+    sseSendAll('pagamentos-changed', { reason: 'update-status' });
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('pagamentos/update:', e.message);
+    res.status(500).json({ error: 'falha_pagamentos_update' });
   }
-
-  const beforeQ = await q(
-    `select id, nome, pagamento_cents, status, paid_at from pagamentos where id = $1`,
-    [req.params.id]
-  );
-  if (!beforeQ.rows.length) return res.status(404).json({ error:'not_found' });
-
-  const { rows } = await q(
-    `update pagamentos
-       set status = $2,
-           paid_at = case when $2 = 'pago' then now() else null end
-     where id = $1
-     returning id, nome,
-               pagamento_cents as "pagamentoCents",
-               pix_type as "PixType",
-               pix_key  as "pixKey",
-               status, created_at as "CreatedAt", paid_at as "paidAt"`,
-    [req.params.id, status]
-  );
-  if (!rows.length) return res.status(404).json({ error:'not_found' });
-
-  sseSendAll('pagamentos-changed', { reason: 'update-status' });
-  res.json(rows[0]);
 });
 
 app.delete('/api/pagamentos/:id', areaAuth, async (req, res) => {
@@ -1516,78 +1563,82 @@ app.post('/api/bancas/manual', areaAuth, async (req, res) => {
 });
 
 app.get('/api/extratos', areaAuth, async (req, res) => {
-  let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
+  try {
+    let { tipo, nome, from, to, range, limit = 200 } = req.query || {};
 
-  const conds = [];
-  const params = [];
-  let i = 1;
+    const conds = [];
+    const params = [];
+    let i = 1;
 
-  if (tipo && ['deposito','pagamento'].includes(tipo)) {
-  conds.push(`tipo = $${i++}`);
-  params.push(tipo);
+    if (tipo && ['deposito','pagamento'].includes(tipo)) {
+      conds.push(`tipo = $${i++}`);
+      params.push(tipo);
 
-  if (tipo === 'deposito') {
-    conds.push(`(origem is null or origem = 'pix')`);
-  }
-
-  }
-  if (nome) {
-    conds.push(`lower(nome) LIKE $${i++}`);
-    params.push(`%${String(nome).toLowerCase()}%`);
-  }
-
-  const now = new Date();
-  const startOfDay = (d)=>{
-    const x = new Date(d);
-    x.setHours(0,0,0,0);
-    return x;
-  };
-  const addDays = (d,n)=>{
-    const x = new Date(d);
-    x.setDate(x.getDate()+n);
-    return x;
-  };
-
-  if (range) {
-    if (range === 'today') {
-      from = startOfDay(now).toISOString();
-      to   = addDays(startOfDay(now), 1).toISOString();
+      if (tipo === 'deposito') {
+        conds.push(`(origem is null or origem = 'pix')`);
+      }
     }
-    if (range === 'last7') {
-      from = addDays(startOfDay(now), -6).toISOString();
-      to   = addDays(startOfDay(now), 1).toISOString();
+    if (nome) {
+      conds.push(`lower(nome) LIKE $${i++}`);
+      params.push(`%${String(nome).toLowerCase()}%`);
     }
-    if (range === 'last30'){
-      from = addDays(startOfDay(now), -29).toISOString();
-      to   = addDays(startOfDay(now), 1).toISOString();
+
+    const now = new Date();
+    const startOfDay = (d)=>{
+      const x = new Date(d);
+      x.setHours(0,0,0,0);
+      return x;
+    };
+    const addDays = (d,n)=>{
+      const x = new Date(d);
+      x.setDate(x.getDate()+n);
+      return x;
+    };
+
+    if (range) {
+      if (range === 'today') {
+        from = startOfDay(now).toISOString();
+        to   = addDays(startOfDay(now), 1).toISOString();
+      }
+      if (range === 'last7') {
+        from = addDays(startOfDay(now), -6).toISOString();
+        to   = addDays(startOfDay(now), 1).toISOString();
+      }
+      if (range === 'last30'){
+        from = addDays(startOfDay(now), -29).toISOString();
+        to   = addDays(startOfDay(now), 1).toISOString();
+      }
     }
-  }
 
-  if (from) {
-    conds.push(`created_at >= $${i++}`);
-    params.push(new Date(from));
-  }
-  if (to)   {
-    conds.push(`created_at <  $${i++}`);
-    params.push(new Date(to));
-  }
+    if (from) {
+      conds.push(`created_at >= $${i++}`);
+      params.push(new Date(from));
+    }
+    if (to)   {
+      conds.push(`created_at <  $${i++}`);
+      params.push(new Date(to));
+    }
 
-  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-  const sql = `
-    SELECT
-      id,
-      ref_id        AS "refId",
-      nome,
-      tipo,
-      valor_cents   AS "valorCents",
-      created_at    AS "createdAt"
-    FROM extratos
-    ${where}
-    ORDER BY created_at DESC
-    LIMIT ${Math.min(parseInt(limit,10)||200, 1000)}
-  `;
-  const { rows } = await q(sql, params);
-  res.json(rows);
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const sql = `
+      SELECT
+        id,
+        ref_id        AS "refId",
+        nome,
+        tipo,
+        valor_cents   AS "valorCents",
+        created_at    AS "createdAt"
+      FROM extratos
+      ${where}
+      ORDER BY created_at DESC
+      LIMIT ${Math.min(parseInt(limit,10)||200, 1000)}
+    `;
+    const { rows } = await q(sql, params);
+    res.json(rows);
+  } catch (e) {
+    console.error('extratos/list:', e.message);
+    res.status(500).json({ error: 'falha_extratos_list' });
+  }
 });
 
 async function ensureMessageColumns(){
