@@ -186,6 +186,9 @@ app.get(/^\/app(?:\/.*)?$/, (req, res, next) => {
 app.get(['/area', '/area.html'], (req, res) => {
   const token = req.cookies?.session;
   if (!token || !verifySession(token)) return res.redirect('/login.html');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.sendFile(path.join(PRIVATE_ROOT, 'area.html'));
 });
 

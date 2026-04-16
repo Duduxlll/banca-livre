@@ -1107,8 +1107,7 @@ dialog.pix-modal::backdrop{
 }
 
 #tab-bancas .table-wrap,
-#tab-pagamentos .table-wrap,
-#tab-cupons .table-wrap{
+#tab-pagamentos .table-wrap{
   max-height:520px;
   min-height:320px;
   overflow:auto;
@@ -1325,4 +1324,45 @@ dialog.pix-modal::backdrop{
   .btn--small{
     width:100%;
   }
+}
+
+html.area-embed,
+body.area-embed{
+  height:auto;
+  min-height:0;
+  background:transparent;
+}
+
+body.area-embed::before{
+  display:none;
+}
+
+body.area-embed .hero,
+body.area-embed .sidebar,
+body.area-embed .toast{
+  display:none !important;
+}
+
+body.area-embed .layout{
+  width:100%;
+  margin:0;
+  display:block;
+}
+
+body.area-embed .layout > .content{
+  grid-column:auto;
+  width:100%;
+  min-width:0;
+}
+
+body.area-embed .content{
+  padding:0;
+}
+
+body.area-embed .tab{
+  margin:0;
+}
+
+body.area-embed .tab.show{
+  display:block;
 }

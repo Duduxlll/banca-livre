@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="218" y2="232" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4EFAB2"/>
+      <stop offset="1" stop-color="#0F8F66"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="60" y1="56" x2="196" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4FFF9" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#D4FFE8" stop-opacity=".32"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bg)"/>
+  <rect x="28" y="28" width="200" height="200" rx="40" fill="#082117" fill-opacity=".22" stroke="white" stroke-opacity=".16" stroke-width="2"/>
+  <circle cx="128" cy="128" r="62" fill="url(#glow)"/>
+  <path d="M88 161V94h31.5c20.4 0 32.5 11.5 32.5 28.6 0 17.8-12.5 29.4-33.3 29.4H88Zm22.3-17.6h7.5c7.8 0 12.7-4.7 12.7-12.4 0-7.5-4.8-12.1-12.5-12.1h-7.7v24.5Z" fill="#062219"/>
+  <path d="M166 87c9.4 0 17 7.6 17 17v48c0 9.4-7.6 17-17 17h-24v-82h24Z" fill="#062219" fill-opacity=".18"/>
+  <path d="M157 101h9c4.4 0 8 3.6 8 8v38c0 4.4-3.6 8-8 8h-9v-54Z" fill="#062219"/>
+</svg>
