@@ -198,17 +198,7 @@ app.get(/^\/area(?:\/.*)?$/, (req, res, next) => {
   });
 });
 
-app.get(['/legacy-area', '/legacy-area.html'], (req, res) => {
-  const token = req.cookies?.session;
-  if (!token || !verifySession(token)) return res.redirect('/area/login');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  return res.sendFile(path.join(PRIVATE_ROOT, 'area.html'));
-});
-
 app.get('/area.html', (req, res) => res.redirect(301, '/area'));
-app.get('/legacy-area.html', (req, res) => res.redirect(301, '/legacy-area'));
 
 
 const loginLimiter = rateLimit({
@@ -1855,5 +1845,4 @@ catch (e) { console.error("❌ batalha bonus tables fail:", e); }
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
   console.log(`⚛️  /area servindo a interface React`);
-  console.log(`🧰 Compatibilidade legada disponível em /legacy-area`);
 });

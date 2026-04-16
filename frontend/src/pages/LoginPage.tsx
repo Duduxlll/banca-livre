@@ -1,18 +1,19 @@
 import { type FormEvent, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { usePageTitle, useStylesheets } from '../hooks/usePageAssets';
 import { ApiError } from '../lib/api';
 import { useSession } from '../providers/SessionProvider';
-import { useToast } from '../providers/ToastProvider';
 
 export function LoginPage(): JSX.Element {
   const { status, login } = useSession();
-  const { showToast } = useToast();
-  const navigate = useNavigate();
   const location = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  usePageTitle('Guigz • Login');
+  useStylesheets(['/assets/css/login.css?v=20260416a']);
 
   const fromPath =
     typeof location.state === 'object' &&
@@ -33,13 +34,12 @@ export function LoginPage(): JSX.Element {
 
     try {
       await login(username.trim(), password);
-      showToast('Login realizado com sucesso.', 'success');
-      navigate(fromPath, { replace: true });
+      window.location.href = fromPath === '/login' ? '/area' : `/area${fromPath}`;
     } catch (error) {
       if (error instanceof ApiError && error.code === 'invalid_credentials') {
         setErrorMessage('Usuário ou senha inválidos.');
       } else {
-        setErrorMessage('Não foi possível entrar agora.');
+        setErrorMessage('Falha ao entrar.');
       }
     } finally {
       setSubmitting(false);
@@ -47,49 +47,41 @@ export function LoginPage(): JSX.Element {
   }
 
   return (
-    <main className="auth-shell">
-      <section className="auth-card">
-        <div className="auth-card__intro">
-          <span className="hero-banner__eyebrow">Área administrativa</span>
-          <h1>Entrar no Banquinhas</h1>
-          <p>
-            Você está entrando na sua área principal. O backend, a autenticação e as regras
-            continuam os mesmos; só a interface está sendo modernizada.
-          </p>
-        </div>
+    <main className="login-wrap">
+      <div className="card">
+        <h1>Entrar</h1>
+        <p className="muted">Acesse a área segura</p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label className="field">
-            <span>Usuário</span>
-            <input
-              className="input"
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="admin"
-            />
-          </label>
+        <form id="loginForm" onSubmit={handleSubmit}>
+          <label htmlFor="user">Usuário</label>
+          <input
+            className="input"
+            id="user"
+            autoComplete="username"
+            required
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
 
-          <label className="field">
-            <span>Senha</span>
-            <input
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Sua senha"
-            />
-          </label>
+          <label htmlFor="pass">Senha</label>
+          <input
+            className="input"
+            id="pass"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
 
-          {errorMessage ? <div className="form-error">{errorMessage}</div> : null}
-
-          <button type="submit" className="btn btn--primary btn--full" disabled={submitting}>
-            {submitting ? 'Entrando...' : 'Entrar na área'}
+          <button className="cta" type="submit" disabled={submitting}>
+            {submitting ? 'Entrando...' : 'Entrar'}
           </button>
+          <div className="error" id="err" role="alert">
+            {errorMessage}
+          </div>
         </form>
-      </section>
+      </div>
     </main>
   );
 }

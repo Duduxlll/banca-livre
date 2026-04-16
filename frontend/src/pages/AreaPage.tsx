@@ -1,0 +1,496 @@
+import { useEffect } from 'react';
+import { usePageTitle, useStylesheets } from '../hooks/usePageAssets';
+
+const ASSET_VERSION = '20260416a';
+
+const AREA_STYLES = [
+  `/assets/css/area.css?v=${ASSET_VERSION}`,
+  `/assets/css/sorteio.css?v=${ASSET_VERSION}`,
+  `/assets/css/palpite.css?v=${ASSET_VERSION}`,
+  `/assets/css/cashback.css?v=${ASSET_VERSION}`,
+  `/assets/css/torneio.css?v=${ASSET_VERSION}`,
+  `/assets/css/gorjeta.css?v=${ASSET_VERSION}`,
+  `/assets/css/batalha-bonus.css?v=${ASSET_VERSION}`
+];
+
+const AREA_SCRIPTS = [
+  `/assets/js/session.js?v=${ASSET_VERSION}`,
+  `/assets/js/area.js?v=${ASSET_VERSION}`,
+  `/assets/js/sorteio.js?v=${ASSET_VERSION}`,
+  `/assets/js/palpite-admin.js?v=${ASSET_VERSION}`,
+  `/assets/js/torneio-admin.js?v=${ASSET_VERSION}`,
+  `/assets/js/cashback-admin.js?v=${ASSET_VERSION}`,
+  `/assets/js/gorjeta-admin.js?v=${ASSET_VERSION}`,
+  `/assets/js/batalha-bonus-admin.js?v=${ASSET_VERSION}`
+];
+
+const AREA_TABS = new Set([
+  'bancas',
+  'pagamentos',
+  'extratos',
+  'sorteio',
+  'palpite',
+  'torneio',
+  'gorjeta',
+  'batalha-bonus',
+  'cashbacks'
+]);
+
+declare global {
+  interface Window {
+    __banquinhasAreaBooted?: boolean;
+  }
+}
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[data-area-script="${src}"]`);
+    if (existing) {
+      resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false;
+    script.dataset.areaScript = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Falha ao carregar ${src}`));
+    document.body.appendChild(script);
+  });
+}
+
+function useAreaScripts(): void {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function boot(): Promise<void> {
+      if (window.__banquinhasAreaBooted) return;
+      window.__banquinhasAreaBooted = true;
+
+      const pathTab = window.location.pathname.replace(/^\/area\/?/, '').split('/')[0];
+      if (AREA_TABS.has(pathTab)) {
+        localStorage.setItem('area_tab', pathTab);
+      }
+
+      for (const src of AREA_SCRIPTS) {
+        await loadScript(src);
+      }
+
+      if (!cancelled) {
+        document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }));
+      }
+    }
+
+    void boot().catch((error) => {
+      console.error(error);
+      window.__banquinhasAreaBooted = false;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+}
+
+const AREA_HTML = String.raw`
+  <header class="hero">
+    <div class="hero-overlay"></div>
+    <div class="hero-wrap">
+      <img src="assets/img/banner-admin.svg?v=20260416a" alt="Banquinhas" class="hero-logo">
+      <div>
+        <h1 class="hero-title">Banquinhas</h1>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="assets/img/banner-admin.svg?v=20260416a" alt="Bancas" class="brand-img">
+        <strong>Bancas</strong>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="bancas">Bancas</button>
+        <button class="nav-btn" data-tab="pagamentos">Pagamentos</button>
+        <button class="nav-btn" data-tab="sorteio">Sorteio</button>
+        <button class="nav-btn" data-tab="palpite">Palpites</button>
+        <button class="nav-btn" data-tab="torneio">Torneio</button>
+        <button class="nav-btn" data-tab="gorjeta">Gorjeta</button>
+        <button class="nav-btn" data-tab="batalha-bonus">Batalha bônus</button>
+        <button class="nav-btn" data-tab="cashbacks">Print dos depositos</button>
+        <button class="nav-btn" data-tab="extratos">Extratos</button>
+
+        <button id="logoutBtn" class="btn btn--ghost" style="margin-left:auto">
+          Sair
+        </button>
+      </nav>
+    </aside>
+
+    <section class="content">
+      <div class="tab tab-view show" id="tab-bancas">
+        <div class="bar totbar">
+          <input
+            id="busca"
+            class="input busca-nome"
+            type="text"
+            placeholder="Buscar por nome…">
+
+          <div class="totais">
+            <button type="button" class="totais-pill" id="btnAddBanca">
+              Adicionar banca
+            </button>
+
+            <button type="button" class="totais-pill" id="totalDepositos">
+              Soma dos Depósitos
+            </button>
+
+            <button type="button" class="totais-pill" id="totalBancas">
+              Soma das Bancas
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table" id="tblBancas" aria-label="Tabela de Bancas">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Depósito (R$)</th>
+                  <th>Banca (R$)</th>
+
+                  <th class="col-acoes">
+                    <div class="th-acoes">
+                      <span>Ações</span>
+                      <button
+                        type="button"
+                        id="btnDelAllBancas"
+                        class="btn btn--danger btn--small">
+                        Excluir todos
+                      </button>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-pagamentos">
+        <div class="card">
+          <div class="table-wrap">
+            <table class="table" id="tblPagamentos" aria-label="Tabela de Pagamentos">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Pagamento (R$)</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-extratos">
+        <div class="card extratos-card">
+          <div class="bar extratos-bar">
+            <div class="extratos-filtros-grid">
+              <div>
+                <label class="muted" for="filtro-tipo">Tipo</label>
+                <select id="filtro-tipo" class="input">
+                  <option value="all">Todos</option>
+                  <option value="deposito">Depósitos</option>
+                  <option value="pagamento">Pagamentos</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="muted" for="filtro-range">Período</label>
+                <select id="filtro-range" class="input">
+                  <option value="today">Hoje</option>
+                  <option value="last7">Últimos 7 dias</option>
+                  <option value="last30" selected>Últimos 30 dias</option>
+                  <option value="custom">Intervalo personalizado</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="muted" for="filtro-from">De</label>
+                <input id="filtro-from" type="date" class="input" disabled>
+              </div>
+
+              <div>
+                <label class="muted" for="filtro-to">Até</label>
+                <input id="filtro-to" type="date" class="input" disabled>
+              </div>
+            </div>
+
+            <div class="extratos-busca-acao">
+              <input
+                id="busca-extrato"
+                class="input"
+                type="text"
+                placeholder="Buscar por nome…">
+              <button id="btn-filtrar" class="btn btn--primary">Aplicar filtros</button>
+              <button id="btn-limpar" class="btn btn--ghost">Limpar</button>
+            </div>
+          </div>
+
+          <div class="extratos-cols">
+            <div class="extratos-col" data-card="deps">
+              <h3>Depósitos</h3>
+              <div class="table-wrap">
+                <table class="table" id="tblExtratosDepositos" aria-label="Extratos - Depósitos">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Valor (R$)</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="extratos-col" data-card="pags">
+              <h3>Pagamentos</h3>
+              <div class="table-wrap">
+                <table class="table" id="tblExtratosPagamentos" aria-label="Extratos - Pagamentos">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Valor (R$)</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-sorteio">
+        <div class="card sorteio-header-card">
+          <div class="sorteio-header-admin">
+            <div>
+              <h2>Sorteio da Live</h2>
+              <div class="palpite-status-row">
+                <span id="sorteioStatusBadge" class="p-status p-closed">FECHADO</span>
+                <span id="sorteioStatusText" class="p-status-text">Inscrições fechadas (Discord)</span>
+              </div>
+              <p class="muted" style="margin:6px 0 0">Inscrições pelo Discord (bot).</p>
+            </div>
+            <div class="sorteio-actions">
+              <button class="btn btn--primary" id="btnSorteioOpen">🟢 Abrir Sorteio</button>
+              <button class="btn btn--ghost" id="btnSorteioClose">🔴 Fechar Sorteio</button>
+              <button id="btnSorteioAtualizar" class="btn-soft">Atualizar lista</button>
+              <button id="btnSorteioLimpar" class="btn-soft danger">Limpar todos</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sorteio-layout">
+          <div class="card sorteio-wheel-card">
+            <div class="wheel-wrapper">
+              <canvas id="sorteioWheel" width="500" height="500"></canvas>
+              <div class="wheel-pointer"></div>
+            </div>
+            <button id="btnSorteioGirar" class="btn-girar">Girar roleta</button>
+            <div class="winner-box" id="sorteioWinnerBox">
+              <span id="sorteioWinnerLabel">Vencedor: —</span>
+              <button id="btnSorteioVerCodigo" class="btn-soft btn-soft-mini" style="margin-left:8px;display:none">
+                Ver ID
+              </button>
+            </div>
+          </div>
+
+          <div class="card sorteio-list-card">
+            <div class="sorteio-list-header">
+              <span id="sorteioTotalInscritos">0 inscritos</span>
+            </div>
+            <div class="sorteio-list">
+              <table class="table" aria-label="Inscritos no sorteio">
+                <thead>
+                  <tr>
+                    <th>Nome Twitch</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodySorteio"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-palpite">
+        <div class="card" style="margin-bottom:12px">
+          <div class="palpite-head">
+            <div>
+              <h2 style="margin:0">💰 Palpites</h2>
+              <div class="palpite-status-row">
+                <span id="palpiteStatusBadge" class="p-status p-closed">FECHADO</span>
+                <span id="palpiteStatusText" class="p-status-text">Palpites estão fechados</span>
+              </div>
+
+              <p class="muted" style="margin:6px 0 0">
+                Chat: <code>!p 231</code> (somente valor)
+              </p>
+            </div>
+
+            <div class="palpite-actions">
+              <button class="btn btn--primary" id="btnPalpiteOpen">🟢 Abrir Palpites</button>
+              <button class="btn btn--ghost" id="btnPalpiteClose">🔴 Fechar Palpites</button>
+              <button class="btn btn--danger" id="btnPalpiteClear">Limpar</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label class="muted">Valor da Compra (Bonus Buy)</label>
+              <input type="number" step="0.01" class="input" id="palpiteBuyValue" placeholder="Ex: 200">
+            </div>
+
+            <div>
+              <label class="muted">Ganhadores</label>
+              <select class="input" id="palpiteWinnersCount">
+                <option value="1">Top 1</option>
+                <option value="2">Top 2</option>
+                <option value="3" selected>Top 3</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:12px">
+          <label class="muted">Log de Palpites</label>
+          <div class="palpite-log" id="palpiteLogBox"></div>
+
+          <div style="text-align:right; color:#aaa; font-size:0.8rem; margin-top:6px;">
+            Total de palpites: <span id="palpiteTotalGuesses">0</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end">
+            <div>
+              <label class="muted">Quanto Pagou (Resultado Real)</label>
+              <input type="number" step="0.01" class="input" id="palpiteFinalResult" placeholder="Ex: 240.50">
+            </div>
+            <button class="btn btn--primary" id="btnPalpiteWinners">🏆 Verificar Vencedores</button>
+          </div>
+
+          <div class="palpite-winners" id="palpiteWinnersBox" style="margin-top:10px">—</div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-torneio"></div>
+
+      <div class="tab tab-view" id="tab-gorjeta">
+        <div class="card">
+          <div class="g-top">
+            <h2>Gorjeta</h2>
+
+            <div class="g-actions">
+              <div class="g-saldo" id="gorjetaSaldoBox">Saldo: <span id="gorjetaSaldo">—</span></div>
+              <button id="gorjetaRefreshBtn" class="g-btn">Atualizar</button>
+              <button id="gorjetaCloseBtn" class="g-btn danger" style="display:none">Fechar rodada</button>
+            </div>
+          </div>
+
+          <div class="g-meta" id="gorjetaRoundMeta">—</div>
+
+          <div id="gorjetaCreateWrap" style="margin-top:14px">
+            <div class="g-grid">
+              <label class="g-field">
+                <span>Valor total (R$)</span>
+                <input id="gorjetaTotal" class="g-input" placeholder="500" />
+              </label>
+            </div>
+
+            <div style="margin-top:12px">
+              <button id="gorjetaCreateBtn" class="g-btn primary">Criar e Abrir</button>
+            </div>
+          </div>
+
+          <div id="gorjetaDrawWrap" style="display:none; margin-top:14px">
+            <div class="g-grid">
+              <label class="g-field">
+                <span>Valor por ganhador (R$)</span>
+                <input id="gorjetaPerWinner" class="g-input" placeholder="20" />
+              </label>
+
+              <label class="g-field">
+                <span>Quantidade de ganhadores</span>
+                <input id="gorjetaWinnersCount" class="g-input" placeholder="10" />
+              </label>
+            </div>
+
+            <div style="margin-top:12px">
+              <button id="gorjetaDrawBtn" class="g-btn primary">Sortear</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Participantes</h3>
+          <div id="gorjetaEntries"></div>
+        </div>
+
+        <div class="card">
+          <h3>Histórico de sorteios</h3>
+          <div id="gorjetaBatches"></div>
+        </div>
+
+        <div class="card">
+          <h3>Resultado</h3>
+          <div id="gorjetaResults"></div>
+        </div>
+      </div>
+
+      <div class="tab tab-view" id="tab-batalha-bonus"></div>
+      <div class="tab tab-view" id="tab-cashbacks"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <dialog id="msgModal" style="border:0; padding:0; background:transparent;">
+    <div style="
+      width:min(94vw,520px);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      box-shadow:0 28px 80px rgba(0,0,0,.55);
+      padding:16px;
+      color:#e7e9f3;">
+
+      <h3 style="margin:0 0 8px; font-weight:800">Mensagem</h3>
+      <p id="msgText" style="white-space:pre-wrap; margin:0 0 12px; color:#cfd2e8"></p>
+
+      <div style="display:flex; gap:8px; justify-content:flex-end">
+        <button class="btn btn--ghost" data-action="close-msg">Fechar</button>
+      </div>
+    </div>
+  </dialog>
+`;
+
+export function AreaPage(): JSX.Element {
+  usePageTitle('Guigz • Área');
+  useStylesheets(AREA_STYLES);
+  useAreaScripts();
+
+  return <div dangerouslySetInnerHTML={{ __html: AREA_HTML }} />;
+}
