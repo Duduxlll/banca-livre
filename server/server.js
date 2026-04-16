@@ -165,13 +165,28 @@ app.use(express.json({ limit: '8mb' }));
 
 app.use(cookieParser());
 app.use(cors({ origin: ORIGIN, credentials: true }));
-app.use(express.static(ROOT, { extensions: ['html'] }));
+app.use((req, res, next) => {
+  const pathOnly = req.path || '';
 
-app.get(/^\/app(?:\/.*)?$/, (req, res, next) => {
-  if (req.path.startsWith('/app/assets/')) {
-    return next();
+  if (pathOnly === '/login' || pathOnly === '/login.html') {
+    return res.redirect(302, '/area/login');
   }
 
+  if (pathOnly.startsWith('/app') && !pathOnly.startsWith('/app/assets/')) {
+    const suffix = pathOnly.slice('/app'.length);
+    const search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    const target = suffix ? `/area${suffix}` : '/area';
+    return res.redirect(301, `${target}${search}`);
+  }
+
+  return next();
+});
+app.use(express.static(ROOT, { extensions: ['html'] }));
+
+app.get(/^\/area(?:\/.*)?$/, (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   return res.sendFile(REACT_APP_INDEX, (err) => {
     if (!err) return;
     if (err.code === 'ENOENT') {
@@ -183,9 +198,9 @@ app.get(/^\/app(?:\/.*)?$/, (req, res, next) => {
   });
 });
 
-app.get(['/area', '/area.html'], (req, res) => {
+app.get(['/legacy-area', '/legacy-area.html'], (req, res) => {
   const token = req.cookies?.session;
-  if (!token || !verifySession(token)) return res.redirect('/login.html');
+  if (!token || !verifySession(token)) return res.redirect('/area/login');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -193,6 +208,7 @@ app.get(['/area', '/area.html'], (req, res) => {
 });
 
 app.get('/area.html', (req, res) => res.redirect(301, '/area'));
+app.get('/legacy-area.html', (req, res) => res.redirect(301, '/legacy-area'));
 
 
 const loginLimiter = rateLimit({
@@ -1838,5 +1854,6 @@ catch (e) { console.error("❌ batalha bonus tables fail:", e); }
 
   console.log(`✅ Server rodando em ${ORIGIN} (NODE_ENV=${process.env.NODE_ENV||'dev'})`);
   console.log(`🗂  Servindo estáticos de: ${ROOT}`);
-  console.log(`🔒 /area.html protegido por sessão; login em /login.html`);
+  console.log(`⚛️  /area servindo a interface React`);
+  console.log(`🧰 Compatibilidade legada disponível em /legacy-area`);
 });
