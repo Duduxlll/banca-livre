@@ -41,6 +41,19 @@ export interface ExtratoItem {
   createdAt: string;
 }
 
+export interface SorteioState {
+  open: boolean;
+  channelId: string | null;
+  messageId: string | null;
+}
+
+export interface SorteioInscrito {
+  id: number;
+  nome_twitch: string;
+  mensagem: string | null;
+  criado_em: string;
+}
+
 export type AreaTabId =
   | 'bancas'
   | 'pagamentos'

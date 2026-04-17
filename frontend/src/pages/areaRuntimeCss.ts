@@ -84,6 +84,50 @@ export const AREA_RUNTIME_CSS = `
   .toast--ok,
   .toast--success{ border-color:rgba(57,247,157,.28); color:#eafff2; }
   .toast--info{ border-color:rgba(134,255,214,.24); color:#d9ffee; }
+  #sorteioConfirmModal::backdrop,
+  #idModal::backdrop{
+    background:rgba(8,12,26,.68);
+    backdrop-filter:blur(6px) saturate(.9);
+  }
+  #sorteioConfirmModal,
+  #idModal{
+    border:0;
+    padding:0;
+    background:transparent;
+  }
+  .sorteio-confirm-box{
+    width:min(94vw,420px);
+    background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.04));
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:16px;
+    box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);
+    padding:18px;
+    color:#e7e9f3;
+  }
+  .sorteio-confirm-title{ margin:0 0 6px; font-weight:800; font-size:1rem; }
+  .sorteio-confirm-text{ margin:0 0 12px; font-size:.9rem; color:#cfd2e8; }
+  .sorteio-confirm-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+  .id-modal-box{
+    width:min(94vw,420px);
+    background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:16px;
+    box-shadow:0 30px 90px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04);
+    padding:18px;
+    color:#e7e9f3;
+  }
+  .id-modal-code{
+    display:grid;
+    gap:10px;
+    margin-top:12px;
+    padding:12px;
+    border-radius:14px;
+    border:1px solid rgba(57,247,157,.16);
+    background:rgba(57,247,157,.06);
+  }
+  .id-modal-label{ color:#cfd2e8; font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; }
+  .id-modal-value{ margin-top:3px; color:#fff; font-weight:800; overflow-wrap:anywhere; }
+  .id-modal-value--code{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   @media (max-width:600px){
     .add-banca-row,
     .add-banca-pix-row{ grid-template-columns:minmax(0,1fr); }

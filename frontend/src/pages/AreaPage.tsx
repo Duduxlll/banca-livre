@@ -15,7 +15,8 @@ import { buildPixPayload } from '../lib/pix';
 import { useSession } from '../providers/SessionProvider';
 import type { AreaTabId, Banca, ExtratoItem, Pagamento, PixType } from '../types';
 import { AREA_RUNTIME_CSS } from './areaRuntimeCss';
-import { GORJETA_HTML, PALPITE_HTML, SORTEIO_HTML } from './legacyAreaMarkup';
+import { GORJETA_HTML, PALPITE_HTML } from './legacyAreaMarkup';
+import { SorteioPanel } from './SorteioPanel';
 
 const ASSET_VERSION = '20260416a';
 
@@ -30,7 +31,6 @@ const AREA_STYLES = [
 ];
 
 const LEGACY_MODULE_SCRIPTS = [
-  `/assets/js/sorteio.js?v=${ASSET_VERSION}`,
   `/assets/js/palpite-admin.js?v=${ASSET_VERSION}`,
   `/assets/js/torneio-admin.js?v=${ASSET_VERSION}`,
   `/assets/js/cashback-admin.js?v=${ASSET_VERSION}`,
@@ -1287,7 +1287,9 @@ export function AreaPage(): JSX.Element {
             </div>
           </div>
 
-          <LegacyHtmlTab id="sorteio" activeTab={activeTab} html={SORTEIO_HTML} />
+          <div className={`tab tab-view${activeTab === 'sorteio' ? ' show' : ''}`} id="tab-sorteio">
+            <SorteioPanel notify={showToast} />
+          </div>
           <LegacyHtmlTab id="palpite" activeTab={activeTab} html={PALPITE_HTML} />
           <LegacyHtmlTab id="torneio" activeTab={activeTab} />
           <LegacyHtmlTab id="gorjeta" activeTab={activeTab} html={GORJETA_HTML} />
